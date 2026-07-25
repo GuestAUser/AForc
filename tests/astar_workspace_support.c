@@ -75,16 +75,12 @@ bool astar_test_tile_blocked(AFORC_Tile tile, uint32_t layer,
     return tile != 0U;
 }
 
-bool astar_test_point_equal(AFORC_Point left, AFORC_Point right) {
-    return left.x == right.x && left.y == right.y;
-}
-
 static bool path_equal(const AFORC_Point *left, const AFORC_Point *right,
                        size_t length) {
     size_t index;
 
     for (index = 0U; index < length; ++index) {
-        if (!astar_test_point_equal(left[index], right[index])) {
+        if (!aforc_world_point_equal(left[index], right[index])) {
             return false;
         }
     }

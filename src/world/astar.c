@@ -484,14 +484,17 @@ static AFORC_Status path_search(AFORC_PathWorkspace *workspace,
                 candidate_cost >= neighbor_node->cost) {
                 continue;
             }
-            operation_status = path_heuristic(
-                map, neighbor_index, goal_index, request->diagonal,
-                &neighbor_node->heuristic);
-            if (operation_status != AFORC_OK ||
-                !path_u64_add(candidate_cost, neighbor_node->heuristic,
+            if (neighbor_node->state == PATH_NODE_UNSEEN) {
+                operation_status = path_heuristic(
+                    map, neighbor_index, goal_index, request->diagonal,
+                    &neighbor_node->heuristic);
+                if (operation_status != AFORC_OK) {
+                    return operation_status;
+                }
+            }
+            if (!path_u64_add(candidate_cost, neighbor_node->heuristic,
                               &candidate_score)) {
-                return operation_status != AFORC_OK ? operation_status
-                                                     : AFORC_ERROR_OVERFLOW;
+                return AFORC_ERROR_OVERFLOW;
             }
             neighbor_node->parent = node_index;
             neighbor_node->cost = candidate_cost;

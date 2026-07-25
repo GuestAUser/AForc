@@ -24,7 +24,6 @@ AFORC_Allocator astar_test_tracking_allocator(
     AstarTestTrackingAllocator *tracking);
 bool astar_test_tile_blocked(AFORC_Tile tile, uint32_t layer,
                              AFORC_Point position, void *context);
-bool astar_test_point_equal(AFORC_Point left, AFORC_Point right);
 bool astar_test_compare_query(AFORC_PathWorkspace *workspace,
                               const AFORC_TileMap *map, AFORC_Point start,
                               AFORC_Point goal,

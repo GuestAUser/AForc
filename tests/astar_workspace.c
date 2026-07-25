@@ -87,7 +87,7 @@ static bool test_sizing_compatibility_and_determinism(void) {
     CHECK(tracking.allocations == allocations_before);
     CHECK(reused_length == legacy_length);
     CHECK(reused_length > 1U);
-    CHECK(astar_test_point_equal(reused_points[1], (AFORC_Point){1, 0}));
+    CHECK(aforc_world_point_equal(reused_points[1], (AFORC_Point){1, 0}));
     for (index = 0U; index < 1000U; ++index) {
         const AFORC_Point goal = (index & 1U) == 0U
                                      ? (AFORC_Point){7, 5}
@@ -179,11 +179,49 @@ static bool test_epoch_wrap_reset(void) {
               (AFORC_Point){2, 0}, astar_test_tile_blocked, NULL, NULL, &points,
               &length) == AFORC_OK);
     CHECK(length == 5U);
-    CHECK(astar_test_point_equal(points[1], (AFORC_Point){0, 1}));
+    CHECK(aforc_world_point_equal(points[1], (AFORC_Point){0, 1}));
     CHECK(tracking.allocations == allocations_before);
     aforc_path_workspace_destroy(workspace);
     aforc_tilemap_destroy(map);
     CHECK(tracking.live == 0U);
+    return true;
+}
+
+static bool test_option_boundaries(void) {
+    AFORC_Allocator allocator = aforc_allocator_default();
+    AFORC_TileMap *map = NULL;
+    AFORC_PathWorkspace *workspace = NULL;
+    AFORC_PathOptions options = aforc_path_options_default();
+    const AFORC_Point *points = NULL;
+    size_t length = 0U;
+
+    CHECK(aforc_tilemap_create((AFORC_Size){3, 3}, 1U, 0U, &allocator, &map) ==
+          AFORC_OK);
+    CHECK(astar_test_create_workspace(&allocator, 9U, &workspace));
+    options.flags = AFORC_PATH_PREVENT_CORNER_CUTTING;
+    CHECK(aforc_pathfind_astar_workspace(
+              workspace, map, 0U, (AFORC_Point){0, 0},
+              (AFORC_Point){2, 2}, astar_test_tile_blocked, NULL, &options,
+              &points, &length) == AFORC_OK);
+    CHECK(length == 5U);
+    options.flags = UINT32_C(1) << 31;
+    CHECK(aforc_pathfind_astar_workspace(
+              workspace, map, 0U, (AFORC_Point){0, 0},
+              (AFORC_Point){2, 0}, astar_test_tile_blocked, NULL, &options,
+              &points, &length) == AFORC_ERROR_INVALID_ARGUMENT);
+    options = aforc_path_options_default();
+    options.max_visited = 2U;
+    CHECK(aforc_pathfind_astar_workspace(
+              workspace, map, 0U, (AFORC_Point){0, 0},
+              (AFORC_Point){2, 0}, astar_test_tile_blocked, NULL, &options,
+              &points, &length) == AFORC_ERROR_LIMIT);
+    options.max_visited = 3U;
+    CHECK(aforc_pathfind_astar_workspace(
+              workspace, map, 0U, (AFORC_Point){0, 0},
+              (AFORC_Point){2, 0}, astar_test_tile_blocked, NULL, &options,
+              &points, &length) == AFORC_OK);
+    aforc_path_workspace_destroy(workspace);
+    aforc_tilemap_destroy(map);
     return true;
 }
 
@@ -192,8 +230,9 @@ int main(void) {
     if (!test_sizing_compatibility_and_determinism()) return 2;
     if (!test_allocator_fail_points()) return 3;
     if (!test_epoch_wrap_reset()) return 4;
-    if (!astar_test_benchmark_size(72, 36, 1000U)) return 5;
-    if (!astar_test_benchmark_size(120, 60, 1000U)) return 6;
+    if (!test_option_boundaries()) return 5;
+    if (!astar_test_benchmark_size(72, 36, 1000U)) return 6;
+    if (!astar_test_benchmark_size(120, 60, 1000U)) return 7;
     (void)puts("astar workspace: ok");
     return 0;
 }
