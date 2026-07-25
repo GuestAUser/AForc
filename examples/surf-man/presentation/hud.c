@@ -27,22 +27,31 @@ static const char *wave_name(SurfManWaveKind kind) {
     return "UNKNOWN";
 }
 
-static const char *maneuver_name(SurfManManeuver maneuver) {
-    switch (maneuver) {
-    case SURF_MAN_MANEUVER_NONE:
-        return "LINE";
-    case SURF_MAN_MANEUVER_CARVE_LEFT:
-        return "LEFT CARVE";
-    case SURF_MAN_MANEUVER_CARVE_RIGHT:
-        return "RIGHT CARVE";
-    case SURF_MAN_MANEUVER_LIP_SNAP:
-        return "LIP SNAP";
-    case SURF_MAN_MANEUVER_AIR:
-        return "AIR";
-    case SURF_MAN_MANEUVER_TUBE:
-        return "TUBE";
+static const char *line_name(const SurfManSimulation *simulation) {
+    if (simulation->line_position_q16 < -SURF_MAN_Q16_ONE / 2) {
+        return "LEFT";
     }
-    return "UNKNOWN";
+    if (simulation->line_position_q16 > SURF_MAN_Q16_ONE / 2) {
+        return "RIGHT";
+    }
+    return "CENTER";
+}
+
+static const char *face_name(const SurfManSimulation *simulation) {
+    const int64_t air_threshold_q16 =
+        (int64_t)simulation->rules.air_face_threshold_q16 * 100 /
+        simulation->settings.timing_percent;
+    const int64_t hazard_threshold_q16 =
+        (int64_t)simulation->rules.hazard_face_threshold_q16 * 100 /
+        simulation->settings.timing_percent;
+
+    if (simulation->wave_face_offset_q16 >= air_threshold_q16) {
+        return "HIGH";
+    }
+    if (simulation->wave_face_offset_q16 < hazard_threshold_q16) {
+        return "LOW";
+    }
+    return "MID";
 }
 
 static const char *color_name(SurfManColorMode mode) {
@@ -64,7 +73,7 @@ static const char *default_message(SurfManPhase phase) {
     case SURF_MAN_COUNT_IN:
         return "SET YOUR LINE.";
     case SURF_MAN_RIDING:
-        return "BANK MANEUVERS BEFORE THE SECTION CLOSES.";
+        return "CLIMB, DROP, THEN REVERSE MOMENTUM TO CARVE.";
     case SURF_MAN_WIPEOUT_RECOVERY:
         return "WIPEOUT: PENDING SCORE LOST.";
     case SURF_MAN_WAVE_RECAP:
@@ -73,6 +82,25 @@ static const char *default_message(SurfManPhase phase) {
         return "DAY COMPLETE. RETURN TO THE SHACK.";
     case SURF_MAN_PRACTICE:
         return "PRACTICE: WIPEOUTS ARE SAFE; ESC PAUSES.";
+    }
+    return "";
+}
+
+static const char *hud_message(const SurfManApp *app) {
+    switch (app->simulation.phase) {
+    case SURF_MAN_COUNT_IN:
+    case SURF_MAN_RIDING:
+    case SURF_MAN_WIPEOUT_RECOVERY:
+    case SURF_MAN_PRACTICE:
+        return app->simulation.award[0] == '\0'
+                   ? default_message(app->simulation.phase)
+                   : app->simulation.award;
+    case SURF_MAN_SHACK:
+    case SURF_MAN_WAVE_RECAP:
+    case SURF_MAN_DAY_RECAP:
+        return app->message[0] == '\0'
+                   ? default_message(app->simulation.phase)
+                   : app->message;
     }
     return "";
 }
@@ -133,9 +161,7 @@ AFORC_Status surf_man_render_hud(SurfManApp *app,
         SURF_MAN_FIXED_HZ;
     const int64_t speed_tenths =
         (int64_t)app->simulation.speed_q16 * 10 / SURF_MAN_Q16_ONE;
-    const char *message = app->message[0] == '\0'
-                              ? default_message(app->simulation.phase)
-                              : app->message;
+    const char *message = hud_message(app);
     AFORC_Status status;
 
     if (layout->hud.width >= 70) {
@@ -189,25 +215,21 @@ AFORC_Status surf_man_render_hud(SurfManApp *app,
     if (layout->hud.width >= 70) {
         (void)snprintf(state,
                        sizeof(state),
-                       "STATE %s  MOVE %s  RISK %s  AIR %s  TUBE %u.%us",
-                       surf_man_phase_name(app->simulation.phase),
-                       maneuver_name(app->simulation.last_maneuver),
+                       "LINE %s  FACE %s  CARVE %s  RISK %s  AIR %s",
+                       line_name(&app->simulation),
+                       face_name(&app->simulation),
+                       app->simulation.last_turn == 0 ? "BUILD" : "READY",
                        app->simulation.risk_active ? "ACTIVE" : "CLEAR",
-                       app->simulation.airborne ? "YES" : "NO",
-                       app->simulation.tube_ticks / SURF_MAN_FIXED_HZ,
-                       (app->simulation.tube_ticks % SURF_MAN_FIXED_HZ) * 10U /
-                           SURF_MAN_FIXED_HZ);
+                       app->simulation.airborne ? "YES" : "NO");
     } else {
         (void)snprintf(state,
                        sizeof(state),
-                       "STATE %s MOVE %s RISK:%s AIR:%s TUBE:%u.%us",
-                       surf_man_phase_name(app->simulation.phase),
-                       maneuver_name(app->simulation.last_maneuver),
+                       "LINE:%s FACE:%s CARVE:%s RISK:%s AIR:%s",
+                       line_name(&app->simulation),
+                       face_name(&app->simulation),
+                       app->simulation.last_turn == 0 ? "BUILD" : "READY",
                        app->simulation.risk_active ? "ACTIVE" : "CLEAR",
-                       app->simulation.airborne ? "YES" : "NO",
-                       app->simulation.tube_ticks / SURF_MAN_FIXED_HZ,
-                       (app->simulation.tube_ticks % SURF_MAN_FIXED_HZ) * 10U /
-                           SURF_MAN_FIXED_HZ);
+                       app->simulation.airborne ? "YES" : "NO");
     }
     if (status == AFORC_OK) {
         status = surf_man_draw_text(app,
@@ -236,21 +258,13 @@ AFORC_Status surf_man_render_hud(SurfManApp *app,
     if (layout->hud.width >= 70) {
         (void)snprintf(accessibility,
                        sizeof(accessibility),
-                       "ARROWS/WASD MOVE SPACE ? P | S%u T%u L:%s M:%s C:%s",
-                       app->settings.speed_percent,
-                       app->settings.timing_percent,
-                       app->settings.landing_assist ? "ON" : "OFF",
+                       "W/S FACE A/D LINE SPACE ACTION ? HELP P PAUSE | M:%s C:%s",
                        app->settings.reduced_motion ? "RED" : "FULL",
                        color_name(app->settings.color_mode));
     } else {
         (void)snprintf(accessibility,
                        sizeof(accessibility),
-                       "MOVE WASD SPACE ? P | S%u T%u L:%s M:%s C:%s",
-                       app->settings.speed_percent,
-                       app->settings.timing_percent,
-                       app->settings.landing_assist ? "ON" : "OFF",
-                       app->settings.reduced_motion ? "RED" : "FULL",
-                       color_name(app->settings.color_mode));
+                       "W/S FACE A/D LINE SPACE ACTION ? HELP P PAUSE");
     }
     if (status == AFORC_OK) {
         status = surf_man_draw_text(app,

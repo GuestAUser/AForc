@@ -12,16 +12,22 @@
 
 enum { SURF_MAN_EVENT_PARTICLE_LIMIT = 24 };
 
+static bool surf_man_phase_has_motion(SurfManPhase phase) {
+    return phase == SURF_MAN_COUNT_IN || phase == SURF_MAN_RIDING ||
+           phase == SURF_MAN_WIPEOUT_RECOVERY || phase == SURF_MAN_PRACTICE;
+}
+
 static uint32_t surf_man_visual_step_milliseconds(uint64_t visual_tick) {
     const uint32_t base = 1000U / SURF_MAN_VISUAL_HZ;
     const uint32_t remainder = 1000U % SURF_MAN_VISUAL_HZ;
     const uint32_t phase =
-        (uint32_t)(visual_tick % SURF_MAN_VISUAL_HZ) * remainder;
+        (uint32_t)(((visual_tick % SURF_MAN_VISUAL_HZ) * remainder) %
+                   SURF_MAN_VISUAL_HZ);
 
     /*
      * Distribute the fractional millisecond remainder across fixed visual
      * ticks. The sequence sums to exactly one second without accumulating
-     * floating-point drift in tweens or particle lifetimes.
+     * floating-point drift in particle lifetimes.
      */
     return base + (phase + remainder >= SURF_MAN_VISUAL_HZ ? 1U : 0U);
 }
@@ -44,39 +50,13 @@ static AFORC_ParticleI32Range fixed_velocity_range(int32_t minimum,
                                     fixed_from_cell(maximum)};
 }
 
-static int32_t spray_surface_row(const SurfManSimulation *simulation,
-                                 AFORC_Rect play) {
-    int64_t face = simulation->face_q16;
-    const int32_t maximum_rise = play.height > 7 ? play.height - 6 : 1;
-    const int32_t minimum_row = play.y + 3;
-    const int32_t maximum_row = play.y + play.height - 2;
-    int32_t row;
-    int32_t rise;
-
-    if (face < 0) {
-        face = -face;
-    }
-    if (face > (int64_t)SURF_MAN_Q16_ONE * SURF_MAN_VISUAL_FACE_UNITS) {
-        face = (int64_t)SURF_MAN_Q16_ONE * SURF_MAN_VISUAL_FACE_UNITS;
-    }
-    rise = 1 + (int32_t)(face * (maximum_rise - 1) /
-                          ((int64_t)SURF_MAN_Q16_ONE *
-                           SURF_MAN_VISUAL_FACE_UNITS));
-    row = play.y + play.height - 2 - rise;
-    if (row < minimum_row) {
-        return minimum_row;
-    }
-    if (row > maximum_row) {
-        return maximum_row;
-    }
-    return row;
-}
-
 static int32_t spray_direction(const SurfManSimulation *simulation) {
-    if (simulation->last_turn < 0) {
+    if (simulation->last_maneuver == SURF_MAN_MANEUVER_CARVE_LEFT ||
+        simulation->line_velocity_q16 < 0) {
         return 1;
     }
-    if (simulation->last_turn > 0) {
+    if (simulation->last_maneuver == SURF_MAN_MANEUVER_CARVE_RIGHT ||
+        simulation->line_velocity_q16 > 0) {
         return -1;
     }
     return simulation->face_velocity_q16 < 0 ? -1 : 1;
@@ -93,20 +73,6 @@ AFORC_Status surf_man_visuals_init(SurfManVisuals *visuals, uint32_t seed) {
                                       visuals->particles,
                                       SURF_MAN_PARTICLE_CAPACITY,
                                       seed);
-    if (status == AFORC_OK) {
-        status = aforc_tween_init(&visuals->title_tween,
-                                  0.0,
-                                  1.0,
-                                  600U,
-                                  AFORC_EASING_CUBIC_OUT);
-    }
-    if (status == AFORC_OK) {
-        status = aforc_tween_init(&visuals->score_tween,
-                                  0.0,
-                                  1.0,
-                                  300U,
-                                  AFORC_EASING_QUADRATIC_OUT);
-    }
     if (status != AFORC_OK) {
         surf_man_visuals_dispose(visuals);
         return status;
@@ -120,8 +86,6 @@ void surf_man_visuals_dispose(SurfManVisuals *visuals) {
     if (visuals == NULL) {
         return;
     }
-    aforc_tween_dispose(&visuals->score_tween);
-    aforc_tween_dispose(&visuals->title_tween);
     aforc_particle_pool_dispose(&visuals->particle_pool);
     *visuals = (SurfManVisuals){0};
 }
@@ -130,6 +94,7 @@ AFORC_Status surf_man_visuals_step(SurfManApp *app) {
     SurfManVisuals *visuals;
     uint32_t milliseconds;
     AFORC_Status status;
+    bool particles_active;
 
     if (app == NULL) {
         return AFORC_ERROR_INVALID_ARGUMENT;
@@ -138,19 +103,23 @@ AFORC_Status surf_man_visuals_step(SurfManApp *app) {
     if (!visuals->initialized) {
         return AFORC_ERROR_STATE;
     }
-    milliseconds = surf_man_visual_step_milliseconds(visuals->visual_tick);
-    if (app->settings.reduced_motion && visuals->particle_pool.active_count > 0U) {
+    particles_active = visuals->particle_pool.active_count > 0U;
+    if (app->settings.reduced_motion) {
+        if (!particles_active) {
+            return AFORC_OK;
+        }
         status = aforc_particle_pool_clear(&visuals->particle_pool);
-    } else {
-        status = aforc_particle_pool_update(&visuals->particle_pool,
-                                            milliseconds);
+        if (status == AFORC_OK) {
+            visuals->dirty = true;
+        }
+        return status;
     }
-    if (status == AFORC_OK && !visuals->title_tween.finished) {
-        status = aforc_tween_update(&visuals->title_tween, milliseconds);
+    if (!particles_active &&
+        !surf_man_phase_has_motion(app->simulation.phase)) {
+        return AFORC_OK;
     }
-    if (status == AFORC_OK && !visuals->score_tween.finished) {
-        status = aforc_tween_update(&visuals->score_tween, milliseconds);
-    }
+    milliseconds = surf_man_visual_step_milliseconds(visuals->visual_tick);
+    status = aforc_particle_pool_update(&visuals->particle_pool, milliseconds);
     if (status != AFORC_OK) {
         return status;
     }
@@ -168,6 +137,7 @@ void surf_man_visuals_mark_dirty(SurfManVisuals *visuals) {
 AFORC_Status surf_man_emit_spray(SurfManApp *app, bool wipeout) {
     AFORC_Size size;
     SurfManLayout layout;
+    SurfManWaveSample rider_sample;
     AFORC_Cell cells[3];
     AFORC_ParticleEmitter emitter;
     size_t available;
@@ -202,9 +172,31 @@ AFORC_Status surf_man_emit_spray(SurfManApp *app, bool wipeout) {
     origin_x = size.width / 3;
     origin_y = size.height / 2;
     if (size.width >= SURF_MAN_MIN_COLUMNS && size.height >= SURF_MAN_MIN_ROWS) {
+        int64_t vertical_q16 =
+            (int64_t)app->simulation.wave_face_offset_q16 +
+            app->simulation.altitude_q16;
+        int32_t rounded_vertical_q16;
+
         layout = surf_man_layout_for_size(size);
-        origin_x = layout.play.x + layout.play.width / 3;
-        origin_y = spray_surface_row(&app->simulation, layout.play);
+        status = surf_man_wave_sample(&app->simulation,
+                                      app->simulation.line_position_q16,
+                                      &rider_sample);
+        if (status != AFORC_OK) {
+            return status;
+        }
+        rounded_vertical_q16 =
+            vertical_q16 < INT32_MIN
+                ? INT32_MIN
+            : vertical_q16 > INT32_MAX ? INT32_MAX
+                                       : (int32_t)vertical_q16;
+        origin_x = surf_man_rider_center_x(&app->simulation, layout.play);
+        origin_y = surf_man_wave_surface_row(&rider_sample, layout.play) -
+                   surf_man_q16_round_cell(rounded_vertical_q16);
+        if (origin_y < layout.play.y + 3) {
+            origin_y = layout.play.y + 3;
+        } else if (origin_y > layout.play.y + layout.play.height - 2) {
+            origin_y = layout.play.y + layout.play.height - 2;
+        }
     }
     direction = spray_direction(&app->simulation);
     speed_cells = app->simulation.speed_q16 / SURF_MAN_Q16_ONE;
