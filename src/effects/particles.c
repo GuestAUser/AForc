@@ -119,6 +119,12 @@ AFORC_Status aforc_particle_pool_spawn(AFORC_ParticlePool *pool,
         description->lifetime_ms == 0U) {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
+    if (out_particle_index != NULL &&
+        aforc_particle_pool_size_output_aliases_state(
+            pool,
+            out_particle_index)) {
+        return AFORC_ERROR_INVALID_ARGUMENT;
+    }
     if (!aforc_particle_pool_ready(pool)) {
         return AFORC_ERROR_STATE;
     }

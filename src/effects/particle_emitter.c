@@ -96,7 +96,10 @@ AFORC_Status aforc_particle_pool_emit(AFORC_ParticlePool *pool,
     size_t search_index = 0U;
     AFORC_Status status;
 
-    if (pool == NULL || out_spawned_count == NULL) {
+    if (pool == NULL || out_spawned_count == NULL ||
+        aforc_particle_pool_size_output_aliases_state(
+            pool,
+            out_spawned_count)) {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
     *out_spawned_count = 0U;

@@ -126,6 +126,33 @@ static bool particle_emission_preserves_order(void)
     return true;
 }
 
+static bool particle_state_outputs_reject_aliases(void)
+{
+    AFORC_Particle storage[2];
+    AFORC_ParticlePool pool;
+    AFORC_ParticleDesc description = {
+        {0, 0}, {0, 0}, {0, 0}, 1000U, test_cell((uint32_t)'x')};
+    const AFORC_Cell emitted_cells[] = {test_cell((uint32_t)'*')};
+    const AFORC_ParticleEmitter emitter = {
+        {0, 0}, {0, 0}, {0, 0}, {0, 0},
+        {0, 0}, {0, 0}, {250U, 250U}, emitted_cells, 1U};
+    size_t spawned = 0U;
+
+    if (aforc_particle_pool_init(&pool, storage, 2U, UINT32_C(1)) !=
+            AFORC_OK ||
+        aforc_particle_pool_spawn(&pool, &description, &pool.active_count) !=
+            AFORC_ERROR_INVALID_ARGUMENT ||
+        pool.active_count != 0U || pool.capacity != 2U || storage[0].active ||
+        aforc_particle_pool_emit(&pool, &emitter, 1U, &pool.capacity) !=
+            AFORC_ERROR_INVALID_ARGUMENT ||
+        pool.active_count != 0U || pool.capacity != 2U || storage[0].active ||
+        aforc_particle_pool_emit(&pool, &emitter, 1U, &spawned) != AFORC_OK ||
+        spawned != 1U || pool.active_count != 1U || !storage[0].active) {
+        return false;
+    }
+    return true;
+}
+
 static bool particle_update_uses_semi_implicit_euler(void)
 {
     AFORC_Particle storage[1];
@@ -174,9 +201,13 @@ int main(void)
         (void)fputs("particle emission regression failed\n", stderr);
         return 2;
     }
+    if (!particle_state_outputs_reject_aliases()) {
+        (void)fputs("particle state output alias regression failed\n", stderr);
+        return 3;
+    }
     if (!particle_update_uses_semi_implicit_euler()) {
         (void)fputs("particle update regression failed\n", stderr);
-        return 3;
+        return 4;
     }
     (void)puts("effects regression: ok");
     return 0;
