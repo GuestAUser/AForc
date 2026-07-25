@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  */
 
+#if defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)
+#define _DARWIN_C_SOURCE 1
+#endif
 #define _XOPEN_SOURCE 600
 
 #include "aforc/terminal.h"
