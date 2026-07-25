@@ -91,7 +91,7 @@ Important CMake options:
 | `AFORC_ENABLE_SANITIZERS` | `OFF` | Enable AddressSanitizer and UBSan |
 | `AFORC_ENABLE_HARDENING` | Top-level `ON` | Harden supported project-owned targets |
 | `BUILD_SHARED_LIBS` | `OFF` | Build AForc as a shared library |
-| `BUILD_TESTING` | `ON` | Register smoke and scene-lifecycle tests |
+| `BUILD_TESTING` | `ON` | Register smoke and all regression tests |
 
 Useful Make targets:
 

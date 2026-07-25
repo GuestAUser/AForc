@@ -1,12 +1,11 @@
 # AForc Design System
 
-## 0. Research Log
+## 0. Asset Provenance
 
-- **Project context:** `README.md` and `docs/ARCHITECTURE.md` establish a compact, deterministic ASCII engine with narrow interfaces; the identity therefore favors terminal cells, coordinate logic, and explicit geometry over illustration.
-- **Embedded references:** shortlisted Warp, Voltagent, and Ollama, then selected Industrial Brutalism + Warp. Warp contributes the warm near-black and parchment restraint; Industrial Brutalism contributes the tactical grid, crosshair, square construction, and single status signal. No logo or trademarked shape was copied.
-- **Shipped-product research:** one Lazyweb query and two desktop screens viewed, Termius and Factory. The reusable grammar is sparse outer space around one dense instrument module, structural rules, and one chromatic state marker; no screen, copy, or interface arrangement was traced.
-- **Palette check:** one UI/UX database query confirmed dark terminal contrast plus semantic green. Its cold navy and cyber-display-font defaults were rejected in favor of the brief's warmer, quieter material.
-- **Imagen drafts:** skipped because no image-generation tool is available in this runtime. The final asset was composed directly as deterministic SVG geometry.
+- The AForc logo was authored for this project as deterministic SVG geometry.
+- It contains no embedded third-party images, fonts, scripts, or remote resources.
+- The asset is distributed under the repository's MIT License and carries SPDX
+  metadata in its XML comment.
 
 ## 1. Atmosphere & Identity
 

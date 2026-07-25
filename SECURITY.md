@@ -48,6 +48,8 @@ coordination.
 
 ## Reporting A Vulnerability
 
-Report suspected vulnerabilities privately to the project maintainer. Include
-the affected version, platform, minimal reproducer, impact, and any proposed
-fix. Avoid publishing exploit details until a corrected release is available.
+Report suspected vulnerabilities through AForc's
+[private vulnerability reporting form](https://github.com/GuestAUser/AForc/security/advisories/new).
+Include the affected version, platform, minimal reproducer, impact, and any
+proposed fix. Avoid publishing exploit details until a corrected release is
+available.
