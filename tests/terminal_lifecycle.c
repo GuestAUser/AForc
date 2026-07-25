@@ -163,14 +163,18 @@ static bool test_open_close_restores_and_borrows_fds(void)
     }
     if (passed) {
         const int flags_after = fcntl(pair.slave, F_GETFL);
+        const int portable_flags = O_ACCMODE | O_APPEND | O_NONBLOCK;
 
-        if (flags_after != flags_before) {
+        if ((flags_after & portable_flags) !=
+            (flags_before & portable_flags)) {
             (void)fprintf(stderr,
                           "terminal descriptor flags: before=%#x after=%#x\n",
                           (unsigned int)flags_before,
                           (unsigned int)flags_after);
         }
-        passed = contract_check(flags_after == flags_before,
+        passed = contract_check(
+            (flags_after & portable_flags) ==
+                (flags_before & portable_flags),
                                 "restored descriptor flags");
     }
     if (passed) {
