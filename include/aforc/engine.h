@@ -49,6 +49,7 @@ typedef struct AFORC_EngineConfig {
  *
  * The fixed-step accumulator clamps long frames and drops excess backlog after
  * maximum_fixed_updates_per_frame to avoid an unbounded spiral of death.
+ * fixed_updates_per_second may not exceed the nanosecond timer resolution.
  * Setting target_frames_per_second to zero disables run-loop sleeping.
  * Run and frame own engine execution until they return and are non-reentrant.
  * Calling either from an engine hook or scene callback returns
@@ -64,6 +65,7 @@ typedef enum AFORC_EngineState {
 } AFORC_EngineState;
 
 AFORC_API AFORC_EngineConfig aforc_engine_config_default(void);
+/* On every failure with a non-NULL out_engine, stores NULL in *out_engine. */
 AFORC_API AFORC_Status aforc_engine_create(const AFORC_EngineConfig *config,
                                      AFORC_Engine **out_engine,
                                      AFORC_Error *error);
