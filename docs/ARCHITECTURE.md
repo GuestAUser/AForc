@@ -146,7 +146,7 @@ separate units; only result-release helpers remain in the assets facade.
 
 ## Frame Flow
 
-The interactive example drives one engine frame as follows:
+The interactive examples drive one engine frame as follows:
 
 1. `poll_events` starts a new input frame, polls terminal bytes, decodes all
    available events, and dispatches them through the scene stack.
@@ -159,10 +159,10 @@ The interactive example drives one engine frame as follows:
 6. Deferred scene commands are applied and the frame limiter sleeps for any
    remaining budget.
 
-The `--smoke` path uses the same game scene, input decoder, renderer, world,
-ECS, effects, UI, assets, and engine frame function with an off-screen renderer
-and deterministic timestamps. Only raw-terminal open/present is skipped, so CI
-does not require a TTY.
+Each `--smoke` path uses its normal game scene, input decoder, renderer, engine
+frame function, and relevant subsystems with an off-screen renderer and
+deterministic timestamps. Only raw-terminal open/present is skipped, so CI does
+not require a TTY.
 
 ## Roguelike Composition
 
@@ -182,6 +182,48 @@ Procedural generation consumes only a floor-derived RNG stream. Loading can
 therefore reconstruct a floor from the run seed and floor number before
 restoring dynamic values. The save schema is versioned independently from the
 engine library version.
+
+## Surf-Man Composition
+
+Surf-Man is a second, nested example under `examples/surf-man`. Its headers in
+`examples/surf-man/include/surf_man` are private cross-translation-unit
+contracts for the example, not installed AForc API. The application keeps
+engine adapters separate from deterministic rules and presentation so the same
+session can run interactively or off-screen.
+
+The nested module boundaries are:
+
+- `app/` owns CLI parsing, reverse-order terminal cleanup, engine hooks, input
+  normalization, scene state, and pause/resize handling. It joins
+  `AFORC_Engine`, terminal, input, and renderer.
+- `game/` owns the Q16.16, 60 Hz surf rules, wave progression, scoring, and
+  state hash. It consumes a seeded `AFORC_Rng`; it has no terminal, renderer,
+  wall-clock, or cosmetic-RNG dependency.
+- `presentation/` converts read-only app and simulation state into ASCII
+  renderer cells, bounded effects particles, tweens, HUDs, menus, and modal
+  panels. It does not change rules or scores.
+- `qa/` drives the actual app, simulation, and renderer through deterministic
+  schedules with an off-screen target. It checks state hashes and visible cells
+  without terminal I/O or filesystem effects.
+
+The app maps terminal input into bounded directional leases and one-shot action,
+confirm, and back commands before fixed updates. `AFORC_Engine` owns the 60 Hz
+simulation cadence, while active presentation composes at 60 Hz and static
+states remain dirty-driven. `AFORC_Input` supplies the
+decoded key and focus events; `AFORC_Renderer` supplies the diffed cell buffer;
+effects and UI provide bounded particles, tweens, layouts, and overlays. The
+assets subsystem provides the explicitly seeded PCG stream used to reproduce
+wave mechanics.
+
+Surf-Man targets an 80 by 24 terminal and supports 60 by 20 or larger. Focus
+loss and an undersized terminal pause authoritative time rather than consuming
+wave time, score, or flow. Its smoke path validates the same scene off-screen
+under deterministic timestamps and frame schedules, including renderer output,
+so continuous integration does not need a TTY.
+
+The example intentionally has no save data or other persistence, network
+protocol, audio system, or arbitrary input-remapping layer. Session state and
+accessibility choices remain local to the running process.
 
 ## Ownership And Failure Rules
 
