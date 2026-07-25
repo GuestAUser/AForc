@@ -19,6 +19,30 @@ DEPS := $(OBJECTS:.o=.d)
 ROGUELIKE_SOURCES := $(sort $(wildcard examples/roguelike/*.c))
 ROGUELIKE_OBJECTS := $(patsubst examples/%.c,$(BUILD_DIR)/obj/examples/%.o,$(ROGUELIKE_SOURCES))
 ROGUELIKE_DEPS := $(ROGUELIKE_OBJECTS:.o=.d)
+SURF_MAN_SOURCES := \
+	examples/surf-man/app/main.c \
+	examples/surf-man/app/lifecycle.c \
+	examples/surf-man/app/input.c \
+	examples/surf-man/app/menu.c \
+	examples/surf-man/app/engine_hooks.c \
+	examples/surf-man/app/runtime.c \
+	examples/surf-man/game/rules.c \
+	examples/surf-man/game/wave.c \
+	examples/surf-man/game/scoring.c \
+	examples/surf-man/game/simulation.c \
+	examples/surf-man/game/ride.c \
+	examples/surf-man/presentation/common.c \
+	examples/surf-man/presentation/effects.c \
+	examples/surf-man/presentation/art.c \
+	examples/surf-man/presentation/rider.c \
+	examples/surf-man/presentation/hud.c \
+	examples/surf-man/presentation/panels.c \
+	examples/surf-man/presentation/render.c \
+	examples/surf-man/qa/simulation_checks.c \
+	examples/surf-man/qa/render_checks.c \
+	examples/surf-man/qa/smoke.c
+SURF_MAN_OBJECTS := $(patsubst examples/%.c,$(BUILD_DIR)/obj/examples/%.o,$(SURF_MAN_SOURCES))
+SURF_MAN_DEPS := $(SURF_MAN_OBJECTS:.o=.d)
 SCENE_TEST_SOURCES := tests/scene_reentrancy.c
 CORE_TEST_SOURCES := tests/core_lifecycle.c
 INPUT_TEST_SOURCES := tests/input_protocol.c
@@ -70,6 +94,7 @@ ECS_SUBJECT_OBJECTS += $(BUILD_DIR)/obj/ecs/component_store.o $(BUILD_DIR)/obj/e
 ECS_SUBJECT_OBJECTS += $(BUILD_DIR)/obj/ecs/entity.o $(BUILD_DIR)/obj/ecs/view.o
 LIBRARY := $(BUILD_DIR)/lib/libaforc.a
 ROGUELIKE := $(BUILD_DIR)/bin/aforc-roguelike
+SURF_MAN := $(BUILD_DIR)/bin/aforc-surf-man
 SCENE_TEST := $(BUILD_DIR)/bin/aforc-scene-reentrancy-test
 CORE_TEST := $(BUILD_DIR)/bin/aforc-core-lifecycle-test
 INPUT_TEST := $(BUILD_DIR)/bin/aforc-input-protocol-test
@@ -95,6 +120,7 @@ TEST_BINARIES += $(RENDERER_LIFECYCLE_TEST) $(EFFECTS_TEST) $(UI_TEST)
 FLAGS_STAMP := $(BUILD_DIR)/.build-flags
 
 AFORC_CPPFLAGS := -Iinclude
+AFORC_SURF_MAN_CPPFLAGS := -Iexamples/surf-man/include
 AFORC_CFLAGS := -std=c17 -Wall -Wextra -Wpedantic
 AFORC_CFLAGS += -Wconversion -Wshadow -Wstrict-prototypes -Wmissing-prototypes
 AFORC_LDLIBS := -lm -pthread
@@ -150,13 +176,13 @@ endif
 
 .DEFAULT_GOAL := all
 
-.PHONY: all library example debug release strict sanitize smoke test run install clean help FORCE
+.PHONY: all library example debug release strict sanitize smoke test run run-surf-man install clean help FORCE
 
 FORCE:
 
 $(FLAGS_STAMP): FORCE
 	@mkdir -p "$(@D)"
-	@signature='$(CC)|$(CPPFLAGS)|$(AFORC_CPPFLAGS)|$(AFORC_LIBRARY_CPPFLAGS)|$(CFLAGS)|$(AFORC_CFLAGS)|$(AFORC_LIBRARY_CFLAGS)|$(AFORC_PROGRAM_CFLAGS)|$(LDFLAGS)|$(AFORC_LDFLAGS)|$(AFORC_PROGRAM_LDFLAGS)|$(LDLIBS)|$(AFORC_LDLIBS)'; \
+	@signature='$(CC)|$(CPPFLAGS)|$(AFORC_CPPFLAGS)|$(AFORC_SURF_MAN_CPPFLAGS)|$(AFORC_LIBRARY_CPPFLAGS)|$(CFLAGS)|$(AFORC_CFLAGS)|$(AFORC_LIBRARY_CFLAGS)|$(AFORC_PROGRAM_CFLAGS)|$(LDFLAGS)|$(AFORC_LDFLAGS)|$(AFORC_PROGRAM_LDFLAGS)|$(LDLIBS)|$(AFORC_LDLIBS)'; \
 	temporary="$@.tmp"; \
 	printf '%s\n' "$$signature" > "$$temporary"; \
 	if ! cmp -s "$$temporary" "$@"; then \
@@ -170,7 +196,7 @@ all: library example
 
 library: $(LIBRARY)
 
-example: $(ROGUELIKE)
+example: $(ROGUELIKE) $(SURF_MAN)
 
 $(LIBRARY): $(OBJECTS)
 	@mkdir -p "$(@D)"
@@ -183,7 +209,9 @@ $(BUILD_DIR)/obj/%.o: src/%.c $(FLAGS_STAMP)
 
 $(BUILD_DIR)/obj/examples/%.o: examples/%.c $(FLAGS_STAMP)
 	@mkdir -p "$(@D)"
-	$(CC) $(CPPFLAGS) $(AFORC_CPPFLAGS) $(CFLAGS) $(AFORC_CFLAGS) $(AFORC_PROGRAM_CFLAGS) -MMD -MP -c "$<" -o "$@"
+	$(CC) $(CPPFLAGS) $(AFORC_CPPFLAGS) $(AFORC_EXAMPLE_CPPFLAGS) $(CFLAGS) $(AFORC_CFLAGS) $(AFORC_PROGRAM_CFLAGS) -MMD -MP -c "$<" -o "$@"
+
+$(SURF_MAN_OBJECTS): AFORC_EXAMPLE_CPPFLAGS := $(AFORC_SURF_MAN_CPPFLAGS)
 
 $(BUILD_DIR)/obj/tests/%.o: tests/%.c $(FLAGS_STAMP)
 	@mkdir -p "$(@D)"
@@ -200,6 +228,10 @@ $(RENDERER_TEST_SUBJECT): src/render/renderer_ansi.c $(FLAGS_STAMP)
 $(ROGUELIKE): $(ROGUELIKE_OBJECTS) $(LIBRARY)
 	@mkdir -p "$(@D)"
 	$(CC) $(LDFLAGS) $(AFORC_LDFLAGS) $(AFORC_PROGRAM_LDFLAGS) $(ROGUELIKE_OBJECTS) $(LIBRARY) $(LDLIBS) $(AFORC_LDLIBS) -o "$@"
+
+$(SURF_MAN): $(SURF_MAN_OBJECTS) $(LIBRARY)
+	@mkdir -p "$(@D)"
+	$(CC) $(LDFLAGS) $(AFORC_LDFLAGS) $(AFORC_PROGRAM_LDFLAGS) $(SURF_MAN_OBJECTS) $(LIBRARY) $(LDLIBS) $(AFORC_LDLIBS) -o "$@"
 
 $(SCENE_TEST): $(SCENE_TEST_OBJECTS) $(LIBRARY)
 	@mkdir -p "$(@D)"
@@ -281,10 +313,14 @@ sanitize:
 	$(MAKE) clean
 	$(MAKE) MODE=debug STRICT=1 SANITIZE=1 all test
 
-smoke: $(ROGUELIKE)
+smoke: $(ROGUELIKE) $(SURF_MAN)
 	"$(ROGUELIKE)" --smoke
+	"$(SURF_MAN)" --smoke
 
 test: smoke $(TEST_BINARIES)
+	"$(SURF_MAN)" --help
+	! "$(SURF_MAN)" --seed nope
+	! "$(SURF_MAN)" --seed -1 --smoke
 	"$(SCENE_TEST)"
 	"$(CORE_TEST)"
 	"$(INPUT_TEST)"
@@ -305,6 +341,9 @@ test: smoke $(TEST_BINARIES)
 run: $(ROGUELIKE)
 	"$(ROGUELIKE)"
 
+run-surf-man: $(SURF_MAN)
+	"$(SURF_MAN)"
+
 install: $(LIBRARY)
 	install -d "$(DESTDIR)$(PREFIX)/lib" "$(DESTDIR)$(PREFIX)/include"
 	install -m 0644 "$(LIBRARY)" "$(DESTDIR)$(PREFIX)/lib/libaforc.a"
@@ -315,16 +354,18 @@ clean:
 
 help:
 	@printf '%s\n' \
-		'all       Build the static library and roguelike (default)' \
+		'all       Build the static library and example programs (default)' \
+		'example   Build the roguelike and Surf-Man examples' \
 		'debug     Build unoptimized binaries with debug symbols' \
 		'release   Build optimized binaries' \
 		'strict    Rebuild with warnings promoted to errors, then test' \
 		'sanitize  Rebuild with ASan/UBSan, then test' \
-		'smoke     Run the deterministic, non-interactive integration smoke' \
-		'test      Run smoke and all regression tests' \
+		'smoke     Run deterministic, non-interactive example smokes' \
+		'test      Run example CLI checks, smoke, and regression tests' \
 		'run       Launch the playable terminal roguelike' \
+		'run-surf-man Launch the playable terminal Surf-Man example' \
 		'install   Install the static library and public headers' \
 		'HARDEN=0  Disable supported build hardening (default: 1)' \
 		'clean     Remove Make build artifacts'
 
--include $(DEPS) $(ROGUELIKE_DEPS) $(TEST_DEPS)
+-include $(DEPS) $(ROGUELIKE_DEPS) $(SURF_MAN_DEPS) $(TEST_DEPS)
