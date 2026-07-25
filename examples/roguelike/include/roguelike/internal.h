@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef AFORC_EXAMPLES_ROGUELIKE_INTERNAL_H
-#define AFORC_EXAMPLES_ROGUELIKE_INTERNAL_H
+#ifndef AFORC_EXAMPLES_ROGUELIKE_INCLUDE_ROGUELIKE_INTERNAL_H
+#define AFORC_EXAMPLES_ROGUELIKE_INCLUDE_ROGUELIKE_INTERNAL_H
 
 #include "aforc/assets.h"
 #include "aforc/ecs.h"
@@ -109,6 +109,7 @@ typedef struct Game {
 
 extern const AFORC_SceneVTable game_scene_vtable;
 
+AFORC_Status game_parse_seed(const char *text, uint64_t *out_seed);
 AFORC_Status game_error(AFORC_Error *error,
                       AFORC_Status status,
                       const char *subsystem,
@@ -199,6 +200,9 @@ AFORC_Status game_present(void *context,
 AFORC_Status game_smoke_checks(Game *game,
                                AFORC_Engine *engine,
                                AFORC_Error *error);
+AFORC_Status game_runtime_smoke_checks(Game *game,
+                                       AFORC_Engine *engine,
+                                       AFORC_Error *error);
 
 void game_dispose(Game *game);
 AFORC_Status game_initialize(Game *game,

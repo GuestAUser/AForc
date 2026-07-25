@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "internal.h"
+#include "roguelike/internal.h"
 
 static AFORC_Status game_point_blocked(Game *game,
                                        AFORC_Point point,
@@ -21,8 +21,18 @@ static AFORC_Status game_point_blocked(Game *game,
                                     out_blocked);
 }
 
+static void game_add_score(Game *game, uint32_t amount) {
+    if (game->score > UINT32_MAX - amount) {
+        game->score = UINT32_MAX;
+        return;
+    }
+    game->score += amount;
+}
+
 static AFORC_Status game_take_turn(Game *game) {
-    ++game->turn;
+    if (game->turn != UINT32_MAX) {
+        ++game->turn;
+    }
     return game_enemy_turns(game);
 }
 
@@ -78,7 +88,7 @@ AFORC_Status game_move_player(Game *game, AFORC_Point delta) {
             if (status != AFORC_OK) {
                 return status;
             }
-            game->score += 100U;
+            game_add_score(game, 100U);
             game_set_message(game, "Sentinel defeated. Score: %u.", game->score);
         } else {
             game_set_message(game,
@@ -118,14 +128,14 @@ AFORC_Status game_descend(Game *game) {
         return AFORC_OK;
     }
     if (game->floor == game->rules.final_floor) {
-        game->score += 1000U;
+        game_add_score(game, 1000U);
         game->run_state = GAME_VICTORIOUS;
         game_set_message(game,
                          "The final seal breaks. Victory with %u points!",
                          game->score);
         return AFORC_OK;
     }
-    game->score += 250U;
+    game_add_score(game, 250U);
     actor->health += 3;
     if (actor->health > actor->maximum_health) {
         actor->health = actor->maximum_health;

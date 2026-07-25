@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "internal.h"
+#include "roguelike/internal.h"
 
 static uint32_t game_event_codepoint(const AFORC_InputEvent *event) {
     uint32_t codepoint = event->data.key.codepoint;
@@ -26,6 +26,8 @@ static bool game_persistence_error_is_recoverable(AFORC_Status status) {
         case AFORC_ERROR_UNSUPPORTED:
         case AFORC_ERROR_FORMAT:
         case AFORC_ERROR_CHECKSUM:
+        case AFORC_ERROR_END_OF_STREAM:
+        case AFORC_ERROR_LIMIT:
             return true;
         default:
             return false;
@@ -62,9 +64,12 @@ static AFORC_Status game_handle_key(Game *game,
         return AFORC_OK;
     }
     if (codepoint == (uint32_t)'?') {
-        game->help_visible = !game->help_visible;
-        game_set_message(game,
-                         game->help_visible ? "Help opened." : "Help closed.");
+        if (!event->data.key.repeat) {
+            game->help_visible = !game->help_visible;
+            game_set_message(
+                game,
+                game->help_visible ? "Help opened." : "Help closed.");
+        }
         return AFORC_OK;
     }
     if (game->help_visible) {
@@ -72,17 +77,25 @@ static AFORC_Status game_handle_key(Game *game,
     }
     if (game->run_state != GAME_PLAYING) {
         if (codepoint == (uint32_t)'r' || codepoint == (uint32_t)'R') {
-            return game_new_run(game);
+            return event->data.key.repeat ? AFORC_OK : game_new_run(game);
         }
         game_set_message(game, "Press R for a new run or Q to quit.");
         return AFORC_OK;
     }
     if (codepoint == (uint32_t)'S') {
-        status = game_report_persistence_result(game, "Save", game_save(game));
+        if (!event->data.key.repeat) {
+            status =
+                game_report_persistence_result(game, "Save", game_save(game));
+        }
     } else if (codepoint == (uint32_t)'L') {
-        status = game_report_persistence_result(game, "Load", game_load(game));
+        if (!event->data.key.repeat) {
+            status =
+                game_report_persistence_result(game, "Load", game_load(game));
+        }
     } else if (codepoint == (uint32_t)'>') {
-        status = game_descend(game);
+        if (!event->data.key.repeat) {
+            status = game_descend(game);
+        }
     } else if (codepoint == (uint32_t)'.' || key == AFORC_KEY_SPACE) {
         status = game_wait_turn(game);
     } else {

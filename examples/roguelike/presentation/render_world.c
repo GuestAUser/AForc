@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "internal.h"
+#include "roguelike/internal.h"
 
 static size_t game_map_index(const Game *game, AFORC_Point position) {
     return (size_t)(uint32_t)position.y *

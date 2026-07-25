@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "internal.h"
+#include "roguelike/internal.h"
 
 AFORC_Status game_emit_burst(Game *game, AFORC_Point point, bool strong) {
     AFORC_Cell cells[3];
@@ -15,10 +15,6 @@ AFORC_Status game_emit_burst(Game *game, AFORC_Point point, bool strong) {
     int32_t y = point.y * AFORC_EFFECT_FIXED_ONE;
     AFORC_Status status;
 
-    if (burst_count > game->particle_pool.capacity -
-                          game->particle_pool.active_count) {
-        (void)aforc_particle_pool_clear(&game->particle_pool);
-    }
     cells[0] = game_cell((uint32_t)'*',
                          aforc_color_indexed(strong ? 196U : 214U),
                          AFORC_STYLE_BOLD);
@@ -46,7 +42,7 @@ AFORC_Status game_emit_burst(Game *game, AFORC_Point point, bool strong) {
                                       &emitter,
                                       burst_count,
                                       &spawned);
-    if (status == AFORC_ERROR_LIMIT && spawned != 0U) {
+    if (status == AFORC_ERROR_LIMIT) {
         return AFORC_OK;
     }
     return status;

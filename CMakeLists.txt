@@ -265,27 +265,31 @@ aforc_enable_target_sanitizers(aforc)
 
 if(AFORC_BUILD_EXAMPLES)
     set(AFORC_ROGUELIKE_SOURCES
-        examples/roguelike/effects.c
-        examples/roguelike/enemy_ai.c
-        examples/roguelike/engine_hooks.c
-        examples/roguelike/floor_population.c
-        examples/roguelike/game.c
-        examples/roguelike/game_entities.c
-        examples/roguelike/game_rules.c
-        examples/roguelike/generation.c
-        examples/roguelike/input_actions.c
         examples/roguelike/main.c
-        examples/roguelike/persistence.c
-        examples/roguelike/player_actions.c
-        examples/roguelike/render.c
-        examples/roguelike/render_ui.c
-        examples/roguelike/render_world.c
-        examples/roguelike/runtime.c
-        examples/roguelike/smoke.c
+        examples/roguelike/app/engine_hooks.c
+        examples/roguelike/app/input_actions.c
+        examples/roguelike/app/runtime.c
+        examples/roguelike/game/enemy_ai.c
+        examples/roguelike/game/floor_population.c
+        examples/roguelike/game/game.c
+        examples/roguelike/game/game_entities.c
+        examples/roguelike/game/game_rules.c
+        examples/roguelike/game/generation.c
+        examples/roguelike/game/player_actions.c
+        examples/roguelike/persistence/persistence.c
+        examples/roguelike/presentation/effects.c
+        examples/roguelike/presentation/render.c
+        examples/roguelike/presentation/render_ui.c
+        examples/roguelike/presentation/render_world.c
+        examples/roguelike/qa/runtime_checks.c
+        examples/roguelike/qa/smoke.c
     )
     add_executable(aforc_roguelike ${AFORC_ROGUELIKE_SOURCES})
     set_target_properties(aforc_roguelike PROPERTIES
         OUTPUT_NAME "aforc-roguelike"
+    )
+    target_include_directories(aforc_roguelike PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/examples/roguelike/include"
     )
     aforc_configure_owned_target(aforc_roguelike)
     target_link_libraries(aforc_roguelike PRIVATE aforc::aforc)
@@ -309,27 +313,35 @@ if(AFORC_BUILD_EXAMPLES)
             TIMEOUT 15
             WILL_FAIL TRUE
         )
+        add_test(
+            NAME roguelike_duplicate_seed
+            COMMAND aforc_roguelike --seed 1 --seed 2 --smoke
+        )
+        set_tests_properties(roguelike_duplicate_seed PROPERTIES
+            TIMEOUT 15
+            WILL_FAIL TRUE
+        )
     endif()
 
     set(AFORC_SURF_MAN_SOURCES
         examples/surf-man/app/main.c
-    examples/surf-man/app/lifecycle.c
-    examples/surf-man/app/input.c
-    examples/surf-man/app/menu.c
-    examples/surf-man/app/engine_hooks.c
+        examples/surf-man/app/lifecycle.c
+        examples/surf-man/app/input.c
+        examples/surf-man/app/menu.c
+        examples/surf-man/app/engine_hooks.c
         examples/surf-man/app/runtime.c
         examples/surf-man/game/rules.c
         examples/surf-man/game/wave.c
-    examples/surf-man/game/scoring.c
-    examples/surf-man/game/simulation.c
-    examples/surf-man/game/ride.c
-    examples/surf-man/presentation/common.c
-    examples/surf-man/presentation/effects.c
-    examples/surf-man/presentation/art.c
-    examples/surf-man/presentation/rider.c
-    examples/surf-man/presentation/hud.c
-    examples/surf-man/presentation/panels.c
-    examples/surf-man/presentation/render.c
+        examples/surf-man/game/scoring.c
+        examples/surf-man/game/simulation.c
+        examples/surf-man/game/ride.c
+        examples/surf-man/presentation/common.c
+        examples/surf-man/presentation/effects.c
+        examples/surf-man/presentation/art.c
+        examples/surf-man/presentation/rider.c
+        examples/surf-man/presentation/hud.c
+        examples/surf-man/presentation/panels.c
+        examples/surf-man/presentation/render.c
         examples/surf-man/qa/simulation_checks.c
         examples/surf-man/qa/render_checks.c
         examples/surf-man/qa/smoke.c

@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "internal.h"
+#include "roguelike/internal.h"
 
 #include <string.h>
 
 static AFORC_Status game_random_range(AFORC_Rng *rng,
-                                    uint32_t minimum,
-                                    uint32_t maximum,
-                                    uint32_t *out_value) {
+                                     uint32_t minimum,
+                                     uint32_t maximum,
+                                     uint32_t *out_value) {
     uint32_t offset = 0U;
     AFORC_Status status;
 
@@ -23,6 +23,13 @@ static AFORC_Status game_random_range(AFORC_Rng *rng,
         *out_value = minimum + offset;
     }
     return status;
+}
+
+static uint32_t game_particle_seed(uint64_t seed, uint32_t floor) {
+    const uint64_t mixed =
+        seed ^ (seed >> 32U) ^ (UINT64_C(0x9e3779b97f4a7c15) * floor);
+
+    return (uint32_t)(mixed ^ (mixed >> 32U));
 }
 
 static bool game_rooms_overlap(GameRoom left, GameRoom right) {
@@ -184,7 +191,15 @@ AFORC_Status game_generate_floor(Game *game,
     }
     (void)memset(game->visibility, 0, game->cell_count);
     (void)memset(game->explored, 0, game->cell_count);
-    (void)aforc_particle_pool_clear(&game->particle_pool);
+    status = aforc_particle_pool_clear(&game->particle_pool);
+    if (status == AFORC_OK) {
+        status = aforc_particle_pool_reseed(&game->particle_pool,
+                                            game_particle_seed(game->seed,
+                                                               floor));
+    }
+    if (status != AFORC_OK) {
+        return status;
+    }
     game->run_state = GAME_PLAYING;
     game->help_visible = false;
     game_set_message(game,

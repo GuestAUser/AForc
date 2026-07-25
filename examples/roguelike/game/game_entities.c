@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "internal.h"
+#include "roguelike/internal.h"
 
 bool game_tile_blocks(AFORC_Tile tile,
                       uint32_t layer,

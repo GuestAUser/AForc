@@ -4,41 +4,20 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "internal.h"
+#include "roguelike/internal.h"
 
 #include <string.h>
 
-static AFORC_Status game_smoke_repeated_direction_is_dispatched(
-    Game *game,
-    AFORC_Engine *engine,
-    AFORC_Error *error) {
-    AFORC_InputEvent event = {0};
-    const bool help_visible = game->help_visible;
-    bool consumed = false;
-    AFORC_Status status;
-
-    event.type = AFORC_INPUT_EVENT_KEY_DOWN;
-    event.data.key.key = AFORC_KEY_UP;
-    event.data.key.repeat = true;
-    game->help_visible = true;
-    status = aforc_engine_dispatch_event(engine, &event, &consumed, error);
-    game->help_visible = help_visible;
-    if (status == AFORC_OK && !consumed) {
-        return game_error(error,
-                          AFORC_ERROR_STATE,
-                          "smoke",
-                          "repeated direction keydown was ignored");
-    }
-    return status;
-}
-
-static AFORC_Status game_smoke_weak_burst_preserves_particles(
+static AFORC_Status game_smoke_burst_preserves_particles(
     Game *game,
     AFORC_Point point,
+    bool strong,
     AFORC_Error *error) {
     AFORC_ParticleDesc particle = {0};
-    const size_t preserved_count = game->particle_pool.capacity - 11U;
-    const size_t expected_count = preserved_count + 7U;
+    const size_t burst_count = strong ? 12U : 7U;
+    const size_t free_count = strong ? burst_count - 1U : burst_count;
+    const size_t preserved_count = game->particle_pool.capacity - free_count;
+    const size_t expected_count = preserved_count + free_count;
     AFORC_Status status = aforc_particle_pool_clear(&game->particle_pool);
 
     particle.lifetime_ms = 1000U;
@@ -50,41 +29,55 @@ static AFORC_Status game_smoke_weak_burst_preserves_particles(
                                            NULL);
     }
     if (status == AFORC_OK) {
-        status = game_emit_burst(game, point, false);
+        status = game_emit_burst(game, point, strong);
     }
     if (status == AFORC_OK &&
         game->particle_pool.active_count != expected_count) {
         status = game_error(error,
                             AFORC_ERROR_STATE,
                             "smoke",
-                            "weak burst discarded existing particles");
+                            "burst discarded existing particles");
     }
     (void)aforc_particle_pool_clear(&game->particle_pool);
     return status;
 }
 
-static AFORC_Status game_smoke_save_failure_is_recoverable(
-    Game *game,
-    AFORC_Engine *engine,
-    AFORC_Error *error) {
-    AFORC_InputEvent event = {0};
-    const char *save_path = game->save_path;
-    bool consumed = false;
-    AFORC_Status status;
+static AFORC_Status game_smoke_score_saturates(Game *game,
+                                                AFORC_Error *error) {
+    GamePosition *position = NULL;
+    GameActor *actor = NULL;
+    AFORC_Point saved_position;
+    uint32_t saved_floor = game->floor;
+    uint32_t saved_score = game->score;
+    GameRunState saved_run_state = game->run_state;
+    char saved_message[GAME_MESSAGE_CAPACITY];
+    AFORC_Status status = game_actor_components(game,
+                                                 game->player,
+                                                 &position,
+                                                 &actor);
 
-    event.type = AFORC_INPUT_EVENT_KEY_DOWN;
-    event.data.key.key = AFORC_KEY_S;
-    event.data.key.codepoint = (uint32_t)'S';
-    game->save_path = "aforc-smoke-missing-directory/save.bin";
-    status = aforc_engine_dispatch_event(engine, &event, &consumed, error);
-    game->save_path = save_path;
-    if (status == AFORC_OK &&
-        (!consumed || strcmp(game->message, "Save failed: not found.") != 0)) {
-        return game_error(error,
-                          AFORC_ERROR_STATE,
-                          "smoke",
-                          "save failure did not remain in game");
+    if (status != AFORC_OK) {
+        return status;
     }
+    saved_position = position->point;
+    (void)memcpy(saved_message, game->message, sizeof(saved_message));
+    position->point = game->exit_position;
+    game->floor = game->rules.final_floor;
+    game->score = UINT32_MAX - 999U;
+    status = game_descend(game);
+    if (status == AFORC_OK) {
+        if (game->score != UINT32_MAX || game->run_state != GAME_VICTORIOUS) {
+            status = game_error(error,
+                                AFORC_ERROR_STATE,
+                                "smoke",
+                                "score overflowed at victory");
+        }
+    }
+    position->point = saved_position;
+    game->floor = saved_floor;
+    game->score = saved_score;
+    game->run_state = saved_run_state;
+    (void)memcpy(game->message, saved_message, sizeof(saved_message));
     return status;
 }
 
@@ -104,6 +97,7 @@ AFORC_Status game_smoke_checks(Game *game,
     uint32_t saved_floor = game->floor;
     uint32_t saved_score = game->score;
     uint32_t saved_turn = game->turn;
+    uint32_t saved_particle_random_state = game->particle_pool.random_state;
     uint64_t saved_seed = game->seed;
     int32_t saved_health = 0;
     const char *save_path = game->save_path;
@@ -169,6 +163,9 @@ AFORC_Status game_smoke_checks(Game *game,
         }
     }
     if (status == AFORC_OK) {
+        status = game_emit_burst(game, position->point, true);
+    }
+    if (status == AFORC_OK) {
         status = game_decode_save(game, save_blob.data, save_blob.size);
     }
     aforc_asset_blob_release(&save_blob);
@@ -181,7 +178,8 @@ AFORC_Status game_smoke_checks(Game *game,
     if (status == AFORC_OK &&
         (game->seed != saved_seed || game->floor != saved_floor ||
          game->score != saved_score || game->turn != saved_turn ||
-         actor->health != saved_health)) {
+         actor->health != saved_health || game->particle_pool.active_count != 0U ||
+         game->particle_pool.random_state != saved_particle_random_state)) {
         status = AFORC_ERROR_STATE;
     }
     if (status == AFORC_OK) {
@@ -199,11 +197,18 @@ AFORC_Status game_smoke_checks(Game *game,
         aforc_free(&game->allocator, path);
         return status;
     }
-    status = game_smoke_save_failure_is_recoverable(game, engine, error);
+    status = game_runtime_smoke_checks(game, engine, error);
     if (status == AFORC_OK) {
-        status = game_smoke_weak_burst_preserves_particles(game,
-                                                           position->point,
-                                                           error);
+        status = game_smoke_burst_preserves_particles(game,
+                                                       position->point,
+                                                       false,
+                                                       error);
+    }
+    if (status == AFORC_OK) {
+        status = game_smoke_burst_preserves_particles(game,
+                                                       position->point,
+                                                       true,
+                                                       error);
     }
     if (status == AFORC_OK) {
         status = game_emit_burst(game, position->point, true);
@@ -227,11 +232,6 @@ AFORC_Status game_smoke_checks(Game *game,
         status = AFORC_ERROR_STATE;
     }
     if (status == AFORC_OK) {
-        status = game_smoke_repeated_direction_is_dispatched(game,
-                                                              engine,
-                                                              error);
-    }
-    if (status == AFORC_OK) {
         status = aforc_engine_frame(engine, UINT64_C(16666667), error);
     }
     if (status == AFORC_OK) {
@@ -244,6 +244,9 @@ AFORC_Status game_smoke_checks(Game *game,
         if (status == AFORC_OK && hud_cell.codepoint != (uint32_t)'+') {
             status = AFORC_ERROR_STATE;
         }
+    }
+    if (status == AFORC_OK) {
+        status = game_smoke_score_saturates(game, error);
     }
     aforc_free(&game->allocator, path);
     return status;

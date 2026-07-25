@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "internal.h"
+#include "roguelike/internal.h"
 
 AFORC_Cell game_cell(uint32_t codepoint,
                      AFORC_Color foreground,

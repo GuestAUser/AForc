@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "internal.h"
+#include "roguelike/internal.h"
 
 #include <inttypes.h>
 #include <stdio.h>
@@ -88,7 +88,7 @@ int game_run_interactive(uint64_t seed) {
     AFORC_InputConfig input_config = aforc_input_config_default();
     AFORC_EngineConfig engine_config = aforc_engine_config_default();
     AFORC_Error error;
-    Game game;
+    Game game = {0};
     bool game_initialized = false;
     AFORC_Status status;
 

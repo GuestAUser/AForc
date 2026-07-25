@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "internal.h"
+#include "roguelike/internal.h"
 
 static AFORC_Status game_gather_enemies(Game *game,
                                         AFORC_Entity *entities,

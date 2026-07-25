@@ -16,7 +16,25 @@ HARDEN ?= 1
 SOURCES := $(sort $(wildcard src/*/*.c))
 OBJECTS := $(patsubst src/%.c,$(BUILD_DIR)/obj/%.o,$(SOURCES))
 DEPS := $(OBJECTS:.o=.d)
-ROGUELIKE_SOURCES := $(sort $(wildcard examples/roguelike/*.c))
+ROGUELIKE_SOURCES := \
+	examples/roguelike/main.c \
+	examples/roguelike/app/engine_hooks.c \
+	examples/roguelike/app/input_actions.c \
+	examples/roguelike/app/runtime.c \
+	examples/roguelike/game/enemy_ai.c \
+	examples/roguelike/game/floor_population.c \
+	examples/roguelike/game/game.c \
+	examples/roguelike/game/game_entities.c \
+	examples/roguelike/game/game_rules.c \
+	examples/roguelike/game/generation.c \
+	examples/roguelike/game/player_actions.c \
+	examples/roguelike/persistence/persistence.c \
+	examples/roguelike/presentation/effects.c \
+	examples/roguelike/presentation/render.c \
+	examples/roguelike/presentation/render_ui.c \
+	examples/roguelike/presentation/render_world.c \
+	examples/roguelike/qa/runtime_checks.c \
+	examples/roguelike/qa/smoke.c
 ROGUELIKE_OBJECTS := $(patsubst examples/%.c,$(BUILD_DIR)/obj/examples/%.o,$(ROGUELIKE_SOURCES))
 ROGUELIKE_DEPS := $(ROGUELIKE_OBJECTS:.o=.d)
 SURF_MAN_SOURCES := \
@@ -120,6 +138,7 @@ TEST_BINARIES += $(RENDERER_LIFECYCLE_TEST) $(EFFECTS_TEST) $(UI_TEST)
 FLAGS_STAMP := $(BUILD_DIR)/.build-flags
 
 AFORC_CPPFLAGS := -Iinclude
+AFORC_ROGUELIKE_CPPFLAGS := -Iexamples/roguelike/include
 AFORC_SURF_MAN_CPPFLAGS := -Iexamples/surf-man/include
 AFORC_CFLAGS := -std=c17 -Wall -Wextra -Wpedantic
 AFORC_CFLAGS += -Wconversion -Wshadow -Wstrict-prototypes -Wmissing-prototypes
@@ -182,7 +201,7 @@ FORCE:
 
 $(FLAGS_STAMP): FORCE
 	@mkdir -p "$(@D)"
-	@signature='$(CC)|$(CPPFLAGS)|$(AFORC_CPPFLAGS)|$(AFORC_SURF_MAN_CPPFLAGS)|$(AFORC_LIBRARY_CPPFLAGS)|$(CFLAGS)|$(AFORC_CFLAGS)|$(AFORC_LIBRARY_CFLAGS)|$(AFORC_PROGRAM_CFLAGS)|$(LDFLAGS)|$(AFORC_LDFLAGS)|$(AFORC_PROGRAM_LDFLAGS)|$(LDLIBS)|$(AFORC_LDLIBS)'; \
+	@signature='$(CC)|$(CPPFLAGS)|$(AFORC_CPPFLAGS)|$(AFORC_ROGUELIKE_CPPFLAGS)|$(AFORC_SURF_MAN_CPPFLAGS)|$(AFORC_LIBRARY_CPPFLAGS)|$(CFLAGS)|$(AFORC_CFLAGS)|$(AFORC_LIBRARY_CFLAGS)|$(AFORC_PROGRAM_CFLAGS)|$(LDFLAGS)|$(AFORC_LDFLAGS)|$(AFORC_PROGRAM_LDFLAGS)|$(LDLIBS)|$(AFORC_LDLIBS)'; \
 	temporary="$@.tmp"; \
 	printf '%s\n' "$$signature" > "$$temporary"; \
 	if ! cmp -s "$$temporary" "$@"; then \
@@ -211,6 +230,7 @@ $(BUILD_DIR)/obj/examples/%.o: examples/%.c $(FLAGS_STAMP)
 	@mkdir -p "$(@D)"
 	$(CC) $(CPPFLAGS) $(AFORC_CPPFLAGS) $(AFORC_EXAMPLE_CPPFLAGS) $(CFLAGS) $(AFORC_CFLAGS) $(AFORC_PROGRAM_CFLAGS) -MMD -MP -c "$<" -o "$@"
 
+$(ROGUELIKE_OBJECTS): AFORC_EXAMPLE_CPPFLAGS := $(AFORC_ROGUELIKE_CPPFLAGS)
 $(SURF_MAN_OBJECTS): AFORC_EXAMPLE_CPPFLAGS := $(AFORC_SURF_MAN_CPPFLAGS)
 
 $(BUILD_DIR)/obj/tests/%.o: tests/%.c $(FLAGS_STAMP)
@@ -318,6 +338,9 @@ smoke: $(ROGUELIKE) $(SURF_MAN)
 	"$(SURF_MAN)" --smoke
 
 test: smoke $(TEST_BINARIES)
+	! "$(ROGUELIKE)" --seed nope
+	! "$(ROGUELIKE)" --seed -1 --smoke
+	! "$(ROGUELIKE)" --seed 1 --seed 2 --smoke
 	"$(SURF_MAN)" --help
 	! "$(SURF_MAN)" --seed nope
 	! "$(SURF_MAN)" --seed -1 --smoke

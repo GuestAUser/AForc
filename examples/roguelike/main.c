@@ -4,9 +4,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "internal.h"
+#include "roguelike/internal.h"
 
-#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,6 +17,31 @@ typedef struct ProgramOptions {
     bool smoke;
     bool help;
 } ProgramOptions;
+
+AFORC_Status game_parse_seed(const char *text, uint64_t *out_seed) {
+    uint64_t value = 0U;
+
+    if (text == NULL || out_seed == NULL) {
+        return AFORC_ERROR_INVALID_ARGUMENT;
+    }
+    if (text[0] == '\0') {
+        return AFORC_ERROR_FORMAT;
+    }
+    for (size_t index = 0U; text[index] != '\0'; ++index) {
+        uint64_t digit;
+
+        if (text[index] < '0' || text[index] > '9') {
+            return AFORC_ERROR_FORMAT;
+        }
+        digit = (uint64_t)(text[index] - '0');
+        if (value > (UINT64_MAX - digit) / UINT64_C(10)) {
+            return AFORC_ERROR_FORMAT;
+        }
+        value = value * UINT64_C(10) + digit;
+    }
+    *out_seed = value;
+    return AFORC_OK;
+}
 
 static void print_usage(FILE *stream, const char *program) {
     (void)fprintf(stream,
@@ -39,30 +63,32 @@ static void print_usage(FILE *stream, const char *program) {
 static AFORC_Status parse_options(int argc,
                                 char **argv,
                                 ProgramOptions *options) {
+    if (argc < 1 || argv == NULL || options == NULL) {
+        return AFORC_ERROR_INVALID_ARGUMENT;
+    }
     (void)memset(options, 0, sizeof(*options));
     for (int index = 1; index < argc; ++index) {
         if (strcmp(argv[index], "--help") == 0 ||
             strcmp(argv[index], "-h") == 0) {
-            options->help = true;
-        } else if (strcmp(argv[index], "--smoke") == 0) {
-            options->smoke = true;
-        } else if (strcmp(argv[index], "--seed") == 0) {
-            char *end = NULL;
-            unsigned long long value;
-
-            if (index + 1 >= argc) {
+            if (options->help) {
                 return AFORC_ERROR_INVALID_ARGUMENT;
             }
-            if (argv[index + 1][0] == '-') {
-                return AFORC_ERROR_FORMAT;
+            options->help = true;
+        } else if (strcmp(argv[index], "--smoke") == 0) {
+            if (options->smoke) {
+                return AFORC_ERROR_INVALID_ARGUMENT;
             }
-            errno = 0;
-            value = strtoull(argv[++index], &end, 10);
-            if (errno != 0 || end == argv[index] || *end != '\0' ||
-                value > UINT64_MAX) {
-                return AFORC_ERROR_FORMAT;
+            options->smoke = true;
+        } else if (strcmp(argv[index], "--seed") == 0) {
+            AFORC_Status status;
+
+            if (options->seed_supplied || index + 1 >= argc) {
+                return AFORC_ERROR_INVALID_ARGUMENT;
             }
-            options->seed = (uint64_t)value;
+            status = game_parse_seed(argv[++index], &options->seed);
+            if (status != AFORC_OK) {
+                return status;
+            }
             options->seed_supplied = true;
         } else {
             return AFORC_ERROR_INVALID_ARGUMENT;
@@ -82,15 +108,18 @@ static uint64_t default_seed(void) {
 }
 
 int main(int argc, char **argv) {
+    const char *program = argc > 0 && argv != NULL && argv[0] != NULL
+                              ? argv[0]
+                              : "aforc-roguelike";
     ProgramOptions options;
     AFORC_Status status = parse_options(argc, argv, &options);
 
     if (status != AFORC_OK) {
-        print_usage(stderr, argv[0]);
+        print_usage(stderr, program);
         return EXIT_FAILURE;
     }
     if (options.help) {
-        print_usage(stdout, argv[0]);
+        print_usage(stdout, program);
         return EXIT_SUCCESS;
     }
     if (!options.seed_supplied) {
