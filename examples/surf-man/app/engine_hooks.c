@@ -27,8 +27,11 @@ AFORC_Status surf_man_scene_fixed_update(AFORC_Scene *scene,
 {
     SurfManApp *app;
     SurfManCommand command;
+    SurfManWaveSample action_sample;
     SurfManPhase previous_phase;
     uint32_t previous_maneuver_count;
+    bool lip_action_consumed = false;
+    bool previous_airborne;
     AFORC_Status status = AFORC_OK;
 
     (void)seconds;
@@ -51,9 +54,32 @@ AFORC_Status surf_man_scene_fixed_update(AFORC_Scene *scene,
 
     previous_phase = app->simulation.phase;
     previous_maneuver_count = app->simulation.maneuver_count;
+    previous_airborne = app->simulation.airborne;
     surf_man_input_take_command(app, &command);
-    if (app->simulation.phase != SURF_MAN_SHACK) {
+    if (command.action && !previous_airborne &&
+        (app->simulation.phase == SURF_MAN_RIDING ||
+         app->simulation.phase == SURF_MAN_PRACTICE)) {
+        status = surf_man_wave_sample(&app->simulation,
+                                      app->simulation.line_position_q16,
+                                      &action_sample);
+        if (status == AFORC_OK) {
+            lip_action_consumed = action_sample.lip && !action_sample.tube;
+        }
+    }
+    if (status == AFORC_OK && app->simulation.phase != SURF_MAN_SHACK) {
         status = surf_man_simulation_step(&app->simulation, &command);
+        if (status == AFORC_OK && command.action &&
+            (lip_action_consumed ||
+             (!previous_airborne && app->simulation.airborne))) {
+            app->controls.action_lease = 0U;
+            app->controls.action_tap = false;
+        }
+        if (status == AFORC_OK &&
+            (app->simulation.phase != previous_phase ||
+             (app->simulation.phase != SURF_MAN_WAVE_RECAP &&
+              app->simulation.phase != SURF_MAN_DAY_RECAP))) {
+            surf_man_visuals_mark_dirty(&app->visuals);
+        }
     }
     if (status == AFORC_OK &&
         app->simulation.phase == SURF_MAN_WIPEOUT_RECOVERY &&
