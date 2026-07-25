@@ -39,26 +39,6 @@ static int32_t offset_q16(int32_t columns) {
     return (int32_t)value;
 }
 
-static int32_t wave_surface_row(const SurfManWaveSample *sample,
-                                AFORC_Rect play) {
-    int64_t face = sample->face_q16;
-    const int32_t maximum_rise = play.height > 7 ? play.height - 6 : 1;
-    int32_t rise;
-
-    if (face < 0) {
-        face = -face;
-    }
-    if (face > (int64_t)SURF_MAN_Q16_ONE * SURF_MAN_VISUAL_FACE_UNITS) {
-        face = (int64_t)SURF_MAN_Q16_ONE * SURF_MAN_VISUAL_FACE_UNITS;
-    }
-    rise = 1 + (int32_t)(face * (maximum_rise - 1) /
-                          ((int64_t)SURF_MAN_Q16_ONE *
-                           SURF_MAN_VISUAL_FACE_UNITS));
-    return clamp_i32(play.y + play.height - 2 - rise,
-                     play.y + 3,
-                     play.y + play.height - 2);
-}
-
 static uint32_t wave_glyph(const SurfManWaveSample *sample,
                            int32_t previous_row,
                            int32_t row,
@@ -438,10 +418,13 @@ AFORC_Status surf_man_render_shack_art(SurfManApp *app,
 }
 
 AFORC_Status surf_man_render_wave_art(SurfManApp *app,
-                                      const SurfManLayout *layout) {
+                                       const SurfManLayout *layout) {
     static const char horizon[] = "---   .   --    . ";
     static const char rear_swell[] = "_____/~~~\\_____________";
-    const int32_t rider_column = layout->play.width / 3;
+    const int32_t wave_anchor_column = layout->play.width / 3;
+    const int32_t rider_column =
+        surf_man_rider_center_x(&app->simulation, layout->play) -
+        layout->play.x;
     const uint64_t horizon_phase = wave_motion_phase(app, 24U);
     const uint64_t rear_phase = wave_motion_phase(app, 16U);
     const uint64_t texture_phase = wave_motion_phase(app, 12U);
@@ -456,7 +439,7 @@ AFORC_Status surf_man_render_wave_art(SurfManApp *app,
     status = surf_man_draw_text(
         app,
         (AFORC_Point){layout->play.x + 1, layout->play.y},
-        "/\\FACE -SHOULDER ^LIP #POCKET =TUBE *FOAM +HAZARD",
+        "W/S FACE   A/D LINE   SPACE ACTION   ? HELP",
         SURF_MAN_TONE_FRAMEWORK,
         AFORC_STYLE_DIM);
     if (status == AFORC_OK) {
@@ -479,16 +462,18 @@ AFORC_Status surf_man_render_wave_art(SurfManApp *app,
     }
     if (status == AFORC_OK) {
         status = surf_man_wave_sample(
-            &app->simulation, offset_q16(-rider_column - 1), &previous_sample);
+            &app->simulation,
+            offset_q16(-wave_anchor_column - 1),
+            &previous_sample);
     }
     if (status == AFORC_OK) {
         status = surf_man_wave_sample(
-            &app->simulation, offset_q16(-rider_column), &sample);
+            &app->simulation, offset_q16(-wave_anchor_column), &sample);
     }
     for (int32_t column = 0;
          status == AFORC_OK && column < layout->play.width;
          ++column) {
-        const int32_t relative_column = column - rider_column;
+        const int32_t relative_column = column - wave_anchor_column;
         int32_t previous_row;
         int32_t row;
         int32_t next_row;
@@ -499,9 +484,10 @@ AFORC_Status surf_man_render_wave_art(SurfManApp *app,
         if (status != AFORC_OK) {
             break;
         }
-        previous_row = wave_surface_row(&previous_sample, layout->play);
-        row = wave_surface_row(&sample, layout->play);
-        next_row = wave_surface_row(&next_sample, layout->play);
+        previous_row =
+            surf_man_wave_surface_row(&previous_sample, layout->play);
+        row = surf_man_wave_surface_row(&sample, layout->play);
+        next_row = surf_man_wave_surface_row(&next_sample, layout->play);
         status = draw_wave_column(app,
                                   layout,
                                   &previous_sample,
@@ -531,13 +517,15 @@ AFORC_Status surf_man_render_wave_art(SurfManApp *app,
         options.clip = layout->play;
         options.clip_enabled = true;
         status = aforc_particle_pool_draw(&app->visuals.particle_pool,
-                                          &options,
-                                          surf_man_plot_cell,
-                                          app);
+                                           &options,
+                                           surf_man_plot_particle_cell,
+                                           app);
     }
     if (status == AFORC_OK) {
         status = surf_man_render_rider(
-            app, layout, wave_surface_row(&rider_sample, layout->play));
+            app,
+            layout,
+            surf_man_wave_surface_row(&rider_sample, layout->play));
     }
     return status;
 }

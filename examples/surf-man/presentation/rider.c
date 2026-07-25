@@ -8,6 +8,7 @@
 
 #include "surf_man/app.h"
 
+#include <limits.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -26,6 +27,7 @@ typedef enum SurfManRiderPose {
 } SurfManRiderPose;
 
 enum {
+    SURF_MAN_RIDER_LEGEND_ROWS = 1,
     SURF_MAN_RIDER_BODY_ROWS = 3,
     SURF_MAN_RIDER_HALF_WIDTH = 5,
     SURF_MAN_RIDER_BODY_WIDTH = SURF_MAN_RIDER_HALF_WIDTH * 2 + 1,
@@ -55,6 +57,9 @@ static const char rider_body[SURF_MAN_RIDER_POSE_COUNT]
         "     O     ", "   __|__   ", "   _/ \\_   "}};
 
 static SurfManRiderPose rider_pose(const SurfManSimulation *simulation) {
+    const int32_t carve_threshold =
+        simulation->rules.carve_velocity_threshold_q16 / 4;
+
     if (simulation->phase == SURF_MAN_WIPEOUT_RECOVERY) {
         return SURF_MAN_RIDER_WIPEOUT;
     }
@@ -75,12 +80,12 @@ static SurfManRiderPose rider_pose(const SurfManSimulation *simulation) {
         simulation->bank_ticks != 0U) {
         return SURF_MAN_RIDER_LANDING;
     }
-    if (simulation->bank_ticks != 0U &&
-        simulation->last_maneuver == SURF_MAN_MANEUVER_CARVE_LEFT) {
+    if (simulation->line_velocity_q16 <= -carve_threshold ||
+        simulation->angle_q16 <= -SURF_MAN_Q16_ONE / 32) {
         return SURF_MAN_RIDER_CARVE_LEFT;
     }
-    if (simulation->bank_ticks != 0U &&
-        simulation->last_maneuver == SURF_MAN_MANEUVER_CARVE_RIGHT) {
+    if (simulation->line_velocity_q16 >= carve_threshold ||
+        simulation->angle_q16 >= SURF_MAN_Q16_ONE / 32) {
         return SURF_MAN_RIDER_CARVE_RIGHT;
     }
     if (simulation->phase == SURF_MAN_COUNT_IN) {
@@ -210,23 +215,26 @@ AFORC_Status surf_man_render_rider(SurfManApp *app,
                                     int32_t surface_y) {
     const SurfManSimulation *simulation = &app->simulation;
     const SurfManRiderPose pose = rider_pose(simulation);
-    const int32_t center_x = layout->play.x + layout->play.width / 3;
+    const int32_t center_x =
+        surf_man_rider_center_x(simulation, layout->play);
     const int32_t minimum_board_y = layout->play.y +
-                                    SURF_MAN_RIDER_BODY_ROWS +
-                                    SURF_MAN_RIDER_BOARD_GAP;
+                                     SURF_MAN_RIDER_LEGEND_ROWS +
+                                     SURF_MAN_RIDER_BODY_ROWS +
+                                     SURF_MAN_RIDER_BOARD_GAP;
     const int32_t maximum_board_y = layout->play.y + layout->play.height - 1;
-    int32_t altitude = simulation->altitude_q16 / SURF_MAN_Q16_ONE;
+    const int64_t vertical_q16 =
+        (int64_t)simulation->wave_face_offset_q16 +
+        simulation->altitude_q16;
+    const int32_t rounded_vertical_q16 =
+        vertical_q16 < INT32_MIN
+            ? INT32_MIN
+        : vertical_q16 > INT32_MAX ? INT32_MAX
+                                   : (int32_t)vertical_q16;
     int32_t board_y;
     AFORC_Point body_origin;
     AFORC_Status status;
 
-    if (altitude < 0) {
-        altitude = 0;
-    }
-    if (altitude > layout->play.height) {
-        altitude = layout->play.height;
-    }
-    board_y = surface_y - altitude;
+    board_y = surface_y - surf_man_q16_round_cell(rounded_vertical_q16);
     if (board_y < minimum_board_y) {
         board_y = minimum_board_y;
     } else if (board_y > maximum_board_y) {
