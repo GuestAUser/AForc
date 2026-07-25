@@ -26,8 +26,19 @@ SurfManRules surf_man_rules_default(void) {
     rules.bank_delay_ticks = (5U * SURF_MAN_FIXED_HZ) / 2U;
     rules.minimum_speed_q16 = 2 * SURF_MAN_Q16_ONE;
     rules.maximum_speed_q16 = 8 * SURF_MAN_Q16_ONE;
-    rules.gravity_q16 = 6 * SURF_MAN_Q16_ONE;
-    rules.pop_velocity_q16 = 4 * SURF_MAN_Q16_ONE;
+    rules.line_position_limit_q16 = 6 * SURF_MAN_Q16_ONE;
+    rules.line_maximum_velocity_q16 = 4 * SURF_MAN_Q16_ONE;
+    rules.line_acceleration_q16 = 18 * SURF_MAN_Q16_ONE;
+    rules.line_drag_q16 = 8 * SURF_MAN_Q16_ONE;
+    rules.carve_velocity_threshold_q16 = 2 * SURF_MAN_Q16_ONE;
+    rules.wave_face_offset_limit_q16 = 3 * SURF_MAN_Q16_ONE;
+    rules.wave_face_maximum_velocity_q16 = 3 * SURF_MAN_Q16_ONE;
+    rules.wave_face_acceleration_q16 = 12 * SURF_MAN_Q16_ONE;
+    rules.wave_face_drag_q16 = 6 * SURF_MAN_Q16_ONE;
+    rules.air_face_threshold_q16 = SURF_MAN_Q16_ONE / 2;
+    rules.hazard_face_threshold_q16 = SURF_MAN_Q16_ONE / 4;
+    rules.gravity_q16 = 8 * SURF_MAN_Q16_ONE;
+    rules.pop_velocity_q16 = 7 * SURF_MAN_Q16_ONE;
     rules.landing_tolerance_q16 = SURF_MAN_Q16_ONE / 8;
     return rules;
 }
@@ -83,6 +94,18 @@ uint64_t surf_man_simulation_hash(const SurfManSimulation *simulation) {
     surf_man_hash_u32(&hash, simulation->rules.bank_delay_ticks);
     surf_man_hash_i32(&hash, simulation->rules.minimum_speed_q16);
     surf_man_hash_i32(&hash, simulation->rules.maximum_speed_q16);
+    surf_man_hash_i32(&hash, simulation->rules.line_position_limit_q16);
+    surf_man_hash_i32(&hash, simulation->rules.line_maximum_velocity_q16);
+    surf_man_hash_i32(&hash, simulation->rules.line_acceleration_q16);
+    surf_man_hash_i32(&hash, simulation->rules.line_drag_q16);
+    surf_man_hash_i32(&hash, simulation->rules.carve_velocity_threshold_q16);
+    surf_man_hash_i32(&hash, simulation->rules.wave_face_offset_limit_q16);
+    surf_man_hash_i32(
+        &hash, simulation->rules.wave_face_maximum_velocity_q16);
+    surf_man_hash_i32(&hash, simulation->rules.wave_face_acceleration_q16);
+    surf_man_hash_i32(&hash, simulation->rules.wave_face_drag_q16);
+    surf_man_hash_i32(&hash, simulation->rules.air_face_threshold_q16);
+    surf_man_hash_i32(&hash, simulation->rules.hazard_face_threshold_q16);
     surf_man_hash_i32(&hash, simulation->rules.gravity_q16);
     surf_man_hash_i32(&hash, simulation->rules.pop_velocity_q16);
     surf_man_hash_i32(&hash, simulation->rules.landing_tolerance_q16);
@@ -109,6 +132,10 @@ uint64_t surf_man_simulation_hash(const SurfManSimulation *simulation) {
     surf_man_hash_u32(&hash, simulation->maneuver_count);
     surf_man_hash_i32(&hash, simulation->distance_q16);
     surf_man_hash_i32(&hash, simulation->speed_q16);
+    surf_man_hash_i32(&hash, simulation->line_position_q16);
+    surf_man_hash_i32(&hash, simulation->line_velocity_q16);
+    surf_man_hash_i32(&hash, simulation->wave_face_offset_q16);
+    surf_man_hash_i32(&hash, simulation->wave_face_velocity_q16);
     surf_man_hash_i32(&hash, simulation->face_q16);
     surf_man_hash_i32(&hash, simulation->face_velocity_q16);
     surf_man_hash_i32(&hash, simulation->altitude_q16);

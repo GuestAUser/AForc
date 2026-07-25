@@ -90,6 +90,17 @@ typedef struct SurfManRules {
     uint32_t bank_delay_ticks;
     int32_t minimum_speed_q16;
     int32_t maximum_speed_q16;
+    int32_t line_position_limit_q16;
+    int32_t line_maximum_velocity_q16;
+    int32_t line_acceleration_q16;
+    int32_t line_drag_q16;
+    int32_t carve_velocity_threshold_q16;
+    int32_t wave_face_offset_limit_q16;
+    int32_t wave_face_maximum_velocity_q16;
+    int32_t wave_face_acceleration_q16;
+    int32_t wave_face_drag_q16;
+    int32_t air_face_threshold_q16;
+    int32_t hazard_face_threshold_q16;
     int32_t gravity_q16;
     int32_t pop_velocity_q16;
     int32_t landing_tolerance_q16;
@@ -134,6 +145,10 @@ typedef struct SurfManSimulation {
     uint32_t maneuver_count;
     int32_t distance_q16;
     int32_t speed_q16;
+    int32_t line_position_q16;
+    int32_t line_velocity_q16;
+    int32_t wave_face_offset_q16;
+    int32_t wave_face_velocity_q16;
     int32_t face_q16;
     int32_t face_velocity_q16;
     int32_t altitude_q16;
