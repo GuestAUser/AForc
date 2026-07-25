@@ -1,0 +1,230 @@
+/*
+ * AForc
+ * Author: GuestAUser
+ * SPDX-License-Identifier: MIT
+ */
+
+#include "ecs_optimization_support.h"
+
+#include <stdio.h>
+#include <string.h>
+
+static bool test_view_case(size_t type_count)
+{
+    AFORC_ComponentType types[ECS_TEST_TYPE_LIMIT];
+    AFORC_ComponentType required[ECS_TEST_TYPE_LIMIT];
+    AFORC_Entity drivers[4];
+    AFORC_Entity fillers[3U * (ECS_TEST_TYPE_LIMIT - 1U)];
+    AFORC_Entity entity = AFORC_ENTITY_INVALID;
+    AFORC_EcsView *view = NULL;
+    AFORC_Ecs *ecs = NULL;
+    bool has_value = false;
+    size_t type_index;
+    size_t index;
+    size_t visited = 0U;
+    bool passed;
+
+    passed = ecs_test_create(32U, type_count, 0U, &ecs) &&
+             ecs_test_register_types(ecs, type_count, 0U, types);
+    for (index = 0U; passed && index < 4U; ++index) {
+        passed = ecs_test_create_entity(ecs, &drivers[index]);
+    }
+    for (index = 0U; passed && index < 3U * (type_count - 1U); ++index) {
+        passed = ecs_test_create_entity(ecs, &fillers[index]);
+    }
+    for (index = 0U; passed && index < 4U; ++index) {
+        passed = ecs_test_add(ecs, drivers[index], types[type_count - 1U]);
+    }
+    for (type_index = 0U; passed && type_index + 1U < type_count;
+         ++type_index) {
+        passed = ecs_test_add(ecs, drivers[0], types[type_index]) &&
+                 ecs_test_add(ecs, drivers[2], types[type_index]) &&
+                 ecs_test_add(ecs, fillers[3U * type_index], types[type_index]) &&
+                 ecs_test_add(
+                     ecs, fillers[3U * type_index + 1U], types[type_index]) &&
+                 ecs_test_add(
+                     ecs, fillers[3U * type_index + 2U], types[type_index]);
+    }
+    for (type_index = 0U; type_index + 1U < type_count; ++type_index) {
+        required[type_index] =
+            types[(type_index + 1U) % (type_count - 1U)];
+    }
+    required[type_count - 1U] = types[type_count - 1U];
+    for (type_index = 0U; passed && type_index + 2U < type_count;
+         ++type_index) {
+        passed = ecs_test_add(ecs, drivers[1], required[type_index]) &&
+                 ecs_test_add(ecs, drivers[3], required[type_index]);
+    }
+    passed = passed &&
+             aforc_ecs_view_create(ecs, required, type_count, &view) ==
+                 AFORC_OK &&
+             ecs_test_next_match(
+                 view, ecs, drivers[0], required, type_count) &&
+             ecs_test_next_match(
+                 view, ecs, drivers[2], required, type_count) &&
+             ecs_test_exhausted(view, type_count);
+    aforc_ecs_view_destroy(view);
+    view = NULL;
+    passed = passed &&
+             aforc_ecs_view_create(ecs, required, type_count, &view) ==
+                 AFORC_OK;
+    while (passed) {
+        passed = aforc_ecs_view_next(view, &entity, NULL, &has_value) ==
+                 AFORC_OK;
+        if (!passed || !has_value) {
+            break;
+        }
+        ++visited;
+    }
+    passed = passed && visited == 2U;
+    aforc_ecs_view_destroy(view);
+    aforc_ecs_destroy(ecs);
+    return passed;
+}
+
+static bool test_zero_and_revision(void)
+{
+    AFORC_ComponentType type = AFORC_COMPONENT_TYPE_INVALID;
+    AFORC_Entity entities[4];
+    AFORC_Entity entity = AFORC_ENTITY_INVALID;
+    AFORC_EcsView *view = NULL;
+    AFORC_Ecs *ecs = NULL;
+    bool has_value = false;
+    size_t index;
+    size_t visited = 0U;
+    bool passed;
+
+    passed = ecs_test_create(8U, 1U, 0U, &ecs) &&
+             ecs_test_register_types(ecs, 1U, 0U, &type);
+    for (index = 0U; passed && index < 4U; ++index) {
+        passed = ecs_test_create_entity(ecs, &entities[index]);
+    }
+    passed = passed &&
+             aforc_ecs_destroy_entity(ecs, entities[1]) == AFORC_OK &&
+             aforc_ecs_view_create(ecs, NULL, 0U, &view) == AFORC_OK;
+    while (passed) {
+        passed = aforc_ecs_view_next(view, &entity, NULL, &has_value) ==
+                 AFORC_OK;
+        if (!passed || !has_value) {
+            break;
+        }
+        ++visited;
+    }
+    passed = passed && visited == 3U;
+    aforc_ecs_view_destroy(view);
+    view = NULL;
+    passed = passed &&
+             aforc_ecs_view_create(ecs, &type, 1U, &view) == AFORC_OK &&
+             ecs_test_add(ecs, entities[0], type);
+    if (passed) {
+        void *component = &entity;
+
+        passed = aforc_ecs_view_next(view, &entity, &component, &has_value) ==
+                     AFORC_ERROR_STATE &&
+                 !has_value &&
+                 aforc_entity_equal(entity, AFORC_ENTITY_INVALID) &&
+                 component == NULL;
+    }
+    aforc_ecs_view_destroy(view);
+    aforc_ecs_destroy(ecs);
+    return passed;
+}
+
+static void cleanup_probe(AFORC_Ecs *ecs,
+                          AFORC_Entity entity,
+                          void *component,
+                          void *user_data)
+{
+    EcsCleanupProbe *probe = (EcsCleanupProbe *)user_data;
+    void *queried = NULL;
+
+    probe->invoked = true;
+    probe->get_status = aforc_ecs_get(ecs, entity, probe->type, &queried);
+    probe->component_visible =
+        queried == component && component == probe->expected_component;
+    probe->remove_status = aforc_ecs_remove(ecs, entity, probe->type);
+    probe->view_entity = entity;
+    probe->view_component = component;
+    probe->view_has_value = true;
+    probe->view_status = aforc_ecs_view_next(probe->view,
+                                             &probe->view_entity,
+                                             &probe->view_component,
+                                             &probe->view_has_value);
+}
+
+static bool test_cleanup_guard(void)
+{
+    AFORC_EcsComponentDesc desc = {0};
+    EcsCleanupProbe probe = {0};
+    AFORC_Entity entity = AFORC_ENTITY_INVALID;
+    EcsTestComponent value;
+    AFORC_Ecs *ecs = NULL;
+    bool has_component = true;
+    bool passed;
+
+    passed = ecs_test_create(4U, 1U, 0U, &ecs);
+    desc.size = sizeof(EcsTestComponent);
+    desc.alignment = _Alignof(EcsTestComponent);
+    desc.cleanup = cleanup_probe;
+    desc.cleanup_user_data = &probe;
+    passed = passed &&
+             aforc_ecs_register_component(ecs, &desc, &probe.type) ==
+                 AFORC_OK &&
+             ecs_test_create_entity(ecs, &entity);
+    value = (EcsTestComponent){entity.index, probe.type.id};
+    passed = passed &&
+             aforc_ecs_add(ecs,
+                           entity,
+                           probe.type,
+                           &value,
+                           &probe.expected_component) == AFORC_OK &&
+             aforc_ecs_view_create(ecs, &probe.type, 1U, &probe.view) ==
+                 AFORC_OK &&
+             aforc_ecs_remove(ecs, entity, probe.type) == AFORC_OK &&
+             probe.invoked && probe.get_status == AFORC_OK &&
+             probe.component_visible &&
+             probe.remove_status == AFORC_ERROR_STATE &&
+             probe.view_status == AFORC_ERROR_STATE &&
+             !probe.view_has_value &&
+             aforc_entity_equal(probe.view_entity, AFORC_ENTITY_INVALID) &&
+             probe.view_component == NULL &&
+             aforc_ecs_has(ecs, entity, probe.type, &has_component) ==
+                 AFORC_OK &&
+             !has_component;
+    aforc_ecs_view_destroy(probe.view);
+    aforc_ecs_destroy(ecs);
+    return passed;
+}
+
+int main(int argc, char **argv)
+{
+    size_t sparse_bytes = 0U;
+
+    if (argc == 2 && strcmp(argv[1], "--benchmark") == 0) {
+        return ecs_test_benchmark() ? 0 : 1;
+    }
+    if (argc != 1) {
+        (void)fprintf(stderr, "usage: %s [--benchmark]\n", argv[0]);
+        return 2;
+    }
+    if (!ecs_test_sparse(&sparse_bytes)) {
+        (void)fprintf(stderr,
+                      "sparse width/swap regression failed (bytes=%zu)\n",
+                      sparse_bytes);
+        return 3;
+    }
+    if (!test_view_case(2U) || !test_view_case(4U) || !test_view_case(8U)) {
+        (void)fprintf(stderr, "2/4/8-type view pointer parity failed\n");
+        return 4;
+    }
+    if (!test_zero_and_revision()) {
+        (void)fprintf(stderr, "zero-type/revision view regression failed\n");
+        return 5;
+    }
+    if (!test_cleanup_guard()) {
+        (void)fprintf(stderr, "cleanup mutation guard regression failed\n");
+        return 6;
+    }
+    (void)puts("ecs optimization: ok");
+    return 0;
+}
