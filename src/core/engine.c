@@ -21,13 +21,24 @@
  * engine_commands.c so callbacks cannot invalidate an active stack walk. */
 
 static uint64_t timespec_to_ns(const struct timespec *value) {
+    uintmax_t wide_seconds;
+    uint64_t seconds;
+    uint64_t nanoseconds;
+
     if (value == NULL || value->tv_sec < 0 || value->tv_nsec < 0 ||
-        value->tv_nsec >= 1000000000L ||
-        (uint64_t)value->tv_sec > UINT64_MAX / UINT64_C(1000000000)) {
+        value->tv_nsec >= 1000000000L) {
         return 0U;
     }
-    return (uint64_t)value->tv_sec * UINT64_C(1000000000) +
-           (uint64_t)value->tv_nsec;
+    wide_seconds = (uintmax_t)value->tv_sec;
+    if (wide_seconds > UINT64_MAX) {
+        return 0U;
+    }
+    seconds = (uint64_t)wide_seconds;
+    nanoseconds = (uint64_t)value->tv_nsec;
+    if (seconds > (UINT64_MAX - nanoseconds) / UINT64_C(1000000000)) {
+        return 0U;
+    }
+    return seconds * UINT64_C(1000000000) + nanoseconds;
 }
 
 static uint64_t default_now(void *context) {
@@ -86,6 +97,7 @@ AFORC_EngineConfig aforc_engine_config_default(void) {
 
 static bool config_valid(const AFORC_EngineConfig *config) {
     return config != NULL && config->fixed_updates_per_second > 0U &&
+           config->fixed_updates_per_second <= UINT32_C(1000000000) &&
            config->maximum_fixed_updates_per_frame > 0U &&
            config->maximum_frame_seconds > 0.0 &&
            config->maximum_frame_seconds <= 3600.0 &&
@@ -101,11 +113,15 @@ AFORC_Status aforc_engine_create(const AFORC_EngineConfig *config,
                              AFORC_Engine **out_engine, AFORC_Error *error) {
     AFORC_Engine *engine = NULL;
     AFORC_Status status;
-    if (out_engine == NULL || !config_valid(config)) {
+    if (out_engine == NULL) {
         return aforc_engine_set_error(error, AFORC_ERROR_INVALID_ARGUMENT,
                                     "invalid engine configuration");
     }
     *out_engine = NULL;
+    if (!config_valid(config)) {
+        return aforc_engine_set_error(error, AFORC_ERROR_INVALID_ARGUMENT,
+                                    "invalid engine configuration");
+    }
     status = aforc_alloc_array(&config->allocator, 1U, sizeof(*engine),
                              (void **)&engine);
     if (status != AFORC_OK) {

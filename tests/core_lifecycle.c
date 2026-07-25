@@ -22,6 +22,7 @@ typedef struct SleepContext {
 
 typedef struct AllocationContext {
     size_t live_allocations;
+    size_t allocation_calls;
     bool destroy_attempted;
 } AllocationContext;
 
@@ -30,6 +31,7 @@ static void *tracked_allocate(void *context, size_t size)
     AllocationContext *allocations = context;
     void *memory = malloc(size);
 
+    ++allocations->allocation_calls;
     if (memory != NULL) {
         ++allocations->live_allocations;
     }
@@ -162,7 +164,7 @@ static bool test_quit_skips_frame_sleep(void)
 
 static bool test_destroy_is_deferred_during_frame(void)
 {
-    AllocationContext context = {0U, false};
+    AllocationContext context = {0U, 0U, false};
     AFORC_EngineConfig config = aforc_engine_config_default();
     AFORC_Engine *engine = NULL;
     AFORC_Error error;
@@ -188,6 +190,26 @@ static bool test_destroy_is_deferred_during_frame(void)
         aforc_engine_destroy(engine);
     }
     return passed && context.live_allocations == 0U;
+}
+
+static bool test_invalid_frequency_is_rejected_before_allocation(void)
+{
+    AllocationContext context = {0U, 0U, false};
+    AFORC_EngineConfig config = aforc_engine_config_default();
+    AFORC_Engine *engine = (AFORC_Engine *)(uintptr_t)1U;
+    AFORC_Error error;
+    AFORC_Status status;
+
+    config.fixed_updates_per_second = UINT32_C(1000000001);
+    config.allocator = (AFORC_Allocator){
+        &context,
+        tracked_allocate,
+        tracked_reallocate,
+        tracked_deallocate,
+    };
+    status = aforc_engine_create(&config, &engine, &error);
+    return status == AFORC_ERROR_INVALID_ARGUMENT && engine == NULL &&
+           context.allocation_calls == 0U && context.live_allocations == 0U;
 }
 
 static bool test_successful_fixed_update_advances_tick_before_quit(void)
@@ -238,6 +260,10 @@ int main(void)
     if (!test_successful_fixed_update_advances_tick_before_quit()) {
         (void)fprintf(stderr, "fixed tick accounting failed\n");
         return 4;
+    }
+    if (!test_invalid_frequency_is_rejected_before_allocation()) {
+        (void)fprintf(stderr, "invalid engine frequency validation failed\n");
+        return 5;
     }
     (void)puts("core lifecycle: ok");
     return 0;
