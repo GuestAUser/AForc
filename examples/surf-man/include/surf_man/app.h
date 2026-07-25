@@ -28,9 +28,12 @@ typedef enum SurfManMenuItem {
 typedef struct SurfManInputState {
     int8_t vertical;
     int8_t horizontal;
+    int8_t vertical_tap;
+    int8_t horizontal_tap;
     uint8_t vertical_lease;
     uint8_t horizontal_lease;
-    bool action_latched;
+    uint8_t action_lease;
+    bool action_tap;
     bool confirm_latched;
     bool back_latched;
 } SurfManInputState;

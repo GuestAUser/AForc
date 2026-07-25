@@ -136,11 +136,22 @@ static AFORC_Status surf_man_handle_key_down(SurfManApp *app,
     } else if (input.vertical != 0) {
         app->controls.vertical = (int8_t)input.vertical;
         app->controls.vertical_lease = SURF_MAN_COMMAND_LEASE_TICKS;
+        if (!input.repeat) {
+            app->controls.vertical_tap = (int8_t)input.vertical;
+        }
     } else if (input.horizontal != 0) {
         app->controls.horizontal = (int8_t)input.horizontal;
         app->controls.horizontal_lease = SURF_MAN_COMMAND_LEASE_TICKS;
-    } else if (!input.repeat && input.key == AFORC_KEY_SPACE) {
-        app->controls.action_latched = true;
+        if (!input.repeat) {
+            app->controls.horizontal_tap = (int8_t)input.horizontal;
+        }
+    } else if (input.key == AFORC_KEY_SPACE &&
+               (app->simulation.phase == SURF_MAN_RIDING ||
+                app->simulation.phase == SURF_MAN_PRACTICE)) {
+        app->controls.action_lease = SURF_MAN_COMMAND_LEASE_TICKS;
+        if (!input.repeat) {
+            app->controls.action_tap = true;
+        }
     } else if (!input.repeat && input.key == AFORC_KEY_ENTER) {
         app->controls.confirm_latched = true;
     } else if (!input.repeat && input.key == AFORC_KEY_BACKSPACE) {
@@ -152,6 +163,7 @@ static AFORC_Status surf_man_handle_key_down(SurfManApp *app,
 static void surf_man_handle_key_up(SurfManApp *app,
                                    const AFORC_InputEvent *event)
 {
+    const uint32_t codepoint = surf_man_event_codepoint(event);
     const int vertical = surf_man_direction(event,
                                              AFORC_KEY_UP,
                                              'w',
@@ -170,6 +182,9 @@ static void surf_man_handle_key_up(SurfManApp *app,
     if (horizontal != 0 && app->controls.horizontal == horizontal) {
         app->controls.horizontal = 0;
         app->controls.horizontal_lease = 0U;
+    }
+    if (event->data.key.key == AFORC_KEY_SPACE || codepoint == (uint32_t)' ') {
+        app->controls.action_lease = 0U;
     }
 }
 
@@ -247,15 +262,25 @@ void surf_man_input_take_command(SurfManApp *app,
         return;
     }
 
-    out_command->vertical = app->controls.vertical;
-    out_command->horizontal = app->controls.horizontal;
-    out_command->action = app->controls.action_latched;
+    out_command->vertical = app->controls.vertical_tap != 0
+                                ? app->controls.vertical_tap
+                                : app->controls.vertical;
+    out_command->horizontal = app->controls.horizontal_tap != 0
+                                  ? app->controls.horizontal_tap
+                                  : app->controls.horizontal;
+    out_command->action = app->controls.action_tap ||
+                          app->controls.action_lease > 0U;
     out_command->confirm = app->controls.confirm_latched;
     out_command->back = app->controls.back_latched;
 
-    app->controls.action_latched = false;
+    app->controls.vertical_tap = 0;
+    app->controls.horizontal_tap = 0;
+    app->controls.action_tap = false;
     app->controls.confirm_latched = false;
     app->controls.back_latched = false;
+    if (app->controls.action_lease > 0U) {
+        --app->controls.action_lease;
+    }
     if (app->controls.vertical_lease > 0U &&
         --app->controls.vertical_lease == 0U) {
         app->controls.vertical = 0;
