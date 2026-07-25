@@ -47,23 +47,35 @@ jobs:
           MODE=debug STRICT=1 SANITIZE=1 all test
 
   cmake:
-    name: CMake ${{ matrix.compiler }} ${{ matrix.linkage }}
-    runs-on: ubuntu-latest
+    name: CMake ${{ matrix.os }} ${{ matrix.compiler }} ${{ matrix.linkage }}
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
         include:
-          - compiler: gcc
+          - os: ubuntu-latest
+            compiler: gcc
             linkage: static
             shared: "OFF"
-          - compiler: gcc
+          - os: ubuntu-latest
+            compiler: gcc
             linkage: shared
             shared: "ON"
-          - compiler: clang
+          - os: ubuntu-latest
+            compiler: clang
             linkage: static
             shared: "OFF"
-          - compiler: clang
+          - os: ubuntu-latest
+            compiler: clang
+            linkage: shared
+            shared: "ON"
+          - os: macos-latest
+            compiler: clang
+            linkage: static
+            shared: "OFF"
+          - os: macos-latest
+            compiler: clang
             linkage: shared
             shared: "ON"
     env:
@@ -86,6 +98,37 @@ jobs:
           ctest --test-dir
           "build/ci-cmake-${{ matrix.compiler }}-${{ matrix.linkage }}"
           --output-on-failure
+      - name: Install
+        run: >-
+          cmake --install
+          "build/ci-cmake-${{ matrix.compiler }}-${{ matrix.linkage }}"
+          --prefix
+          "${{ github.workspace }}/build/ci-install-${{ matrix.compiler }}-${{ matrix.linkage }}"
+      - name: Configure installed-package consumer
+        run: >-
+          cmake -S tests/package_consumer
+          -B "build/ci-consumer-${{ matrix.compiler }}-${{ matrix.linkage }}"
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_PREFIX_PATH="${{ github.workspace }}/build/ci-install-${{ matrix.compiler }}-${{ matrix.linkage }}"
+      - name: Build installed-package consumer
+        run: >-
+          cmake --build
+          "build/ci-consumer-${{ matrix.compiler }}-${{ matrix.linkage }}"
+          --parallel
+      - name: Test installed-package consumer
+        run: >-
+          ctest --test-dir
+          "build/ci-consumer-${{ matrix.compiler }}-${{ matrix.linkage }}"
+          --output-on-failure
+      - name: Reject incompatible package minor
+        run: |
+          if cmake -S tests/package_consumer \
+            -B "build/ci-consumer-incompatible-${{ matrix.compiler }}-${{ matrix.linkage }}" \
+            -DCMAKE_PREFIX_PATH="${{ github.workspace }}/build/ci-install-${{ matrix.compiler }}-${{ matrix.linkage }}" \
+            -DAFORC_REQUIRED_VERSION=0.0; then
+            printf '%s\n' 'AForc 0.1 must not satisfy a 0.0 requirement.' >&2
+            exit 1
+          fi
 
   cmake-sanitizers:
     name: CMake ASan and UBSan
