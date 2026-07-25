@@ -20,35 +20,78 @@ ROGUELIKE_SOURCES := $(sort $(wildcard examples/roguelike/*.c))
 ROGUELIKE_OBJECTS := $(patsubst examples/%.c,$(BUILD_DIR)/obj/examples/%.o,$(ROGUELIKE_SOURCES))
 ROGUELIKE_DEPS := $(ROGUELIKE_OBJECTS:.o=.d)
 SCENE_TEST_SOURCES := tests/scene_reentrancy.c
+CORE_TEST_SOURCES := tests/core_lifecycle.c
+INPUT_TEST_SOURCES := tests/input_protocol.c
+TERMINAL_TEST_SOURCES := tests/terminal_lifecycle.c
 SAVE_TEST_SOURCES := tests/save_crc.c
+ASSETS_TEST_SOURCES := tests/assets_contracts.c
+CONFIG_BOUNDARIES_TEST_SOURCES := tests/config_parser_boundaries.c
+SAVE_BOUNDARIES_TEST_SOURCES := tests/save_container_boundaries.c
 CONFIG_TEST_SOURCES := tests/config_parser_scale.c tests/config_parser_scale_support.c
 RENDERER_TEST_SOURCES := tests/renderer_diff.c tests/renderer_diff_cases.c tests/renderer_diff_model.c
 ECS_TEST_SOURCES := tests/ecs_optimization.c tests/ecs_optimization_support.c
+ECS_TEST_SOURCES += tests/ecs_lifecycle_cases.c tests/ecs_storage_cases.c
 ASTAR_TEST_SOURCES := tests/astar_workspace.c tests/astar_workspace_support.c
+WORLD_TEST_SOURCES := tests/world_algorithms.c tests/world_test_support.c
+WORLD_TEST_SOURCES += tests/world_core_cases.c tests/world_visibility_cases.c
+WORLD_TEST_SOURCES += tests/astar_correctness_cases.c
+RENDERER_LIFECYCLE_TEST_SOURCES := tests/renderer_lifecycle.c
+EFFECTS_TEST_SOURCES := tests/effects_regression.c
+UI_TEST_SOURCES := tests/ui_regression.c
 SCENE_TEST_OBJECTS := $(patsubst tests/%.c,$(BUILD_DIR)/obj/tests/%.o,$(SCENE_TEST_SOURCES))
+CORE_TEST_OBJECTS := $(patsubst tests/%.c,$(BUILD_DIR)/obj/tests/%.o,$(CORE_TEST_SOURCES))
+INPUT_TEST_OBJECTS := $(patsubst tests/%.c,$(BUILD_DIR)/obj/tests/%.o,$(INPUT_TEST_SOURCES))
+TERMINAL_TEST_OBJECTS := $(patsubst tests/%.c,$(BUILD_DIR)/obj/tests/%.o,$(TERMINAL_TEST_SOURCES))
 SAVE_TEST_OBJECTS := $(patsubst tests/%.c,$(BUILD_DIR)/obj/tests/%.o,$(SAVE_TEST_SOURCES))
+ASSETS_TEST_OBJECTS := $(patsubst tests/%.c,$(BUILD_DIR)/obj/tests/%.o,$(ASSETS_TEST_SOURCES))
+CONFIG_BOUNDARIES_TEST_OBJECTS := $(patsubst tests/%.c,$(BUILD_DIR)/obj/tests/%.o,$(CONFIG_BOUNDARIES_TEST_SOURCES))
+SAVE_BOUNDARIES_TEST_OBJECTS := $(patsubst tests/%.c,$(BUILD_DIR)/obj/tests/%.o,$(SAVE_BOUNDARIES_TEST_SOURCES))
 CONFIG_TEST_OBJECTS := $(patsubst tests/%.c,$(BUILD_DIR)/obj/tests/%.o,$(CONFIG_TEST_SOURCES))
 RENDERER_TEST_OBJECTS := $(patsubst tests/%.c,$(BUILD_DIR)/obj/tests/%.o,$(RENDERER_TEST_SOURCES))
 ECS_TEST_OBJECTS := $(patsubst tests/%.c,$(BUILD_DIR)/obj/tests/%.o,$(ECS_TEST_SOURCES))
 ASTAR_TEST_OBJECTS := $(patsubst tests/%.c,$(BUILD_DIR)/obj/tests/%.o,$(ASTAR_TEST_SOURCES))
+WORLD_TEST_OBJECTS := $(patsubst tests/%.c,$(BUILD_DIR)/obj/tests/%.o,$(WORLD_TEST_SOURCES))
+RENDERER_LIFECYCLE_TEST_OBJECTS := $(patsubst tests/%.c,$(BUILD_DIR)/obj/tests/%.o,$(RENDERER_LIFECYCLE_TEST_SOURCES))
+EFFECTS_TEST_OBJECTS := $(patsubst tests/%.c,$(BUILD_DIR)/obj/tests/%.o,$(EFFECTS_TEST_SOURCES))
+UI_TEST_OBJECTS := $(patsubst tests/%.c,$(BUILD_DIR)/obj/tests/%.o,$(UI_TEST_SOURCES))
 TEST_OBJECTS := $(SCENE_TEST_OBJECTS) $(SAVE_TEST_OBJECTS) $(CONFIG_TEST_OBJECTS)
+TEST_OBJECTS += $(CORE_TEST_OBJECTS) $(INPUT_TEST_OBJECTS) $(TERMINAL_TEST_OBJECTS)
+TEST_OBJECTS += $(ASSETS_TEST_OBJECTS) $(CONFIG_BOUNDARIES_TEST_OBJECTS) $(SAVE_BOUNDARIES_TEST_OBJECTS)
 TEST_OBJECTS += $(RENDERER_TEST_OBJECTS) $(ECS_TEST_OBJECTS) $(ASTAR_TEST_OBJECTS)
-CONFIG_TEST_SUBJECT := $(BUILD_DIR)/obj/tests/subjects/config_parser.o
+TEST_OBJECTS += $(WORLD_TEST_OBJECTS)
+TEST_OBJECTS += $(RENDERER_LIFECYCLE_TEST_OBJECTS) $(EFFECTS_TEST_OBJECTS) $(UI_TEST_OBJECTS)
+CONFIG_TEST_SUBJECT_SOURCES := src/assets/config_parser.c src/assets/config_index.c src/assets/config_storage.c
+CONFIG_TEST_SUBJECT_OBJECTS := $(patsubst src/assets/%.c,$(BUILD_DIR)/obj/tests/subjects/%.o,$(CONFIG_TEST_SUBJECT_SOURCES))
 RENDERER_TEST_SUBJECT := $(BUILD_DIR)/obj/tests/subjects/renderer_ansi.o
-TEST_DEPS := $(TEST_OBJECTS:.o=.d) $(CONFIG_TEST_SUBJECT:.o=.d) $(RENDERER_TEST_SUBJECT:.o=.d)
+TEST_DEPS := $(TEST_OBJECTS:.o=.d) $(CONFIG_TEST_SUBJECT_OBJECTS:.o=.d) $(RENDERER_TEST_SUBJECT:.o=.d)
 COMMON_OBJECT := $(BUILD_DIR)/obj/core/common.o
-ECS_SUBJECT_OBJECTS := $(BUILD_DIR)/obj/ecs/component.o
-ECS_SUBJECT_OBJECTS += $(BUILD_DIR)/obj/ecs/ecs.o $(BUILD_DIR)/obj/ecs/view.o
+ECS_SUBJECT_OBJECTS := $(BUILD_DIR)/obj/ecs/component.o $(BUILD_DIR)/obj/ecs/component_instances.o
+ECS_SUBJECT_OBJECTS += $(BUILD_DIR)/obj/ecs/component_store.o $(BUILD_DIR)/obj/ecs/ecs.o
+ECS_SUBJECT_OBJECTS += $(BUILD_DIR)/obj/ecs/entity.o $(BUILD_DIR)/obj/ecs/view.o
 LIBRARY := $(BUILD_DIR)/lib/libaforc.a
 ROGUELIKE := $(BUILD_DIR)/bin/aforc-roguelike
 SCENE_TEST := $(BUILD_DIR)/bin/aforc-scene-reentrancy-test
+CORE_TEST := $(BUILD_DIR)/bin/aforc-core-lifecycle-test
+INPUT_TEST := $(BUILD_DIR)/bin/aforc-input-protocol-test
+TERMINAL_TEST := $(BUILD_DIR)/bin/aforc-terminal-lifecycle-test
 SAVE_TEST := $(BUILD_DIR)/bin/aforc-save-crc-test
+ASSETS_TEST := $(BUILD_DIR)/bin/aforc-assets-contracts-test
+CONFIG_BOUNDARIES_TEST := $(BUILD_DIR)/bin/aforc-config-parser-boundaries-test
+SAVE_BOUNDARIES_TEST := $(BUILD_DIR)/bin/aforc-save-container-boundaries-test
 CONFIG_TEST := $(BUILD_DIR)/bin/aforc-config-parser-scale-test
 RENDERER_TEST := $(BUILD_DIR)/bin/aforc-renderer-diff-test
 ECS_TEST := $(BUILD_DIR)/bin/aforc-ecs-optimization-test
 ASTAR_TEST := $(BUILD_DIR)/bin/aforc-astar-workspace-test
+WORLD_TEST := $(BUILD_DIR)/bin/aforc-world-algorithms-test
+RENDERER_LIFECYCLE_TEST := $(BUILD_DIR)/bin/aforc-renderer-lifecycle-test
+EFFECTS_TEST := $(BUILD_DIR)/bin/aforc-effects-regression-test
+UI_TEST := $(BUILD_DIR)/bin/aforc-ui-regression-test
 TEST_BINARIES := $(SCENE_TEST) $(SAVE_TEST) $(CONFIG_TEST)
+TEST_BINARIES += $(CORE_TEST) $(INPUT_TEST) $(TERMINAL_TEST)
+TEST_BINARIES += $(ASSETS_TEST) $(CONFIG_BOUNDARIES_TEST) $(SAVE_BOUNDARIES_TEST)
 TEST_BINARIES += $(RENDERER_TEST) $(ECS_TEST) $(ASTAR_TEST)
+TEST_BINARIES += $(WORLD_TEST)
+TEST_BINARIES += $(RENDERER_LIFECYCLE_TEST) $(EFFECTS_TEST) $(UI_TEST)
 FLAGS_STAMP := $(BUILD_DIR)/.build-flags
 
 AFORC_CPPFLAGS := -Iinclude
@@ -146,7 +189,7 @@ $(BUILD_DIR)/obj/tests/%.o: tests/%.c $(FLAGS_STAMP)
 	@mkdir -p "$(@D)"
 	$(CC) $(CPPFLAGS) $(AFORC_CPPFLAGS) $(CFLAGS) $(AFORC_CFLAGS) $(AFORC_PROGRAM_CFLAGS) -MMD -MP -c "$<" -o "$@"
 
-$(CONFIG_TEST_SUBJECT): src/assets/config_parser.c tests/config_parser_scale_support.h $(FLAGS_STAMP)
+$(CONFIG_TEST_SUBJECT_OBJECTS): $(BUILD_DIR)/obj/tests/subjects/%.o: src/assets/%.c tests/config_parser_scale_support.h $(FLAGS_STAMP)
 	@mkdir -p "$(@D)"
 	$(CC) $(CPPFLAGS) $(AFORC_CPPFLAGS) $(CFLAGS) $(AFORC_CFLAGS) $(AFORC_PROGRAM_CFLAGS) -include tests/config_parser_scale_support.h -Dmalloc=aforc_config_test_malloc -Drealloc=aforc_config_test_realloc -Dfree=aforc_config_test_free -MMD -MP -c "$<" -o "$@"
 
@@ -162,13 +205,37 @@ $(SCENE_TEST): $(SCENE_TEST_OBJECTS) $(LIBRARY)
 	@mkdir -p "$(@D)"
 	$(CC) $(LDFLAGS) $(AFORC_LDFLAGS) $(AFORC_PROGRAM_LDFLAGS) $(SCENE_TEST_OBJECTS) $(LIBRARY) $(LDLIBS) $(AFORC_LDLIBS) -o "$@"
 
+$(CORE_TEST): $(CORE_TEST_OBJECTS) $(LIBRARY)
+	@mkdir -p "$(@D)"
+	$(CC) $(LDFLAGS) $(AFORC_LDFLAGS) $(AFORC_PROGRAM_LDFLAGS) $(CORE_TEST_OBJECTS) $(LIBRARY) $(LDLIBS) $(AFORC_LDLIBS) -o "$@"
+
+$(INPUT_TEST): $(INPUT_TEST_OBJECTS) $(LIBRARY)
+	@mkdir -p "$(@D)"
+	$(CC) $(LDFLAGS) $(AFORC_LDFLAGS) $(AFORC_PROGRAM_LDFLAGS) $(INPUT_TEST_OBJECTS) $(LIBRARY) $(LDLIBS) $(AFORC_LDLIBS) -o "$@"
+
+$(TERMINAL_TEST): $(TERMINAL_TEST_OBJECTS) $(LIBRARY)
+	@mkdir -p "$(@D)"
+	$(CC) $(LDFLAGS) $(AFORC_LDFLAGS) $(AFORC_PROGRAM_LDFLAGS) $(TERMINAL_TEST_OBJECTS) $(LIBRARY) $(LDLIBS) $(AFORC_LDLIBS) -o "$@"
+
 $(SAVE_TEST): $(SAVE_TEST_OBJECTS) $(LIBRARY)
 	@mkdir -p "$(@D)"
 	$(CC) $(LDFLAGS) $(AFORC_LDFLAGS) $(AFORC_PROGRAM_LDFLAGS) $(SAVE_TEST_OBJECTS) $(LIBRARY) $(LDLIBS) $(AFORC_LDLIBS) -o "$@"
 
-$(CONFIG_TEST): $(CONFIG_TEST_OBJECTS) $(CONFIG_TEST_SUBJECT) $(COMMON_OBJECT)
+$(ASSETS_TEST): $(ASSETS_TEST_OBJECTS) $(LIBRARY)
 	@mkdir -p "$(@D)"
-	$(CC) $(LDFLAGS) $(AFORC_LDFLAGS) $(AFORC_PROGRAM_LDFLAGS) $(CONFIG_TEST_OBJECTS) $(CONFIG_TEST_SUBJECT) $(COMMON_OBJECT) $(LDLIBS) $(AFORC_LDLIBS) -o "$@"
+	$(CC) $(LDFLAGS) $(AFORC_LDFLAGS) $(AFORC_PROGRAM_LDFLAGS) $(ASSETS_TEST_OBJECTS) $(LIBRARY) $(LDLIBS) $(AFORC_LDLIBS) -o "$@"
+
+$(CONFIG_BOUNDARIES_TEST): $(CONFIG_BOUNDARIES_TEST_OBJECTS) $(LIBRARY)
+	@mkdir -p "$(@D)"
+	$(CC) $(LDFLAGS) $(AFORC_LDFLAGS) $(AFORC_PROGRAM_LDFLAGS) $(CONFIG_BOUNDARIES_TEST_OBJECTS) $(LIBRARY) $(LDLIBS) $(AFORC_LDLIBS) -o "$@"
+
+$(SAVE_BOUNDARIES_TEST): $(SAVE_BOUNDARIES_TEST_OBJECTS) $(LIBRARY)
+	@mkdir -p "$(@D)"
+	$(CC) $(LDFLAGS) $(AFORC_LDFLAGS) $(AFORC_PROGRAM_LDFLAGS) $(SAVE_BOUNDARIES_TEST_OBJECTS) $(LIBRARY) $(LDLIBS) $(AFORC_LDLIBS) -o "$@"
+
+$(CONFIG_TEST): $(CONFIG_TEST_OBJECTS) $(CONFIG_TEST_SUBJECT_OBJECTS) $(COMMON_OBJECT)
+	@mkdir -p "$(@D)"
+	$(CC) $(LDFLAGS) $(AFORC_LDFLAGS) $(AFORC_PROGRAM_LDFLAGS) $(CONFIG_TEST_OBJECTS) $(CONFIG_TEST_SUBJECT_OBJECTS) $(COMMON_OBJECT) $(LDLIBS) $(AFORC_LDLIBS) -o "$@"
 
 $(RENDERER_TEST): $(RENDERER_TEST_OBJECTS) $(RENDERER_TEST_SUBJECT) $(COMMON_OBJECT) $(LIBRARY)
 	@mkdir -p "$(@D)"
@@ -181,6 +248,22 @@ $(ECS_TEST): $(ECS_TEST_OBJECTS) $(COMMON_OBJECT) $(ECS_SUBJECT_OBJECTS)
 $(ASTAR_TEST): $(ASTAR_TEST_OBJECTS) $(LIBRARY)
 	@mkdir -p "$(@D)"
 	$(CC) $(LDFLAGS) $(AFORC_LDFLAGS) $(AFORC_PROGRAM_LDFLAGS) $(ASTAR_TEST_OBJECTS) $(LIBRARY) $(LDLIBS) $(AFORC_LDLIBS) -o "$@"
+
+$(WORLD_TEST): $(WORLD_TEST_OBJECTS) $(LIBRARY)
+	@mkdir -p "$(@D)"
+	$(CC) $(LDFLAGS) $(AFORC_LDFLAGS) $(AFORC_PROGRAM_LDFLAGS) $(WORLD_TEST_OBJECTS) $(LIBRARY) $(LDLIBS) $(AFORC_LDLIBS) -o "$@"
+
+$(RENDERER_LIFECYCLE_TEST): $(RENDERER_LIFECYCLE_TEST_OBJECTS) $(LIBRARY)
+	@mkdir -p "$(@D)"
+	$(CC) $(LDFLAGS) $(AFORC_LDFLAGS) $(AFORC_PROGRAM_LDFLAGS) $(RENDERER_LIFECYCLE_TEST_OBJECTS) $(LIBRARY) $(LDLIBS) $(AFORC_LDLIBS) -o "$@"
+
+$(EFFECTS_TEST): $(EFFECTS_TEST_OBJECTS) $(LIBRARY)
+	@mkdir -p "$(@D)"
+	$(CC) $(LDFLAGS) $(AFORC_LDFLAGS) $(AFORC_PROGRAM_LDFLAGS) $(EFFECTS_TEST_OBJECTS) $(LIBRARY) $(LDLIBS) $(AFORC_LDLIBS) -o "$@"
+
+$(UI_TEST): $(UI_TEST_OBJECTS) $(LIBRARY)
+	@mkdir -p "$(@D)"
+	$(CC) $(LDFLAGS) $(AFORC_LDFLAGS) $(AFORC_PROGRAM_LDFLAGS) $(UI_TEST_OBJECTS) $(LIBRARY) $(LDLIBS) $(AFORC_LDLIBS) -o "$@"
 
 debug:
 	$(MAKE) clean
@@ -203,11 +286,21 @@ smoke: $(ROGUELIKE)
 
 test: smoke $(TEST_BINARIES)
 	"$(SCENE_TEST)"
+	"$(CORE_TEST)"
+	"$(INPUT_TEST)"
+	"$(TERMINAL_TEST)"
 	"$(SAVE_TEST)"
+	"$(ASSETS_TEST)"
+	"$(CONFIG_BOUNDARIES_TEST)"
+	"$(SAVE_BOUNDARIES_TEST)"
 	"$(CONFIG_TEST)"
 	"$(RENDERER_TEST)"
 	"$(ECS_TEST)"
 	"$(ASTAR_TEST)"
+	"$(WORLD_TEST)"
+	"$(RENDERER_LIFECYCLE_TEST)"
+	"$(EFFECTS_TEST)"
+	"$(UI_TEST)"
 
 run: $(ROGUELIKE)
 	"$(ROGUELIKE)"

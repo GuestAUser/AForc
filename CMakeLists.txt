@@ -172,19 +172,30 @@ function(aforc_configure_owned_target target)
 endfunction()
 
 add_library(aforc
+    src/assets/asset_file.c
+    src/assets/asset_path.c
     src/assets/assets.c
+    src/assets/config_index.c
     src/assets/config_parser.c
-    src/assets/path_io.c
+    src/assets/config_storage.c
     src/assets/pcg.c
+    src/assets/save_codec.c
     src/assets/save_container.c
+    src/assets/save_crc32.c
+    src/assets/save_reader.c
+    src/assets/save_writer.c
     src/core/common.c
     src/core/engine.c
     src/core/engine_commands.c
     src/core/scene.c
     src/ecs/component.c
+    src/ecs/component_instances.c
+    src/ecs/component_store.c
     src/ecs/ecs.c
+    src/ecs/entity.c
     src/ecs/view.c
     src/effects/animation.c
+    src/effects/particle_emitter.c
     src/effects/particles.c
     src/effects/sprite.c
     src/effects/tween.c
@@ -198,10 +209,15 @@ add_library(aforc
     src/platform/terminal_signals.c
     src/render/renderer.c
     src/render/renderer_ansi.c
+    src/render/renderer_ansi_encode.c
+    src/render/renderer_ansi_measure.c
     src/render/renderer_draw.c
+    src/render/renderer_resize.c
     src/ui/canvas.c
+    src/ui/controls.c
     src/ui/focus.c
     src/ui/layout.c
+    src/ui/menu.c
     src/ui/widgets.c
     src/world/astar.c
     src/world/camera.c
@@ -249,13 +265,23 @@ aforc_enable_target_sanitizers(aforc)
 
 if(AFORC_BUILD_EXAMPLES)
     set(AFORC_ROGUELIKE_SOURCES
-        examples/roguelike/main.c
+        examples/roguelike/effects.c
+        examples/roguelike/enemy_ai.c
+        examples/roguelike/engine_hooks.c
+        examples/roguelike/floor_population.c
         examples/roguelike/game.c
+        examples/roguelike/game_entities.c
+        examples/roguelike/game_rules.c
         examples/roguelike/generation.c
+        examples/roguelike/input_actions.c
+        examples/roguelike/main.c
         examples/roguelike/persistence.c
+        examples/roguelike/player_actions.c
         examples/roguelike/render.c
+        examples/roguelike/render_ui.c
+        examples/roguelike/render_world.c
         examples/roguelike/runtime.c
-        examples/roguelike/turns.c
+        examples/roguelike/smoke.c
     )
     add_executable(aforc_roguelike ${AFORC_ROGUELIKE_SOURCES})
     set_target_properties(aforc_roguelike PROPERTIES
@@ -267,6 +293,22 @@ if(AFORC_BUILD_EXAMPLES)
     if(BUILD_TESTING)
         add_test(NAME roguelike_smoke COMMAND aforc_roguelike --smoke)
         set_tests_properties(roguelike_smoke PROPERTIES TIMEOUT 15)
+        add_test(
+            NAME roguelike_invalid_seed
+            COMMAND aforc_roguelike --seed nope
+        )
+        set_tests_properties(roguelike_invalid_seed PROPERTIES
+            TIMEOUT 15
+            WILL_FAIL TRUE
+        )
+        add_test(
+            NAME roguelike_negative_seed
+            COMMAND aforc_roguelike --seed -1 --smoke
+        )
+        set_tests_properties(roguelike_negative_seed PROPERTIES
+            TIMEOUT 15
+            WILL_FAIL TRUE
+        )
     endif()
 endif()
 
@@ -289,17 +331,51 @@ if(BUILD_TESTING)
         tests/scene_reentrancy.c
     )
     aforc_add_library_regression(
+        core_lifecycle
+        tests/core_lifecycle.c
+    )
+    aforc_add_library_regression(
+        input_protocol
+        tests/input_protocol.c
+    )
+    aforc_add_library_regression(
+        terminal_lifecycle
+        tests/terminal_lifecycle.c
+    )
+    aforc_add_library_regression(
         save_crc
         tests/save_crc.c
+    )
+    aforc_add_library_regression(
+        assets_contracts
+        tests/assets_contracts.c
+    )
+    aforc_add_library_regression(
+        config_parser_boundaries
+        tests/config_parser_boundaries.c
+    )
+    aforc_add_library_regression(
+        save_container_boundaries
+        tests/save_container_boundaries.c
     )
     aforc_add_library_regression(
         astar_workspace
         tests/astar_workspace.c
         tests/astar_workspace_support.c
     )
+    aforc_add_library_regression(
+        world_algorithms
+        tests/world_algorithms.c
+        tests/world_test_support.c
+        tests/world_core_cases.c
+        tests/world_visibility_cases.c
+        tests/astar_correctness_cases.c
+    )
 
     add_library(aforc_config_parser_test_subject OBJECT
+        src/assets/config_index.c
         src/assets/config_parser.c
+        src/assets/config_storage.c
     )
     target_include_directories(aforc_config_parser_test_subject PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
@@ -351,12 +427,30 @@ if(BUILD_TESTING)
     target_link_libraries(aforc_renderer_diff_test PRIVATE aforc::aforc)
     aforc_register_regression(aforc_renderer_diff_test renderer_diff)
 
+    aforc_add_library_regression(
+        renderer_lifecycle
+        tests/renderer_lifecycle.c
+    )
+    aforc_add_library_regression(
+        effects_regression
+        tests/effects_regression.c
+    )
+    aforc_add_library_regression(
+        ui_regression
+        tests/ui_regression.c
+    )
+
     add_executable(aforc_ecs_optimization_test
+        tests/ecs_lifecycle_cases.c
         tests/ecs_optimization.c
         tests/ecs_optimization_support.c
+        tests/ecs_storage_cases.c
         src/core/common.c
         src/ecs/component.c
+        src/ecs/component_instances.c
+        src/ecs/component_store.c
         src/ecs/ecs.c
+        src/ecs/entity.c
         src/ecs/view.c
     )
     target_include_directories(aforc_ecs_optimization_test PRIVATE
@@ -396,7 +490,7 @@ configure_package_config_file(
 write_basic_package_version_file(
     "${CMAKE_CURRENT_BINARY_DIR}/aforcConfigVersion.cmake"
     VERSION "${PROJECT_VERSION}"
-    COMPATIBILITY SameMajorVersion
+    COMPATIBILITY SameMinorVersion
 )
 install(
     FILES
