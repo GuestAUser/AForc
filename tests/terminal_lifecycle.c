@@ -71,6 +71,14 @@ static AFORC_TerminalConfig terminal_config(int fd)
     return config;
 }
 
+static bool contract_check(bool condition, const char *label)
+{
+    if (!condition) {
+        (void)fprintf(stderr, "terminal contract check failed: %s\n", label);
+    }
+    return condition;
+}
+
 static bool termios_equal(const struct termios *left,
                           const struct termios *right)
 {
@@ -100,34 +108,67 @@ static bool test_open_close_restores_and_borrows_fds(void)
     AFORC_Terminal *terminal = NULL;
     AFORC_Terminal *duplicate = NULL;
     AFORC_TerminalConfig config;
+    AFORC_Status open_status;
     int flags_before;
     bool passed;
 
     if (!pty_open(&pair)) {
+        (void)fprintf(stderr, "terminal contract setup failed: open PTY\n");
         pty_close(&pair);
         return false;
     }
     config = terminal_config(pair.slave);
     flags_before = fcntl(pair.slave, F_GETFL);
-    if (flags_before < 0 || tcgetattr(pair.slave, &before) < 0 ||
-        aforc_terminal_open(&terminal, &config) != AFORC_OK ||
-        tcgetattr(pair.slave, &raw) < 0) {
+    if (flags_before < 0) {
+        (void)fprintf(stderr, "terminal contract setup failed: read flags\n");
+        pty_close(&pair);
+        return false;
+    }
+    if (tcgetattr(pair.slave, &before) < 0) {
+        (void)fprintf(stderr, "terminal contract setup failed: read termios\n");
+        pty_close(&pair);
+        return false;
+    }
+    open_status = aforc_terminal_open(&terminal, &config);
+    if (open_status != AFORC_OK || tcgetattr(pair.slave, &raw) < 0) {
+        (void)fprintf(stderr,
+                      "terminal contract setup failed: engine open status %d\n",
+                      (int)open_status);
         aforc_terminal_close(terminal);
         pty_close(&pair);
         return false;
     }
-    passed = aforc_terminal_is_active(terminal) &&
-             aforc_terminal_input_fd(terminal) == pair.slave &&
-             aforc_terminal_output_fd(terminal) == pair.slave &&
-             (raw.c_lflag & (ECHO | ICANON | ISIG)) == 0U &&
-             (fcntl(pair.slave, F_GETFL) & O_NONBLOCK) != 0 &&
-             aforc_terminal_open(&duplicate, &config) == AFORC_ERROR_EXISTS &&
-             duplicate == NULL;
+    passed = contract_check(aforc_terminal_is_active(terminal), "active") &&
+              contract_check(aforc_terminal_input_fd(terminal) == pair.slave,
+                             "input descriptor") &&
+              contract_check(aforc_terminal_output_fd(terminal) == pair.slave,
+                             "output descriptor") &&
+              contract_check((raw.c_lflag & (ECHO | ICANON | ISIG)) == 0U,
+                             "raw local flags") &&
+              contract_check((fcntl(pair.slave, F_GETFL) & O_NONBLOCK) != 0,
+                             "nonblocking input") &&
+              contract_check(
+                  aforc_terminal_open(&duplicate, &config) ==
+                      AFORC_ERROR_EXISTS,
+                  "duplicate open") &&
+              contract_check(duplicate == NULL, "duplicate output");
     aforc_terminal_close(terminal);
-    passed = passed && tcgetattr(pair.slave, &after) == 0 &&
-             termios_equal(&before, &after) &&
-             fcntl(pair.slave, F_GETFL) == flags_before &&
-             fcntl(pair.master, F_GETFL) >= 0;
+    if (passed) {
+        passed = contract_check(tcgetattr(pair.slave, &after) == 0,
+                                "read restored termios");
+    }
+    if (passed) {
+        passed = contract_check(termios_equal(&before, &after),
+                                "restored termios");
+    }
+    if (passed) {
+        passed = contract_check(fcntl(pair.slave, F_GETFL) == flags_before,
+                                "restored descriptor flags");
+    }
+    if (passed) {
+        passed = contract_check(fcntl(pair.master, F_GETFL) >= 0,
+                                "borrowed descriptors");
+    }
     pty_close(&pair);
     return passed;
 }
