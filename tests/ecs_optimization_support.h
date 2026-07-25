@@ -21,20 +21,6 @@ typedef struct EcsTestComponent {
     uint32_t type_id;
 } EcsTestComponent;
 
-typedef struct EcsCleanupProbe {
-    AFORC_ComponentType type;
-    AFORC_EcsView *view;
-    void *expected_component;
-    AFORC_Status get_status;
-    AFORC_Status remove_status;
-    AFORC_Status view_status;
-    AFORC_Entity view_entity;
-    void *view_component;
-    bool invoked;
-    bool component_visible;
-    bool view_has_value;
-} EcsCleanupProbe;
-
 bool ecs_test_create(size_t max_entities,
                      size_t max_component_types,
                      size_t initial_component_capacity,
@@ -64,5 +50,7 @@ bool ecs_test_next_match(AFORC_EcsView *view,
                          size_t type_count);
 bool ecs_test_exhausted(AFORC_EcsView *view, size_t type_count);
 bool ecs_test_benchmark(void);
+bool ecs_test_lifecycle_cases(void);
+bool ecs_test_storage_cases(void);
 
 #endif

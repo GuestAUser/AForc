@@ -130,72 +130,6 @@ static bool test_zero_and_revision(void)
     return passed;
 }
 
-static void cleanup_probe(AFORC_Ecs *ecs,
-                          AFORC_Entity entity,
-                          void *component,
-                          void *user_data)
-{
-    EcsCleanupProbe *probe = (EcsCleanupProbe *)user_data;
-    void *queried = NULL;
-
-    probe->invoked = true;
-    probe->get_status = aforc_ecs_get(ecs, entity, probe->type, &queried);
-    probe->component_visible =
-        queried == component && component == probe->expected_component;
-    probe->remove_status = aforc_ecs_remove(ecs, entity, probe->type);
-    probe->view_entity = entity;
-    probe->view_component = component;
-    probe->view_has_value = true;
-    probe->view_status = aforc_ecs_view_next(probe->view,
-                                             &probe->view_entity,
-                                             &probe->view_component,
-                                             &probe->view_has_value);
-}
-
-static bool test_cleanup_guard(void)
-{
-    AFORC_EcsComponentDesc desc = {0};
-    EcsCleanupProbe probe = {0};
-    AFORC_Entity entity = AFORC_ENTITY_INVALID;
-    EcsTestComponent value;
-    AFORC_Ecs *ecs = NULL;
-    bool has_component = true;
-    bool passed;
-
-    passed = ecs_test_create(4U, 1U, 0U, &ecs);
-    desc.size = sizeof(EcsTestComponent);
-    desc.alignment = _Alignof(EcsTestComponent);
-    desc.cleanup = cleanup_probe;
-    desc.cleanup_user_data = &probe;
-    passed = passed &&
-             aforc_ecs_register_component(ecs, &desc, &probe.type) ==
-                 AFORC_OK &&
-             ecs_test_create_entity(ecs, &entity);
-    value = (EcsTestComponent){entity.index, probe.type.id};
-    passed = passed &&
-             aforc_ecs_add(ecs,
-                           entity,
-                           probe.type,
-                           &value,
-                           &probe.expected_component) == AFORC_OK &&
-             aforc_ecs_view_create(ecs, &probe.type, 1U, &probe.view) ==
-                 AFORC_OK &&
-             aforc_ecs_remove(ecs, entity, probe.type) == AFORC_OK &&
-             probe.invoked && probe.get_status == AFORC_OK &&
-             probe.component_visible &&
-             probe.remove_status == AFORC_ERROR_STATE &&
-             probe.view_status == AFORC_ERROR_STATE &&
-             !probe.view_has_value &&
-             aforc_entity_equal(probe.view_entity, AFORC_ENTITY_INVALID) &&
-             probe.view_component == NULL &&
-             aforc_ecs_has(ecs, entity, probe.type, &has_component) ==
-                 AFORC_OK &&
-             !has_component;
-    aforc_ecs_view_destroy(probe.view);
-    aforc_ecs_destroy(ecs);
-    return passed;
-}
-
 int main(int argc, char **argv)
 {
     size_t sparse_bytes = 0U;
@@ -221,9 +155,13 @@ int main(int argc, char **argv)
         (void)fprintf(stderr, "zero-type/revision view regression failed\n");
         return 5;
     }
-    if (!test_cleanup_guard()) {
-        (void)fprintf(stderr, "cleanup mutation guard regression failed\n");
+    if (!ecs_test_lifecycle_cases()) {
+        (void)fprintf(stderr, "entity lifecycle/cleanup regression failed\n");
         return 6;
+    }
+    if (!ecs_test_storage_cases()) {
+        (void)fprintf(stderr, "component storage boundary regression failed\n");
+        return 7;
     }
     (void)puts("ecs optimization: ok");
     return 0;
