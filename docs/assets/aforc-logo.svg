@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AForc | Author: GuestAUser | SPDX-License-Identifier: MIT -->
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="960"
+     height="280"
+     viewBox="0 0 960 280"
+     preserveAspectRatio="xMidYMid meet"
+     role="img"
+     aria-labelledby="aforc-logo-title aforc-logo-desc">
+  <title id="aforc-logo-title">AForc</title>
+  <desc id="aforc-logo-desc">A warm near-black rectangular mark with a geometric A built over a coordinate-plane crosshair, followed by the custom vector word AForc. One green square marks the active origin.</desc>
+
+  <rect width="960" height="280" fill="#171612"/>
+  <rect x="4" y="4" width="952" height="272" fill="none" stroke="#6A655C" stroke-width="2"/>
+
+  <g aria-hidden="true">
+    <rect x="44" y="40" width="200" height="200" fill="none" stroke="#6A655C" stroke-width="2"/>
+
+    <path d="M68 40V240 M92 40V240 M116 40V240 M140 40V240 M164 40V240 M188 40V240 M212 40V240
+             M44 68H244 M44 92H244 M44 116H244 M44 140H244 M44 164H244 M44 188H244 M44 212H244"
+          fill="none" stroke="#6A655C" stroke-width="1" opacity="0.34"/>
+
+    <path d="M140 48V100 M140 132V232 M52 116H124 M156 116H236"
+          fill="none" stroke="#6A655C" stroke-width="2"/>
+    <path d="M132 48H148 M132 232H148 M52 108V124 M236 108V124"
+          fill="none" stroke="#6A655C" stroke-width="2"/>
+
+    <g fill="#FAF9F6">
+      <rect x="92" y="110" width="24" height="90"/>
+      <rect x="104" y="86" width="24" height="24"/>
+      <rect x="128" y="74" width="32" height="24"/>
+      <rect x="160" y="86" width="24" height="24"/>
+      <rect x="172" y="110" width="24" height="90"/>
+      <rect x="116" y="140" width="56" height="24"/>
+    </g>
+
+    <rect x="136" y="112" width="8" height="8" fill="#62D776"/>
+
+    <g fill="none"
+       stroke="#FAF9F6"
+       stroke-width="20"
+       stroke-linecap="butt"
+       stroke-linejoin="miter">
+      <path d="M292 202V110H306V92H324V78H374V92H392V110H406V202 M306 148H392"/>
+      <path d="M448 202V78H536 M448 138H522"/>
+      <path d="M582 112H646V202H582Z"/>
+      <path d="M692 202V112 M692 132H708V112H756V138"/>
+      <path d="M860 128V112H800V128H784V186H800V202H860"/>
+    </g>
+
+    <path d="M292 230H884 M292 222V238 M884 222V238"
+          fill="none" stroke="#6A655C" stroke-width="2"/>
+  </g>
+</svg>
