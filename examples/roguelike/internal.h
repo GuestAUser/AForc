@@ -58,6 +58,11 @@ typedef struct GameRules {
     uint32_t final_floor;
 } GameRules;
 
+typedef struct GameRoom {
+    AFORC_Rect bounds;
+    AFORC_Point center;
+} GameRoom;
+
 typedef struct GamePosition {
     AFORC_Point point;
 } GamePosition;
@@ -99,7 +104,6 @@ typedef struct Game {
     AFORC_Point exit_position;
     GameRunState run_state;
     bool help_visible;
-    bool smoke_mode;
     char message[GAME_MESSAGE_CAPACITY];
 } Game;
 
@@ -124,15 +128,25 @@ AFORC_Status game_actor_components(Game *game,
                                  GamePosition **out_position,
                                  GameActor **out_actor);
 AFORC_Status game_entity_at(Game *game,
-                          AFORC_Point point,
-                          AFORC_Entity *out_entity,
-                          bool *out_found);
+                            AFORC_Point point,
+                            AFORC_Entity *out_entity,
+                            bool *out_found);
 
+AFORC_Status game_load_rules(GameRules *rules);
+AFORC_Status game_populate_floor(Game *game,
+                                 AFORC_Rng *rng,
+                                 const GameRoom *rooms,
+                                 size_t room_count,
+                                 int32_t player_health);
 AFORC_Status game_generate_floor(Game *game,
-                               uint32_t floor,
-                               int32_t player_health);
+                                uint32_t floor,
+                                int32_t player_health);
 AFORC_Status game_new_run(Game *game);
 
+AFORC_Status game_enemy_turns(Game *game);
+AFORC_Status game_move_player(Game *game, AFORC_Point delta);
+AFORC_Status game_wait_turn(Game *game);
+AFORC_Status game_descend(Game *game);
 AFORC_Status game_emit_burst(Game *game, AFORC_Point point, bool strong);
 AFORC_Status game_scene_event(AFORC_Scene *scene,
                             AFORC_Engine *engine,
@@ -145,8 +159,20 @@ AFORC_Status game_decode_save(Game *game, const void *data, size_t size);
 AFORC_Status game_save(Game *game);
 AFORC_Status game_load(Game *game);
 
+AFORC_Cell game_cell(uint32_t codepoint,
+                     AFORC_Color foreground,
+                     AFORC_CellStyle style);
+AFORC_Status game_plot_cell(void *context,
+                            AFORC_Point position,
+                            AFORC_Cell cell);
+AFORC_Status game_render_world(Game *game,
+                               AFORC_Size screen,
+                               int32_t map_rows);
+AFORC_Status game_render_hud(Game *game,
+                             AFORC_Size screen,
+                             int32_t map_rows);
 AFORC_Status game_scene_fixed_update(AFORC_Scene *scene,
-                                   AFORC_Engine *engine,
+                                    AFORC_Engine *engine,
                                    double seconds,
                                    AFORC_Error *error);
 AFORC_Status game_scene_update(AFORC_Scene *scene,
@@ -154,17 +180,32 @@ AFORC_Status game_scene_update(AFORC_Scene *scene,
                              double seconds,
                              AFORC_Error *error);
 AFORC_Status game_scene_render(AFORC_Scene *scene,
-                             AFORC_Engine *engine,
-                             double interpolation,
-                             AFORC_Error *error);
+                              AFORC_Engine *engine,
+                              double interpolation,
+                              AFORC_Error *error);
+
+AFORC_Status game_dispatch_input_queue(Game *game,
+                                       AFORC_Engine *engine,
+                                       AFORC_Error *error);
+AFORC_Status game_poll_events(void *context,
+                              AFORC_Engine *engine,
+                              AFORC_Error *error);
+AFORC_Status game_begin_frame(void *context,
+                              AFORC_Engine *engine,
+                              AFORC_Error *error);
+AFORC_Status game_present(void *context,
+                          AFORC_Engine *engine,
+                          AFORC_Error *error);
+AFORC_Status game_smoke_checks(Game *game,
+                               AFORC_Engine *engine,
+                               AFORC_Error *error);
 
 void game_dispose(Game *game);
 AFORC_Status game_initialize(Game *game,
-                           AFORC_Renderer *renderer,
-                           AFORC_Input *input,
-                           AFORC_Terminal *terminal,
-                           uint64_t seed,
-                           bool smoke_mode);
+                             AFORC_Renderer *renderer,
+                             AFORC_Input *input,
+                             AFORC_Terminal *terminal,
+                             uint64_t seed);
 
 int game_run_smoke(uint64_t seed);
 int game_run_interactive(uint64_t seed);
