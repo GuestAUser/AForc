@@ -190,6 +190,69 @@ cleanup:
     return passed;
 }
 
+static bool batch_contains(const AFORC_Renderer *renderer,
+                           const char *needle,
+                           size_t needle_size)
+{
+    if (needle_size > renderer->batch_size) {
+        return false;
+    }
+    for (size_t offset = 0U;
+         offset <= renderer->batch_size - needle_size;
+         ++offset) {
+        if (memcmp(renderer->batch + offset, needle, needle_size) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool invalidation_skips_cleared_cells(void)
+{
+    static const char clear_screen[] = "\x1b[0m\x1b[2J\x1b[H";
+    AFORC_RendererConfig config = aforc_renderer_config_default();
+    AFORC_Renderer *renderer = NULL;
+    bool passed;
+
+    config.size = (AFORC_Size){8, 2};
+    if (aforc_renderer_create(&renderer, &config) != AFORC_OK) {
+        return false;
+    }
+    passed = aforc_renderer_build_ansi(renderer) == AFORC_OK &&
+             renderer->batch_size == sizeof(clear_screen) - 1U &&
+             memcmp(renderer->batch,
+                    clear_screen,
+                    sizeof(clear_screen) - 1U) == 0;
+    aforc_renderer_destroy(renderer);
+    return passed;
+}
+
+static bool non_ascii_repositions_following_cell(void)
+{
+    static const char second_column[] = "\x1b[1;2H";
+    AFORC_RendererConfig config = aforc_renderer_config_default();
+    AFORC_Renderer *renderer = NULL;
+    AFORC_Cell wide = aforc_cell_default();
+    AFORC_Cell following = aforc_cell_default();
+    bool passed;
+
+    config.size = (AFORC_Size){3, 1};
+    if (aforc_renderer_create(&renderer, &config) != AFORC_OK) {
+        return false;
+    }
+    wide.codepoint = UINT32_C(0x4e2d);
+    following.codepoint = (uint32_t)'X';
+    renderer->invalidated = false;
+    renderer->back[0] = wide;
+    renderer->back[1] = following;
+    passed = aforc_renderer_build_ansi(renderer) == AFORC_OK &&
+             batch_contains(renderer,
+                            second_column,
+                            sizeof(second_column) - 1U);
+    aforc_renderer_destroy(renderer);
+    return passed;
+}
+
 int renderer_diff_run_cases(void)
 {
     int result = 0;
@@ -209,6 +272,14 @@ int renderer_diff_run_cases(void)
     if (!invalid_cells_keep_existing_status()) {
         (void)fprintf(stderr, "renderer diff error semantics changed\n");
         result = 4;
+    }
+    if (!invalidation_skips_cleared_cells()) {
+        (void)fprintf(stderr, "renderer invalidation emitted cleared cells\n");
+        result = 5;
+    }
+    if (!non_ascii_repositions_following_cell()) {
+        (void)fprintf(stderr, "renderer Unicode cursor recovery failed\n");
+        result = 6;
     }
     return result;
 }

@@ -46,16 +46,27 @@ static bool ansi_cell_cost(AFORC_Cell cell,
                          aforc_renderer_ansi_codepoint_size(cell.codepoint));
 }
 
+static bool ansi_cell_needs_output(const AFORC_Renderer *renderer,
+                                   size_t index,
+                                   AFORC_Cell cleared)
+{
+    const AFORC_Cell previous = renderer->invalidated
+                                    ? cleared
+                                    : renderer->front[index];
+
+    return !aforc_renderer_cells_equal(previous, renderer->back[index]);
+}
+
 static int32_t ansi_next_changed(const AFORC_Renderer *renderer,
                                  int32_t row,
-                                 int32_t column)
+                                 int32_t column,
+                                 AFORC_Cell cleared)
 {
     for (; column < renderer->size.width; ++column) {
         const size_t index = (size_t)row * (size_t)renderer->size.width +
                              (size_t)column;
 
-        if (!aforc_renderer_cells_equal(renderer->front[index],
-                                        renderer->back[index])) {
+        if (ansi_cell_needs_output(renderer, index, cleared)) {
             return column;
         }
     }
@@ -98,8 +109,9 @@ static bool ansi_gap_is_cheaper(const AFORC_Renderer *renderer,
 
 AFORC_Status aforc_renderer_build_ansi(AFORC_Renderer *renderer)
 {
+    const AFORC_Cell cleared = aforc_cell_default();
     bool emitted = false;
-    AnsiEncodingState encoding = {aforc_cell_default(), false, true};
+    AnsiEncodingState encoding = {cleared, false, true};
     AFORC_Status status = AFORC_OK;
 
     renderer->batch_size = 0u;
@@ -116,9 +128,7 @@ AFORC_Status aforc_renderer_build_ansi(AFORC_Renderer *renderer)
             size_t index = (size_t)row * (size_t)renderer->size.width +
                            (size_t)column;
 
-            if (!renderer->invalidated &&
-                aforc_renderer_cells_equal(renderer->front[index],
-                                           renderer->back[index])) {
+            if (!ansi_cell_needs_output(renderer, index, cleared)) {
                 ++column;
                 continue;
             }
@@ -134,12 +144,10 @@ AFORC_Status aforc_renderer_build_ansi(AFORC_Renderer *renderer)
                        column < renderer->size.width) {
                     index = (size_t)row * (size_t)renderer->size.width +
                             (size_t)column;
-                    if (!renderer->invalidated &&
-                        aforc_renderer_cells_equal(renderer->front[index],
-                                                   renderer->back[index]) &&
+                    if (!ansi_cell_needs_output(renderer, index, cleared) &&
                         column >= bridge_until) {
                         const int32_t next_changed = ansi_next_changed(
-                            renderer, row, column + 1);
+                            renderer, row, column + 1, cleared);
 
                         if (next_changed == renderer->size.width ||
                             !ansi_gap_is_cheaper(renderer,
@@ -171,6 +179,9 @@ AFORC_Status aforc_renderer_build_ansi(AFORC_Renderer *renderer)
                     }
                     emitted = true;
                     ++column;
+                    if (!encoding.ascii_width) {
+                        break;
+                    }
                 }
             }
         }
