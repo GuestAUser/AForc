@@ -65,19 +65,15 @@ AFORC_Status aforc_camera_clamp_to_map(AFORC_Camera *camera,
 
 AFORC_Status aforc_camera_center_on(AFORC_Camera *camera, AFORC_Point target,
                                 const AFORC_TileMap *map) {
-    const int64_t candidate_x = camera == NULL
-                                    ? 0
-                                    : (int64_t)target.x -
-                                          camera->viewport.width / 2;
-    const int64_t candidate_y = camera == NULL
-                                    ? 0
-                                    : (int64_t)target.y -
-                                          camera->viewport.height / 2;
+    int64_t candidate_x;
+    int64_t candidate_y;
 
     if (camera == NULL || map == NULL ||
         !camera_viewport_is_valid(camera->viewport)) {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
+    candidate_x = (int64_t)target.x - camera->viewport.width / 2;
+    candidate_y = (int64_t)target.y - camera->viewport.height / 2;
     camera->origin.x = world_camera_clamp_axis(
         candidate_x, map->size.width, camera->viewport.width);
     camera->origin.y = world_camera_clamp_axis(

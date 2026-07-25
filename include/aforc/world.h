@@ -33,12 +33,13 @@ typedef bool (*AFORC_TileTestFn)(AFORC_Tile tile,
 typedef enum AFORC_PathFlag {
     AFORC_PATH_NONE = 0,
     AFORC_PATH_ALLOW_DIAGONAL = UINT32_C(1) << 0,
+    /* Has no effect unless AFORC_PATH_ALLOW_DIAGONAL is also set. */
     AFORC_PATH_PREVENT_CORNER_CUTTING = UINT32_C(1) << 1
 } AFORC_PathFlag;
 
 typedef struct AFORC_PathOptions {
     uint32_t flags;
-    /* Zero permits visiting every cell in the map. */
+    /* Bounds expanded cells, including endpoints; zero permits every cell. */
     size_t max_visited;
 } AFORC_PathOptions;
 
@@ -98,6 +99,7 @@ AFORC_API AFORC_Status aforc_camera_clamp_to_map(AFORC_Camera *camera,
 AFORC_API AFORC_Status aforc_camera_center_on(AFORC_Camera *camera,
                                        AFORC_Point target,
                                        const AFORC_TileMap *map);
+/* Coordinate transforms translate only; they do not clip to map or viewport. */
 AFORC_API AFORC_Status aforc_camera_world_to_screen(const AFORC_Camera *camera,
                                               AFORC_Point world,
                                               AFORC_Point *out_screen);
@@ -121,7 +123,10 @@ AFORC_API AFORC_Status aforc_grid_rect_blocked(const AFORC_TileMap *map,
                                          void *context,
                                          bool *out_blocked,
                                          AFORC_Point *out_first_blocked);
-/* Supercover traversal includes endpoints and corner-touching cells. */
+/*
+ * Supercover traversal includes endpoints and corner-touching cells. out_hit
+ * is optional and receives end when the ray is clear.
+ */
 AFORC_API AFORC_Status aforc_grid_raycast(const AFORC_TileMap *map,
                                     uint32_t layer,
                                     AFORC_Point start,
@@ -148,7 +153,8 @@ AFORC_API void aforc_path_workspace_destroy(AFORC_PathWorkspace *workspace);
 /*
  * Returns a workspace-owned path including start and goal. The borrowed path
  * remains valid until the next search, reserve, or destroy on that workspace.
- * Ties resolve deterministically; default movement is four-directional.
+ * Cardinal steps cost 10 and diagonal steps cost 14. Ties resolve
+ * deterministically; default movement is four-directional.
  */
 AFORC_API AFORC_Status aforc_pathfind_astar_workspace(
     AFORC_PathWorkspace *workspace,
@@ -165,7 +171,8 @@ AFORC_API AFORC_Status aforc_pathfind_astar_workspace(
  * The returned path includes start and goal. If point_capacity is too small,
  * out_length receives the required count and AFORC_ERROR_LIMIT is returned.
  * Passing NULL with zero capacity is therefore a supported sizing query.
- * Ties resolve deterministically; default movement is four-directional.
+ * Cardinal steps cost 10 and diagonal steps cost 14. Ties resolve
+ * deterministically; default movement is four-directional.
  */
 AFORC_API AFORC_Status aforc_pathfind_astar(const AFORC_TileMap *map,
                                       uint32_t layer,
@@ -181,7 +188,8 @@ AFORC_API AFORC_Status aforc_pathfind_astar(const AFORC_TileMap *map,
 /*
  * Writes one byte per row-major map cell for the selected layer. Opaque cells
  * can be visible, while cells behind them are shadowed. The radius is
- * Euclidean and the origin is always visible.
+ * Euclidean and the origin is always visible. Complex scans may allocate
+ * temporary task storage through the map's allocator.
  */
 AFORC_API AFORC_Status aforc_fov_compute(const AFORC_TileMap *map,
                                    uint32_t layer,
