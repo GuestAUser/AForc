@@ -178,6 +178,14 @@ not require a TTY.
 | UI | Framed status area, health progress, help overlay |
 | Assets | Seeded generation, config values, save/load container |
 
+The Roguelike is a nested example under `examples/roguelike`. Its
+`include/roguelike/internal.h` header is a private cross-translation-unit
+contract, not installed AForc API. `app/` contains the engine, terminal, and
+input adapters; `game/` contains state, rules, generation, actors, and turns;
+`presentation/` contains rendering and effects; `persistence/` owns save/load
+integration; and `qa/` contains the off-screen smoke checks. `main.c` remains
+at the example root as the CLI entry point.
+
 Procedural generation consumes only a floor-derived RNG stream. Loading can
 therefore reconstruct a floor from the run seed and floor number before
 restoring dynamic values. The save schema is versioned independently from the
@@ -196,24 +204,33 @@ The nested module boundaries are:
 - `app/` owns CLI parsing, reverse-order terminal cleanup, engine hooks, input
   normalization, scene state, and pause/resize handling. It joins
   `AFORC_Engine`, terminal, input, and renderer.
-- `game/` owns the Q16.16, 60 Hz surf rules, wave progression, scoring, and
-  state hash. It consumes a seeded `AFORC_Rng`; it has no terminal, renderer,
-  wall-clock, or cosmetic-RNG dependency.
+- `game/` owns the Q16.16, 60 Hz surf rules, bounded line position and
+  momentum, bounded wave-face motion, rider-local wave sampling, wave
+  progression, scoring, and state hash. It consumes a seeded `AFORC_Rng`; it
+  has no terminal, renderer, wall-clock, or cosmetic-RNG dependency.
 - `presentation/` converts read-only app and simulation state into ASCII
-  renderer cells, bounded effects particles, tweens, HUDs, menus, and modal
-  panels. It does not change rules or scores.
+  renderer cells, rider-local placement and poses, bounded effects particles,
+  HUDs, menus, and modal panels. It does not change rules or scores.
 - `qa/` drives the actual app, simulation, and renderer through deterministic
-  schedules with an off-screen target. It checks state hashes and visible cells
-  without terminal I/O or filesystem effects.
+  schedules with an off-screen target. It checks input taps and leases,
+  bounded motion and recovery, state hashes, visible cells, color modes,
+  reduced motion, and resize framing without terminal I/O or filesystem
+  effects.
 
-The app maps terminal input into bounded directional leases and one-shot action,
-confirm, and back commands before fixed updates. `AFORC_Engine` owns the 60 Hz
-simulation cadence, while active presentation composes at 60 Hz and static
-states remain dirty-driven. `AFORC_Input` supplies the
-decoded key and focus events; `AFORC_Renderer` supplies the diffed cell buffer;
-effects and UI provide bounded particles, tweens, layouts, and overlays. The
-assets subsystem provides the explicitly seeded PCG stream used to reproduce
-wave mechanics.
+The app maps terminal input into bounded directional and ride-action leases,
+while confirm and back remain one-shot commands before fixed updates. A tap is
+preserved even if its key-up arrives before the next fixed update; an explicit
+release clears the matching lease immediately. `AFORC_Engine` owns the 60 Hz
+simulation cadence, while active presentation composes at 60 Hz and static or
+reduced-motion states remain dirty-driven. `AFORC_Input` supplies decoded key
+and focus events; `AFORC_Renderer` supplies the diffed cell buffer; effects and
+UI provide bounded particles, layouts, and overlays. The assets subsystem
+provides the explicitly seeded PCG stream used to reproduce wave mechanics.
+
+No engine extension was required for Surf-Man's responsive motion. Input lease
+normalization belongs in the example adapter, and the Q16 line, face, air, and
+recovery rules remain game-local state. The public AForc API and engine
+ownership/error conventions therefore remain unchanged.
 
 Surf-Man targets an 80 by 24 terminal and supports 60 by 20 or larger. Focus
 loss and an undersized terminal pause authoritative time rather than consuming
