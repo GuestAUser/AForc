@@ -203,13 +203,15 @@ typedef struct AFORC_ParticleDrawOptions {
 
 AFORC_API AFORC_ParticleDrawOptions aforc_particle_draw_options_default(void);
 AFORC_API AFORC_Status aforc_particle_pool_init(AFORC_ParticlePool *pool,
-                                          AFORC_Particle *storage,
-                                          size_t capacity,
+                                           AFORC_Particle *storage,
+                                           size_t capacity,
                                           uint32_t seed);
 AFORC_API void aforc_particle_pool_dispose(AFORC_ParticlePool *pool);
 AFORC_API AFORC_Status aforc_particle_pool_clear(AFORC_ParticlePool *pool);
 AFORC_API AFORC_Status aforc_particle_pool_reseed(AFORC_ParticlePool *pool,
-                                            uint32_t seed);
+                                             uint32_t seed);
+/* Output index/count pointers must not alias pool->capacity or pool->active_count.
+ * Such aliases return AFORC_ERROR_INVALID_ARGUMENT without mutating the pool. */
 AFORC_API AFORC_Status aforc_particle_pool_spawn(
     AFORC_ParticlePool *pool,
     const AFORC_ParticleDesc *description,

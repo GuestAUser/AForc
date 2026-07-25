@@ -19,6 +19,12 @@ static inline bool aforc_particle_pool_ready(const AFORC_ParticlePool *pool) {
            pool->random_state != 0U;
 }
 
+static inline bool aforc_particle_pool_size_output_aliases_state(
+    const AFORC_ParticlePool *pool,
+    const size_t *output) {
+    return output == &pool->capacity || output == &pool->active_count;
+}
+
 static inline void aforc_particle_assign(
     AFORC_Particle *particle,
     const AFORC_ParticleDesc *description) {
