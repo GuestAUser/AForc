@@ -13,12 +13,21 @@
 #include <string.h>
 
 static AFORC_Rect centered_rect(const SurfManLayout *layout,
-                                int32_t width,
+                                 int32_t width,
                                 int32_t height) {
     return (AFORC_Rect){(layout->screen.width - width) / 2,
                         layout->play.y + (layout->play.height - height) / 2,
                         width,
                         height};
+}
+
+static int32_t centered_text_x(AFORC_Rect rect, const char *text) {
+    int32_t x = rect.x + (rect.width - (int32_t)strlen(text)) / 2;
+
+    if (x < rect.x + 1) {
+        x = rect.x + 1;
+    }
+    return x;
 }
 
 static const char *color_name(SurfManColorMode mode) {
@@ -82,14 +91,14 @@ AFORC_Status surf_man_render_menu(SurfManApp *app,
 static AFORC_Status render_help(SurfManApp *app,
                                 const SurfManLayout *layout) {
     static const char *const lines[] = {
-        "CARVE: ALTERNATE LEFT / RIGHT FOR FLOW.",
-        "LIP: UP + SPACE LAUNCHES AN AIR.",
-        "IN AIR: STEER TO ROTATE; SPACE TO GRAB.",
-        "TUBE: PRESS SPACE THROUGH TUBE SECTIONS.",
-        "LAND LEVEL; STAY STABLE 2.5S TO BANK.",
-        "VARY TRICKS: REPEATS SCORE HALF, BUILD NO FLOW.",
-        "P PAUSE/RESUME  ESC BACK  ? HELP  Q/CTRL-C QUIT",
-        "NO CHORDS, KEY RELEASE TIMING, OR RAPID MASHING."};
+        "W/S CLIMBS HIGH OR DROPS LOW ON THE WAVE FACE.",
+        "A/D BUILDS LINE MOMENTUM; REVERSE TO CARVE.",
+        "HIGH LIP: SPACE LAUNCHES. LOW LIP: SPACE SNAPS.",
+        "IN AIR: A/D ROTATES; SPACE GRABS.",
+        "HOLD SPACE THROUGH TUBE SECTIONS.",
+        "STAY HIGH OR MOVE YOUR LINE TO CLEAR HAZARDS.",
+        "LAND LEVEL; HOLD A CLEAN LINE 2.5S TO BANK.",
+        "NO CHORDS, RAPID MASHING, OR RELEASE TIMING."};
     const AFORC_Rect panel = centered_rect(layout, 56, 12);
     AFORC_Status status = surf_man_draw_panel(app, panel, "HELP");
 
@@ -331,6 +340,51 @@ AFORC_Status surf_man_render_resize(SurfManApp *app, AFORC_Size size) {
 
     if (app == NULL) {
         return AFORC_ERROR_INVALID_ARGUMENT;
+    }
+    if (size.width >= 24 && size.height >= 7) {
+        const int32_t panel_width = size.width > 48 ? 48 : size.width - 2;
+        const AFORC_Rect panel = {(size.width - panel_width) / 2,
+                                  (size.height - 7) / 2,
+                                  panel_width,
+                                  7};
+        const char *needed =
+            panel_width >= (int32_t)sizeof(requirement) + 1
+                ? requirement
+                : "NEED 60x20";
+        const char *paused =
+            panel_width >= 23 ? "GAMEPLAY TIME PAUSED" : "GAMEPLAY PAUSED";
+
+        status = surf_man_draw_panel(app, panel, "RESIZE");
+        if (status == AFORC_OK) {
+            status = surf_man_draw_text(
+                app,
+                (AFORC_Point){centered_text_x(panel, needed), panel.y + 2},
+                needed,
+                SURF_MAN_TONE_SIGNAL,
+                AFORC_STYLE_BOLD);
+        }
+        (void)snprintf(current,
+                       sizeof(current),
+                       "CURRENT %dx%d",
+                       size.width,
+                       size.height);
+        if (status == AFORC_OK) {
+            status = surf_man_draw_text(
+                app,
+                (AFORC_Point){centered_text_x(panel, current), panel.y + 3},
+                current,
+                SURF_MAN_TONE_INK,
+                AFORC_STYLE_NONE);
+        }
+        if (status == AFORC_OK) {
+            status = surf_man_draw_text(
+                app,
+                (AFORC_Point){centered_text_x(panel, paused), panel.y + 5},
+                paused,
+                SURF_MAN_TONE_FRAMEWORK,
+                AFORC_STYLE_NONE);
+        }
+        return status;
     }
     requirement_x = (size.width - (int32_t)(sizeof(requirement) - 1U)) / 2;
     if (requirement_x < 0) {
