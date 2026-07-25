@@ -150,6 +150,11 @@ void aforc_engine_destroy(AFORC_Engine *engine) {
     if (engine == NULL) {
         return;
     }
+    if (engine->frame_active || engine->scenes.dispatching ||
+        engine->state == AFORC_ENGINE_RUNNING ||
+        engine->state == AFORC_ENGINE_STOPPING) {
+        return;
+    }
     allocator = engine->config.allocator;
     aforc_scene_stack_dispose(&engine->scenes, engine);
     aforc_free(&allocator, engine->commands);
@@ -163,16 +168,12 @@ static AFORC_Status invoke_hook(AFORC_EngineHookFn hook, AFORC_Engine *engine,
                         : hook(engine->config.hooks.context, engine, error);
 }
 
-AFORC_Status aforc_engine_frame(AFORC_Engine *engine, uint64_t now_ns,
-                             AFORC_Error *error) {
+static AFORC_Status engine_frame_impl(AFORC_Engine *engine, uint64_t now_ns,
+                                      AFORC_Error *error) {
     uint64_t elapsed_ns = 0U;
     uint64_t maximum_ns;
     uint32_t updates = 0U;
     AFORC_Status status;
-    if (engine == NULL || engine->state == AFORC_ENGINE_STOPPED) {
-        return aforc_engine_set_error(error, AFORC_ERROR_STATE,
-                                    "frame requested for inactive engine");
-    }
     status = aforc_engine_apply_scene_commands(engine, error);
     if (status != AFORC_OK || engine->quit_requested) {
         return status;
@@ -207,6 +208,9 @@ AFORC_Status aforc_engine_frame(AFORC_Engine *engine, uint64_t now_ns,
     if (status != AFORC_OK) {
         return status;
     }
+    if (engine->quit_requested) {
+        return AFORC_OK;
+    }
     /* Consume whole fixed quanta only. Commands are committed after every
      * callback boundary so a transition requested by one tick is visible to
      * the next without mutating a scene stack during traversal. */
@@ -218,13 +222,13 @@ AFORC_Status aforc_engine_frame(AFORC_Engine *engine, uint64_t now_ns,
         if (status != AFORC_OK) {
             return status;
         }
+        engine->accumulator_ns -= engine->fixed_step_ns;
+        engine->fixed_tick++;
+        updates++;
         status = aforc_engine_apply_scene_commands(engine, error);
         if (status != AFORC_OK || engine->quit_requested) {
             return status;
         }
-        engine->accumulator_ns -= engine->fixed_step_ns;
-        engine->fixed_tick++;
-        updates++;
     }
     if (engine->accumulator_ns >= engine->fixed_step_ns) {
         /* The per-frame update budget is a hard latency bound. Retaining the
@@ -263,10 +267,26 @@ AFORC_Status aforc_engine_frame(AFORC_Engine *engine, uint64_t now_ns,
     return status;
 }
 
+AFORC_Status aforc_engine_frame(AFORC_Engine *engine, uint64_t now_ns,
+                                AFORC_Error *error) {
+    AFORC_Status status;
+
+    if (engine == NULL || engine->state != AFORC_ENGINE_CREATED ||
+        engine->frame_active) {
+        return aforc_engine_set_error(error, AFORC_ERROR_STATE,
+                                      "engine frame is already owned");
+    }
+    engine->frame_active = true;
+    status = engine_frame_impl(engine, now_ns, error);
+    engine->frame_active = false;
+    return status;
+}
+
 AFORC_Status aforc_engine_run(AFORC_Engine *engine, AFORC_Error *error) {
     AFORC_Status status = AFORC_OK;
     if (engine == NULL || (engine->state != AFORC_ENGINE_CREATED &&
-                           engine->state != AFORC_ENGINE_STOPPED)) {
+                           engine->state != AFORC_ENGINE_STOPPED) ||
+        engine->frame_active) {
         return aforc_engine_set_error(
             error,
             AFORC_ERROR_STATE,
@@ -282,11 +302,13 @@ AFORC_Status aforc_engine_run(AFORC_Engine *engine, AFORC_Error *error) {
         const uint64_t frame_start = engine->config.hooks.now(
             engine->config.hooks.context);
         status = invoke_hook(engine->config.hooks.poll_events, engine, error);
-        if (status != AFORC_OK) {
+        if (status != AFORC_OK || engine->quit_requested) {
             break;
         }
-        status = aforc_engine_frame(engine, frame_start, error);
-        if (status != AFORC_OK) {
+        engine->frame_active = true;
+        status = engine_frame_impl(engine, frame_start, error);
+        engine->frame_active = false;
+        if (status != AFORC_OK || engine->quit_requested) {
             break;
         }
         if (engine->config.target_frames_per_second > 0U &&

@@ -35,6 +35,7 @@ struct AFORC_Engine {
     AFORC_EngineState state;
     bool clock_started;
     bool quit_requested;
+    bool frame_active;
 };
 
 static inline AFORC_Status aforc_engine_set_error(AFORC_Error *error,
