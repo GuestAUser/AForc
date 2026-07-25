@@ -134,22 +134,47 @@ copying individual signed artworks.
   recap, and resize requirements. It must preserve the underlying context when
   that context remains relevant.
 
+### Surf-Man Changed And Retained Contract
+
+The responsive surf redesign changes the interaction model, not the terminal
+identity:
+
+- `A`/`D` and Left/Right accelerate a bounded, authoritative Q16 line position
+  and velocity. Reversing an established line produces a carve; a single press
+  still changes motion on the next fixed update.
+- `W`/`S` and Up/Down move a bounded, authoritative wave-face offset. The
+  rider samples the wave at the current line position, so line and face choices
+  change both rule outcomes and the visible rider location.
+- Space is a bounded action command. At a high lip it launches an air without a
+  directional chord; at a lower lip it snaps. Repeats can renew the bounded
+  action, while explicit key release clears it.
+- The anchored wave field remains readable while the rider, board, wake, and
+  spray move through adjacent cells from authoritative line, face, and air
+  state.
+
+The redesign retains the 60 Hz fixed-step simulation, 80 by 24 target and 60
+by 20 supported layout, four terminal tokens, ASCII-only glyph vocabulary,
+three-row rider and separate board contracts, labelled monochrome cues, and
+focus or undersize pauses that do not consume gameplay time.
+
 ### Layout And Motion
 
 - Design target: `80 x 24` cells. Play is supported at `60 x 20` or larger.
   Smaller terminals pause authoritative time and display the exact requirement.
 - A four-cell rhythm governs major horizontal and vertical regions; one-cell
   spacing is permitted only inside sprites, meters, and compact status rows.
-- Authoritative simulation and normal-play visual composition run at 60 ticks
-  per second. Unchanged frames perform no composition, ANSI diff, or terminal
-  write; reduced-motion and static menus remain event-driven.
+- Authoritative simulation and active normal-play visual composition run at 60
+  ticks per second. Clean frames skip composition. Renderer presentation may
+  still scan the cell diff, but it emits and writes no unchanged cells;
+  reduced-motion and static menus remain event-driven.
 - Motion must explain speed, wave phase, score banking, landing, wipeout, or
   scene transition. No blinking, idle scanlines, random shimmer, or perpetual
   motion without gameplay meaning.
-- Wave layers advance at different deterministic rates derived from active tick
-  and board speed. Rider and board pose changes follow steering, airborne,
-  tube, landing, and recovery state; short easing through adjacent cell poses
-  is preferred over teleporting the focal object.
+- Wave layers advance at different deterministic rates derived from active
+  visual time and board speed. The field remains anchored while rider and board
+  position, pose, wake, and spray follow rider-local wave samples, bounded line
+  and face motion, airborne state, tube, landing, and recovery. Short easing
+  through adjacent cells is preferred over teleporting the focal object.
 - Limb animation may swap one anchored arm or leg row, but the head, torso,
   feet, and board must not oscillate independently.
 - Playable wave crests form continuous rising and falling contours. Sparse
@@ -163,6 +188,10 @@ copying individual signed artworks.
 
 - No action requires a chord, reliable key-release event, rapid mashing, mouse,
   audio, color distinction, or ambiguous-width Unicode glyph.
+- Directional taps must reach one fixed update even if key-up arrives first.
+  Bounded action repeats support tubes and grabs, while explicit release clears
+  the action immediately. A high lip plus Space launches an air; direction can
+  modify the resulting motion but cannot gate eligibility.
 - Arrow and WASD controls, persistent help, wide timing,
   75-percent speed, landing assistance, no-color/high-contrast, and reduced
   motion are first-class states rather than undocumented debug switches.
