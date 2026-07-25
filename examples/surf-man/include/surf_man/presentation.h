@@ -19,8 +19,6 @@ typedef struct SurfManApp SurfManApp;
 typedef struct SurfManVisuals {
     AFORC_Particle particles[SURF_MAN_PARTICLE_CAPACITY];
     AFORC_ParticlePool particle_pool;
-    AFORC_Tween title_tween;
-    AFORC_Tween score_tween;
     uint64_t visual_tick;
     bool dirty;
     bool initialized;

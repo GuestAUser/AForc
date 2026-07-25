@@ -9,6 +9,7 @@
 #include "aforc/ui.h"
 #include "surf_man/app.h"
 
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -54,6 +55,74 @@ SurfManLayout surf_man_layout_for_size(AFORC_Size size) {
     return layout;
 }
 
+int32_t surf_man_q16_round_cell(int32_t value_q16) {
+    int64_t magnitude = value_q16;
+
+    if (magnitude < 0) {
+        magnitude = -magnitude;
+    }
+    magnitude = (magnitude + SURF_MAN_Q16_ONE / 2) / SURF_MAN_Q16_ONE;
+    if (value_q16 < 0) {
+        magnitude = -magnitude;
+    }
+    if (magnitude < INT32_MIN) {
+        return INT32_MIN;
+    }
+    if (magnitude > INT32_MAX) {
+        return INT32_MAX;
+    }
+    return (int32_t)magnitude;
+}
+
+int32_t surf_man_rider_center_x(const SurfManSimulation *simulation,
+                                AFORC_Rect play) {
+    const int32_t minimum = play.x + 5;
+    const int32_t maximum = play.x + play.width - 6;
+    const int64_t columns_q16 =
+        simulation == NULL ? 0 : (int64_t)simulation->line_position_q16 * 2;
+    int64_t magnitude = columns_q16;
+    int32_t offset;
+    int32_t center;
+
+    if (magnitude < 0) {
+        magnitude = -magnitude;
+    }
+    magnitude = (magnitude + SURF_MAN_Q16_ONE / 2) / SURF_MAN_Q16_ONE;
+    if (columns_q16 < 0) {
+        magnitude = -magnitude;
+    }
+    offset = magnitude < INT32_MIN
+                 ? INT32_MIN
+             : magnitude > INT32_MAX ? INT32_MAX
+                                     : (int32_t)magnitude;
+    center = play.x + play.width / 3;
+    if ((int64_t)center + offset < minimum) {
+        return minimum;
+    }
+    if ((int64_t)center + offset > maximum) {
+        return maximum;
+    }
+    return center + offset;
+}
+
+int32_t surf_man_wave_surface_row(const SurfManWaveSample *sample,
+                                  AFORC_Rect play) {
+    int64_t face = sample->face_q16;
+    const int32_t maximum_rise = play.height > 7 ? play.height - 6 : 1;
+    int32_t rise;
+
+    if (face < 0) {
+        face = -face;
+    }
+    if (face > (int64_t)SURF_MAN_Q16_ONE * SURF_MAN_VISUAL_FACE_UNITS) {
+        face = (int64_t)SURF_MAN_Q16_ONE * SURF_MAN_VISUAL_FACE_UNITS;
+    }
+    rise = 1 + (int32_t)(face * (maximum_rise - 1) /
+                          ((int64_t)SURF_MAN_Q16_ONE *
+                           SURF_MAN_VISUAL_FACE_UNITS));
+    return play.y + play.height - 2 - rise;
+}
+
 AFORC_Cell surf_man_cell(uint32_t codepoint,
                          uint8_t color_index,
                          AFORC_CellStyle style) {
@@ -92,6 +161,23 @@ AFORC_Status surf_man_plot_cell(void *context,
 
     if (app == NULL) {
         return AFORC_ERROR_INVALID_ARGUMENT;
+    }
+    return aforc_renderer_put(app->renderer, position, cell);
+}
+
+AFORC_Status surf_man_plot_particle_cell(void *context,
+                                         AFORC_Point position,
+                                         AFORC_Cell cell) {
+    SurfManApp *app = context;
+    AFORC_Cell existing;
+    AFORC_Status status;
+
+    if (app == NULL || app->renderer == NULL) {
+        return AFORC_ERROR_INVALID_ARGUMENT;
+    }
+    status = aforc_renderer_get(app->renderer, position, &existing);
+    if (status != AFORC_OK || existing.codepoint != (uint32_t)' ') {
+        return status;
     }
     return aforc_renderer_put(app->renderer, position, cell);
 }

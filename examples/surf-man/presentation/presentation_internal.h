@@ -31,10 +31,18 @@ typedef struct SurfManLayout {
 } SurfManLayout;
 
 SurfManLayout surf_man_layout_for_size(AFORC_Size size);
+int32_t surf_man_q16_round_cell(int32_t value_q16);
+int32_t surf_man_rider_center_x(const SurfManSimulation *simulation,
+                                AFORC_Rect play);
+int32_t surf_man_wave_surface_row(const SurfManWaveSample *sample,
+                                  AFORC_Rect play);
 AFORC_Cell surf_man_tone_cell(const SurfManApp *app,
                               uint32_t codepoint,
                               SurfManTone tone,
                               AFORC_CellStyle style);
+AFORC_Status surf_man_plot_particle_cell(void *context,
+                                         AFORC_Point position,
+                                         AFORC_Cell cell);
 AFORC_Status surf_man_draw_text(SurfManApp *app,
                                 AFORC_Point position,
                                 const char *text,
