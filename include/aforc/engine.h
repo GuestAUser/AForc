@@ -50,6 +50,10 @@ typedef struct AFORC_EngineConfig {
  * The fixed-step accumulator clamps long frames and drops excess backlog after
  * maximum_fixed_updates_per_frame to avoid an unbounded spiral of death.
  * Setting target_frames_per_second to zero disables run-loop sleeping.
+ * Run and frame own engine execution until they return and are non-reentrant.
+ * Calling either from an engine hook or scene callback returns
+ * AFORC_ERROR_STATE. Destroy requested during active execution is ignored; the
+ * owner must destroy the engine after the outer operation returns.
  */
 
 typedef enum AFORC_EngineState {
@@ -65,11 +69,13 @@ AFORC_API AFORC_Status aforc_engine_create(const AFORC_EngineConfig *config,
                                      AFORC_Error *error);
 AFORC_API void aforc_engine_destroy(AFORC_Engine *engine);
 /* Owns the loop until quit/error. poll_events runs before each frame; render is
- * followed by present. The engine may be run again from STOPPED state. */
+ * followed by present. The engine may be run again from STOPPED state. A quit
+ * request skips remaining frame work and frame-rate sleep. */
 AFORC_API AFORC_Status aforc_engine_run(AFORC_Engine *engine, AFORC_Error *error);
-/* Deterministic embedding entry point. now_ns must be nondecreasing and use one
- * clock domain. It does not call poll_events or sleep, but does call
- * begin_frame and present. */
+/* Deterministic embedding entry point for CREATED engines. now_ns must be
+ * nondecreasing and use one clock domain. It does not call poll_events or
+ * sleep, but does call begin_frame and present. Each successful fixed callback
+ * advances fixed_tick even when that callback requests quit. */
 AFORC_API AFORC_Status aforc_engine_frame(AFORC_Engine *engine, uint64_t now_ns,
                                     AFORC_Error *error);
 AFORC_API void aforc_engine_request_quit(AFORC_Engine *engine);

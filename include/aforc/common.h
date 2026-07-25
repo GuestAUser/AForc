@@ -52,7 +52,9 @@ typedef enum AFORC_Status {
 
 typedef struct AFORC_Error {
     AFORC_Status status;
+    /* Borrowed; the pointed-to subsystem name must outlive this value. */
     const char *subsystem;
+    /* Always NUL-terminated after aforc_error_clear/set. */
     char message[192];
 } AFORC_Error;
 
@@ -66,6 +68,10 @@ typedef struct AFORC_Allocator {
     AFORC_ReallocFn reallocate;
     AFORC_FreeFn deallocate;
 } AFORC_Allocator;
+
+/* Custom allocator callbacks and context are borrowed wherever an allocator
+ * is copied into an owning object. They must remain valid until that object is
+ * destroyed. Allocation helpers accept only complete callback tables. */
 
 typedef enum AFORC_LogLevel {
     AFORC_LOG_TRACE = 0,
@@ -104,6 +110,8 @@ typedef struct AFORC_Rect {
 AFORC_API AFORC_Allocator aforc_allocator_default(void);
 AFORC_API bool aforc_size_multiply(size_t left, size_t right, size_t *out);
 AFORC_API bool aforc_size_add(size_t left, size_t right, size_t *out);
+/* Successful zero-sized allocation stores NULL. Reallocation failure leaves
+ * the original allocation owned by the caller and does not overwrite output. */
 AFORC_API AFORC_Status aforc_alloc_array(const AFORC_Allocator *allocator,
                                    size_t count, size_t element_size,
                                    void **out_memory);

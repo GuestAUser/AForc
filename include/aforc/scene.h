@@ -60,6 +60,9 @@ struct AFORC_Scene {
  * A top scene opts into dispatch below it with the corresponding *_BELOW flag.
  * Update/render callbacks then execute from the lowest included scene upward;
  * events travel top-down until consumed or propagation is disabled.
+ * Enter runs before a push/replace is committed, so stack_top still returns the
+ * previous scene from that callback. Leave runs while the removed scene is
+ * still top. Scene objects, vtables, and user_data remain caller-owned.
  */
 
 typedef struct AFORC_SceneStack {
@@ -69,6 +72,10 @@ typedef struct AFORC_SceneStack {
     AFORC_Allocator allocator;
     bool dispatching;
 } AFORC_SceneStack;
+
+/* AFORC_SceneStack storage is public for caller allocation, but its fields are
+ * read-only to consumers after init. Mutating or disposing a stack from one of
+ * its callbacks is rejected or ignored until dispatch returns. */
 
 AFORC_API AFORC_Status aforc_scene_stack_init(AFORC_SceneStack *stack,
                                         size_t capacity,
