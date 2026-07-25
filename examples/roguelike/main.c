@@ -53,9 +53,13 @@ static AFORC_Status parse_options(int argc,
             if (index + 1 >= argc) {
                 return AFORC_ERROR_INVALID_ARGUMENT;
             }
+            if (argv[index + 1][0] == '-') {
+                return AFORC_ERROR_FORMAT;
+            }
             errno = 0;
             value = strtoull(argv[++index], &end, 10);
-            if (errno != 0 || end == argv[index] || *end != '\0') {
+            if (errno != 0 || end == argv[index] || *end != '\0' ||
+                value > UINT64_MAX) {
                 return AFORC_ERROR_FORMAT;
             }
             options->seed = (uint64_t)value;
