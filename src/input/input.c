@@ -37,12 +37,6 @@ static AFORC_Status aforc_input_internal_now_ms(uint64_t *out_now_ms)
     return AFORC_OK;
 }
 
-static bool aforc_input_internal_allocator_valid(const AFORC_Allocator *allocator)
-{
-    return allocator != NULL && allocator->allocate != NULL &&
-           allocator->reallocate != NULL && allocator->deallocate != NULL;
-}
-
 AFORC_InputConfig aforc_input_config_default(void)
 {
     AFORC_InputConfig config;
@@ -75,7 +69,7 @@ AFORC_Status aforc_input_create(
         effective_config.byte_capacity < 64u ||
         effective_config.event_capacity >
             SIZE_MAX / sizeof(AFORC_InputEvent) ||
-        !aforc_input_internal_allocator_valid(&effective_config.allocator)) {
+        !aforc_allocator_is_valid(&effective_config.allocator)) {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
     status = aforc_alloc_array(&effective_config.allocator,

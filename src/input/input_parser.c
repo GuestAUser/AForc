@@ -108,6 +108,7 @@ static void aforc_input_internal_emit_escape(
         AFORC_MOD_NONE,
         false,
         false,
+        false,
         timestamp_ms
     );
 }
