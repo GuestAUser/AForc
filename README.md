@@ -10,7 +10,8 @@ The repository includes two complete examples. The procedural roguelike
 demonstrates the engine loop, terminal lifecycle, buffered renderer, decoded
 input, tile world, ECS, effects, UI, deterministic random generation, and save
 containers working together. Surf-Man is a deterministic, fixed-step terminal
-surf session with an accessible single-screen presentation and off-screen QA.
+surf session with responsive Q16 line and wave-face motion, an accessible
+single-screen presentation, and off-screen QA.
 
 ## Features
 
@@ -103,9 +104,11 @@ reproduces the same sequence of floors.
 ## Surf-Man
 
 Surf-Man is a single-screen, three-wave surf session that pairs a bounded,
-fixed-step simulation with an ASCII instrument display. It demonstrates the
-engine loop, terminal lifecycle, decoded input, renderer, effects, UI, and PCG
-random generation without adding persistence, networking, or audio.
+fixed-step simulation with an ASCII instrument display. Bounded Q16 line and
+wave-face motion make steering responsive and free without changing the engine
+API. It demonstrates the engine loop, terminal lifecycle, decoded input,
+renderer, effects, UI, and PCG random generation without adding persistence,
+networking, or audio.
 
 See [examples/surf-man/README.md](examples/surf-man/README.md) for build,
 controls, scoring, accessibility, seed, and deterministic smoke-test details.
@@ -216,9 +219,11 @@ src/ecs/           Entity-component storage and views
 src/effects/       Sprites, animation, tweens, and particles
 src/ui/            Layout and widgets
 src/assets/        Asset I/O, RNG, config, and save containers
-examples/roguelike/ Complete roguelike integration example
+examples/roguelike/ Structured roguelike integration example
 examples/surf-man/  Surf-Man integration example
-docs/              Design and architecture notes
+DESIGN.md          Brand and terminal-game surface contract
+SECURITY.md        Security policy and integration constraints
+docs/              Architecture and extension guidance
 ```
 
 Public contracts remain in `include/aforc`; subsystem representations and
@@ -226,6 +231,13 @@ cross-translation-unit helpers remain private under `src`. CMake enumerates
 every engine translation unit explicitly, while the Make build discovers the
 same one-level `src/<subsystem>/*.c` units. Private headers are neither installed
 nor part of the supported ABI.
+
+Both examples keep cross-translation-unit contracts private. The Roguelike
+separates its `app/`, `game/`, `presentation/`, `persistence/`, and `qa/`
+modules under `examples/roguelike`, with private headers in
+`include/roguelike/`; Surf-Man retains its separate `app/`, `game/`,
+`presentation/`, `qa/`, and `include/surf_man/` boundaries. Both build
+manifests enumerate their module units explicitly.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for subsystem boundaries,
 frame flow, and extension guidance. See [SECURITY.md](SECURITY.md) for trust
