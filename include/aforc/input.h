@@ -83,6 +83,10 @@ typedef enum AFORC_Key {
     AFORC_KEY_COUNT = 320
 } AFORC_Key;
 
+/* Printable ASCII keys use their uppercase codepoint value even when no named
+ * enumerator is listed. Unicode text outside ASCII is reported as TEXT events
+ * with AFORC_KEY_NONE rather than extending this key-state table. */
+
 typedef uint16_t AFORC_Modifiers;
 
 enum {
@@ -154,24 +158,39 @@ typedef struct AFORC_InputConfig {
     AFORC_Allocator allocator;
 } AFORC_InputConfig;
 
+/* Input owns fixed-capacity byte and event buffers allocated at create time.
+ * The copied allocator and its context must outlive the input object. Accepted
+ * events are FIFO. When full, the newest event is dropped, dropped_events is
+ * incremented (saturating), state still advances, and the producing operation
+ * returns AFORC_ERROR_LIMIT. No allocations occur while parsing. */
+
 AFORC_API AFORC_InputConfig aforc_input_config_default(void);
 AFORC_API AFORC_Status aforc_input_create(
     AFORC_Input **out_input,
     const AFORC_InputConfig *config
 );
 AFORC_API void aforc_input_destroy(AFORC_Input *input);
+/* Clears pressed/released edges, resolves elapsed parser/key deadlines against
+ * CLOCK_MONOTONIC, and preserves unread events plus held state. */
 AFORC_API AFORC_Status aforc_input_begin_frame(AFORC_Input *input);
+/* Poll borrows an active terminal for this call and bounds its wait by pending
+ * escape and synthetic key-release deadlines. */
 AFORC_API AFORC_Status aforc_input_poll(
     AFORC_Input *input,
     AFORC_Terminal *terminal,
     int timeout_ms
 );
+/* Feed is the deterministic decoder entry point. Timestamps across feed,
+ * flush, and release_all calls on one input must be nondecreasing milliseconds
+ * from one clock domain. Partial UTF-8/control sequences remain buffered. */
 AFORC_API AFORC_Status aforc_input_feed(
     AFORC_Input *input,
     const unsigned char *bytes,
     size_t size,
     uint64_t timestamp_ms
 );
+/* Resolves only deadlines elapsed at timestamp_ms; it does not force an
+ * unexpired partial sequence. Explicit protocol releases are never synthesized. */
 AFORC_API AFORC_Status aforc_input_flush(
     AFORC_Input *input,
     uint64_t timestamp_ms
