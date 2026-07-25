@@ -366,7 +366,9 @@ AFORC_Status aforc_terminal_poll(AFORC_Terminal *terminal,
         out_readable != NULL) {
         *out_readable = true;
     }
-    if ((descriptors[0].revents & (POLLERR | POLLNVAL)) != 0 ||
+    if ((descriptors[0].revents & POLLNVAL) != 0 ||
+        ((descriptors[0].revents & POLLERR) != 0 &&
+         (descriptors[0].revents & POLLHUP) == 0) ||
         (descriptors[1].revents & (POLLERR | POLLNVAL)) != 0) {
         errno = EIO;
         return AFORC_ERROR_IO;
