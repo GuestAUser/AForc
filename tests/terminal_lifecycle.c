@@ -9,6 +9,7 @@
 #endif
 #define _XOPEN_SOURCE 600
 
+#include "aforc/input.h"
 #include "aforc/terminal.h"
 
 #include <fcntl.h>
@@ -18,6 +19,7 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <termios.h>
+#include <time.h>
 #include <unistd.h>
 
 typedef struct PtyPair {
@@ -97,6 +99,19 @@ static bool set_size(int fd, unsigned short columns, unsigned short rows)
     size.ws_col = columns;
     size.ws_row = rows;
     return ioctl(fd, TIOCSWINSZ, &size) == 0;
+}
+
+static bool monotonic_time_ms(uint64_t *out_time_ms)
+{
+    struct timespec now;
+
+    if (out_time_ms == NULL || clock_gettime(CLOCK_MONOTONIC, &now) < 0 ||
+        now.tv_sec < 0) {
+        return false;
+    }
+    *out_time_ms = (uint64_t)now.tv_sec * UINT64_C(1000) +
+                   (uint64_t)now.tv_nsec / UINT64_C(1000000);
+    return true;
 }
 
 static bool test_open_close_restores_and_borrows_fds(void)
@@ -280,6 +295,41 @@ static bool test_master_hangup_reports_end_of_stream(void)
     return passed;
 }
 
+static bool test_explicit_release_preserves_poll_timeout(void)
+{
+    static const unsigned char press[] = "\x1b[97;3:1u";
+    PtyPair pair;
+    AFORC_Input *input = NULL;
+    AFORC_Terminal *terminal = NULL;
+    AFORC_TerminalConfig config;
+    uint64_t before_ms = 0U;
+    uint64_t after_ms = 0U;
+    bool passed = false;
+
+    if (!pty_open(&pair)) {
+        pty_close(&pair);
+        return false;
+    }
+    config = terminal_config(pair.slave);
+    if (aforc_terminal_open(&terminal, &config) != AFORC_OK ||
+        aforc_input_create(&input, NULL) != AFORC_OK ||
+        aforc_input_feed(input, press, sizeof(press) - 1U, 1U) != AFORC_OK ||
+        !aforc_input_key_held(input, AFORC_KEY_A) ||
+        !monotonic_time_ms(&before_ms)) {
+        aforc_input_destroy(input);
+        aforc_terminal_close(terminal);
+        pty_close(&pair);
+        return false;
+    }
+    passed = aforc_input_poll(input, terminal, 80) == AFORC_OK &&
+             monotonic_time_ms(&after_ms) && after_ms >= before_ms &&
+             after_ms - before_ms >= 50U;
+    aforc_input_destroy(input);
+    aforc_terminal_close(terminal);
+    pty_close(&pair);
+    return passed;
+}
+
 int main(void)
 {
     if (!test_open_close_restores_and_borrows_fds()) {
@@ -297,6 +347,10 @@ int main(void)
     if (!test_master_hangup_reports_end_of_stream()) {
         (void)fprintf(stderr, "terminal hangup handling failed\n");
         return 4;
+    }
+    if (!test_explicit_release_preserves_poll_timeout()) {
+        (void)fprintf(stderr, "explicit-release poll timeout failed\n");
+        return 5;
     }
     (void)puts("terminal lifecycle: ok");
     return 0;

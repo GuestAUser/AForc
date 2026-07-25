@@ -288,7 +288,7 @@ int aforc_input_internal_effective_timeout(
         }
     }
     for (index = 1u; index < AFORC_KEY_COUNT; ++index) {
-        if (input->keys[index].held) {
+        if (input->keys[index].held && !input->keys[index].explicit_release) {
             const int remaining = aforc_input_internal_timeout_until(
                 input->keys[index].expires_at_ms,
                 now_ms
