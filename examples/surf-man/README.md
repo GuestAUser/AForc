@@ -1,9 +1,11 @@
 # Surf-Man
 
 Surf-Man is a deterministic terminal surf-session example for AForc. It keeps
-the rules and active presentation on a bounded 60 Hz cadence while rendering a
-readable, diffed single-screen ASCII instrument. An interactive run uses the POSIX terminal;
-the same scene also runs through an off-screen deterministic smoke path.
+rules and active ride presentation on a bounded 60 Hz cadence while rendering a
+readable, diffed single-screen ASCII instrument. Static and reduced-motion
+surfaces are event-driven: unchanged frames do not recompose. An interactive
+run uses the POSIX terminal; the same scene also runs through an off-screen
+deterministic smoke path.
 
 ## Build And Run
 
@@ -52,13 +54,16 @@ ctest --test-dir build/cmake -R '^surf_man_' --output-on-failure
 
 Smoke mode creates no terminal session. It drives the normal app, scene,
 simulation, renderer, and input-normalization paths using deterministic time
-and an off-screen renderer. Simulation checks run 240 equal fixed ticks under
-steady `{1}`, alternating `{1, 3}`, and bounded-stall `{0, 0, 8}` frame
-schedules, then cover score banking, wipeout, saturation, and practice/day
-boundaries. Render checks assert exact 80 by 24 shack, menu, HUD, rider, and
-board geometry plus ASCII, indexed-token, and no-blink rules. Smoke checks cover one-shot
-leases and repeats, focus/resize hash invariants, the real pushed off-screen
-scene, and no filesystem effects.
+and an off-screen renderer. Simulation checks compare steady `{1}`,
+alternating `{1, 3}`, and bounded-stall `{0, 0, 8}` frame schedules while
+covering immediate directional response, bounded line and wave-face travel,
+momentum reversals, rider-local wave sampling, recovery, scoring, saturation,
+and state-hash coverage. Render checks assert the 80 by 24 shack, menu, HUD,
+rider, and board contracts; dynamic rider position; ASCII, token, and
+no-blink rules; high-contrast and no-color output; reduced-motion composition;
+and bordered resize notices. Smoke checks cover directional taps, bounded
+action leases and explicit releases, focus/resize pause invariants, the real
+pushed off-screen scene, and no filesystem effects.
 
 ## Session Loop And Scoring
 
@@ -67,8 +72,9 @@ count-in; a wipeout uses a two-second recovery before the next state. The app
 moves through the shack, count-in, riding, wipeout recovery, wave recap, and
 day recap states. Practice uses the same rules but loops its timed wave instead
 of advancing a normal day; Back banks pending points and returns to the shack.
-While riding, steer the board along the changing wave face and commit timing
-actions for carves, lip snaps, airs, and tubes.
+While riding, move along the changing wave face, build and reverse line
+momentum for carves, and use one unchorded action for lip snaps, airs, and
+tubes.
 
 Maneuvers create pending score. Consecutive varied maneuvers build flow to a
 maximum of five, while immediate repetition earns half base score without
@@ -81,10 +87,13 @@ than color alone.
 
 ## Ride Technique
 
-- Alternate left and right carves to build FLOW.
-- At a lip, use Up + Space to launch an air. While airborne, steer for
-  rotations and press Space to grab.
-- Press Space through tube sections to ride them.
+- Use `A`/`D` or Left/Right to build line momentum. Reverse an established
+  line to carve and build FLOW.
+- Use `W`/`S` or Up/Down to climb high or drop low on the wave face.
+- At a high lip, press Space alone to launch an air. At a lower lip, Space
+  snaps instead. While airborne, steer for rotations and press Space to grab.
+- Hold Space through tube sections to ride them. Stay high or move the line to
+  clear hazards.
 - Land level, then stay stable for 2.5 seconds to bank pending points.
 - Vary maneuvers. Repeating the immediately previous trick earns half base
   score and does not build FLOW.
@@ -93,19 +102,26 @@ than color alone.
 
 The main menu provides Surf, Practice, Help, Accessibility, and Quit. Arrow
 keys and `WASD` provide the same directional input for menu navigation and
-riding. `Space` sends the ride action and activates the selected menu item;
+riding: Up/Down climb or drop on the face, while Left/Right build line
+momentum. `Space` is the ride action and activates the selected menu item;
+at a high lip it launches without requiring a directional chord. Directional
+taps survive a key-up that arrives before the next fixed update. Held or
+repeated Space renews a bounded ride-action lease; explicit release clears it
+immediately.
 `Enter` activates the selected menu item. `Escape` returns from a panel or
 pauses the session, `P` pauses or resumes, `?` opens Help, and `Q` or `Ctrl-C`
-requests quit. The in-game Help
-panel teaches riding technique during play. Select Accessibility from the main
-menu with Up/Down and Enter or Space.
+requests quit. The in-game Help panel teaches riding technique during play.
+Select Accessibility from the main menu with Up/Down and Enter or Space; in
+the panel, Up/Down selects, Left/Right changes, and Escape returns.
 
 Surf-Man targets 80 by 24 cells and remains playable at 60 by 20 or larger. A
 smaller terminal, focus loss, or resize pause stops authoritative time without
 consuming a wave, score, or flow. The Accessibility panel provides wide timing,
 75-percent speed, landing assistance, high-contrast and no-color modes, and
-reduced motion. Reduced motion removes decorative beach movement, camera shake,
-and cosmetic spray while retaining all rule-state cues.
+reduced motion. Reduced motion freezes decorative beach and wave-phase motion,
+suppresses cosmetic spray, and preserves all rule-state cues. Static and
+reduced-motion surfaces compose only after a rule-state, input, resize, or
+remaining-effect change.
 
 Every action is available without chords, mouse input, rapid mashing, reliable
 key-release events, color discrimination, audio, or ambiguous-width Unicode.
@@ -114,12 +130,17 @@ provide redundant state cues.
 
 ## Module Boundaries And Scope
 
-`app/` owns lifecycle, CLI, input, and engine hooks. `game/` owns deterministic
-Q16.16 rules, waves, and scoring. `presentation/` owns renderer composition,
-effects, HUDs, menus, and overlays. `qa/` owns deterministic off-screen checks.
-The private headers in `include/surf_man/` connect those modules but are not
-installed library headers.
+`app/` owns lifecycle, CLI, responsive input normalization, and engine hooks.
+`game/` owns deterministic Q16.16 rules, bounded line and wave-face motion,
+waves, and scoring. `presentation/` owns renderer composition, dynamic rider
+placement, effects, HUDs, menus, and overlays. `qa/` owns deterministic
+off-screen checks. The private headers in `include/surf_man/` connect those
+modules but are not installed library headers. This redesign uses those
+game-local responsibilities and adds no public AForc API.
 
 The example demonstrates engine scenes and timing, terminal lifecycle, decoded
 input, diffed cell rendering, effects, UI, and seeded PCG mechanics. It is
 deliberately not a persistence, network, audio, or input-remapping example.
+An interactive run owns the process terminal session; do not combine it with
+another raw-mode or alternate-screen owner without the coordination described
+in [SECURITY.md](../../SECURITY.md).
