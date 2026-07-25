@@ -96,7 +96,7 @@ static AFORC_Status surf_man_activate_menu(SurfManApp *app,
     return AFORC_OK;
 }
 
-static void surf_man_adjust_setting(SurfManApp *app, int direction)
+static AFORC_Status surf_man_adjust_setting(SurfManApp *app, int direction)
 {
     switch (app->menu_item) {
         case SURF_MAN_MENU_SURF:
@@ -115,20 +115,26 @@ static void surf_man_adjust_setting(SurfManApp *app, int direction)
             break;
         case SURF_MAN_MENU_QUIT: {
             int mode = (int)app->settings.color_mode + direction;
+            AFORC_Status status;
 
             if (mode < 0) {
                 mode = (int)SURF_MAN_COLOR_NONE;
             } else if (mode > (int)SURF_MAN_COLOR_NONE) {
                 mode = (int)SURF_MAN_COLOR_STANDARD;
             }
+            status = aforc_particle_pool_clear(&app->visuals.particle_pool);
+            if (status != AFORC_OK) {
+                return status;
+            }
             app->settings.color_mode = (SurfManColorMode)mode;
             break;
         }
         case SURF_MAN_MENU_COUNT:
-            return;
+            return AFORC_ERROR_STATE;
     }
     app->simulation.settings = app->settings;
     surf_man_visuals_mark_dirty(&app->visuals);
+    return AFORC_OK;
 }
 
 AFORC_Status surf_man_menu_handle_modal_key(
@@ -164,10 +170,10 @@ AFORC_Status surf_man_menu_handle_modal_key(
         if (input->vertical != 0) {
             surf_man_move_menu(app, input->vertical);
         } else if (input->horizontal != 0) {
-            surf_man_adjust_setting(app, input->horizontal);
+            return surf_man_adjust_setting(app, input->horizontal);
         } else if (input->key == AFORC_KEY_ENTER ||
                    input->key == AFORC_KEY_SPACE) {
-            surf_man_adjust_setting(app, 1);
+            return surf_man_adjust_setting(app, 1);
         }
     }
     return AFORC_OK;
