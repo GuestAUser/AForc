@@ -95,9 +95,10 @@ The world layer owns dense, layered tile maps. Cameras translate between world
 and screen coordinates and clamp a viewport to map bounds. Collision callbacks
 let the application decide which tile values block movement or sight.
 
-A* returns caller-owned point sequences through bounded output storage. Field
-of view writes a caller-provided visibility array sized to the map. This keeps
-per-turn allocation policy under application control.
+A* supports caller-owned output storage and a reusable workspace whose reserved
+searches allocate no scratch. Field of view writes a caller-provided visibility
+array and uses inline task storage, spilling through the map allocator only for
+complex scans.
 
 Tile storage, camera transforms, collision, raycast, A*, and field of view are
 independent units sharing only checked coordinate/index helpers.

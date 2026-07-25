@@ -9,7 +9,7 @@
 #include <string.h>
 
 /*
- * Iterative symmetric shadowcasting across eight octants.
+ * Iterative recursive shadowcasting across eight octants.
  *
  * Rational slopes avoid floating-point boundary drift. An explicit growable
  * task stack replaces recursion, keeping failure propagation and scratch
@@ -31,11 +31,14 @@ typedef struct FovTask {
     int32_t yy;
 } FovTask;
 
+#define FOV_INLINE_TASK_CAPACITY 16U
+
 typedef struct FovStack {
     const AFORC_Allocator *allocator;
     FovTask *items;
     size_t count;
     size_t capacity;
+    FovTask inline_items[FOV_INLINE_TASK_CAPACITY];
 } FovStack;
 
 static int fov_slope_compare(FovSlope left, FovSlope right) {
@@ -70,17 +73,23 @@ static AFORC_Status fov_stack_push(FovStack *stack, FovTask task) {
         size_t new_capacity;
         AFORC_Status status;
 
-        if (stack->capacity == 0U) {
-            new_capacity = 16U;
-        } else {
-            if (stack->capacity > SIZE_MAX / 2U) {
-                return AFORC_ERROR_OVERFLOW;
-            }
-            new_capacity = stack->capacity * 2U;
+        if (stack->capacity > SIZE_MAX / 2U) {
+            return AFORC_ERROR_OVERFLOW;
         }
-        status = aforc_realloc_array(stack->allocator, stack->items,
-                                   new_capacity, sizeof(*replacement),
-                                   (void **)&replacement);
+        new_capacity = stack->capacity * 2U;
+        if (stack->items == stack->inline_items) {
+            status = aforc_alloc_array(stack->allocator, new_capacity,
+                                       sizeof(*replacement),
+                                       (void **)&replacement);
+            if (status == AFORC_OK) {
+                (void)memcpy(replacement, stack->items,
+                             stack->count * sizeof(*replacement));
+            }
+        } else {
+            status = aforc_realloc_array(stack->allocator, stack->items,
+                                         new_capacity, sizeof(*replacement),
+                                         (void **)&replacement);
+        }
         if (status != AFORC_OK) {
             return status;
         }
@@ -240,9 +249,9 @@ AFORC_Status aforc_fov_compute(const AFORC_TileMap *map, uint32_t layer,
         return AFORC_OK;
     }
     stack.allocator = &map->allocator;
-    stack.items = NULL;
+    stack.items = stack.inline_items;
     stack.count = 0U;
-    stack.capacity = 0U;
+    stack.capacity = FOV_INLINE_TASK_CAPACITY;
 
     for (octant = 0U; octant < 8U; ++octant) {
         FovTask root;
@@ -273,6 +282,8 @@ AFORC_Status aforc_fov_compute(const AFORC_TileMap *map, uint32_t layer,
             break;
         }
     }
-    aforc_free(&map->allocator, stack.items);
+    if (stack.items != stack.inline_items) {
+        aforc_free(&map->allocator, stack.items);
+    }
     return status;
 }
