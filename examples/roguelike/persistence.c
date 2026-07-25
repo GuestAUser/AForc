@@ -127,12 +127,6 @@ AFORC_Status game_load(Game *game) {
                                    &policy,
                                    GAME_SAVE_MAX_BYTES,
                                    &blob);
-    if (status == AFORC_ERROR_NOT_FOUND) {
-        game_set_message(game,
-                         "No saved run found at %s.",
-                         game->save_path);
-        return AFORC_OK;
-    }
     if (status == AFORC_OK) {
         status = game_decode_save(game, blob.data, blob.size);
     }
