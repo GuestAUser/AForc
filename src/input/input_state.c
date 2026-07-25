@@ -72,6 +72,7 @@ void aforc_input_internal_emit_key_down(
     uint32_t codepoint,
     AFORC_Modifiers modifiers,
     bool protocol_repeat,
+    bool explicit_release,
     bool emit_text,
     uint64_t timestamp_ms
 )
@@ -90,11 +91,13 @@ void aforc_input_internal_emit_key_down(
             state->pressed = true;
         }
         state->held = true;
-        /* Legacy protocols omit key-up, so each key-down renews its lease. */
-        state->expires_at_ms = aforc_input_internal_add_timeout(
-            timestamp_ms,
-            input->key_release_timeout_ms
-        );
+        state->explicit_release = explicit_release;
+        state->expires_at_ms = explicit_release
+                                   ? 0U
+                                   : aforc_input_internal_add_timeout(
+                                         timestamp_ms,
+                                         input->key_release_timeout_ms
+                                     );
         event.data.key.key = key;
         event.data.key.codepoint = codepoint;
         event.data.key.modifiers = modifiers;
@@ -102,7 +105,8 @@ void aforc_input_internal_emit_key_down(
         (void)aforc_input_internal_queue_event(input, &event);
     }
     if (emit_text && codepoint != 0u &&
-        (modifiers & (AFORC_MOD_CTRL | AFORC_MOD_SUPER)) == 0u) {
+        (modifiers & (AFORC_MOD_ALT | AFORC_MOD_CTRL | AFORC_MOD_SUPER)) ==
+            0u) {
         aforc_input_internal_emit_text(input, codepoint, timestamp_ms);
     }
 }
@@ -124,6 +128,7 @@ void aforc_input_internal_emit_key_up(
     state = &input->keys[(size_t)key];
     state->held = false;
     state->released = true;
+    state->explicit_release = false;
     state->expires_at_ms = 0u;
     event = aforc_input_internal_event(AFORC_INPUT_EVENT_KEY_UP, timestamp_ms);
     event.data.key.key = key;
@@ -142,7 +147,7 @@ void aforc_input_internal_release_expired(
 
     /* Synthetic releases keep held state finite on terminals without key-up. */
     for (index = 1u; index < AFORC_KEY_COUNT; ++index) {
-        if (input->keys[index].held &&
+        if (input->keys[index].held && !input->keys[index].explicit_release &&
             input->keys[index].expires_at_ms <= timestamp_ms) {
             aforc_input_internal_emit_key_up(
                 input,
@@ -242,7 +247,7 @@ void aforc_input_internal_release_all(
     size_t index = 1u;
 
     for (index = 1u; index < AFORC_KEY_COUNT; ++index) {
-        if (input->keys[index].held) {
+        if (input->keys[index].held && !input->keys[index].explicit_release) {
             aforc_input_internal_emit_key_up(
                 input,
                 (AFORC_Key)index,

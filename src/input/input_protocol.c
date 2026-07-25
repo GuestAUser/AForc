@@ -130,6 +130,7 @@ static void aforc_input_internal_emit_plain_byte(
             codepoint,
             modifiers,
             false,
+            false,
             emit_text,
             timestamp_ms
         );
@@ -182,6 +183,7 @@ AFORC_ParseResult aforc_input_internal_parse_plain(
         AFORC_KEY_NONE,
         codepoint,
         modifiers,
+        false,
         false,
         true,
         timestamp_ms
@@ -357,6 +359,7 @@ void aforc_input_internal_handle_ss3(
             AFORC_MOD_NONE,
             false,
             false,
+            false,
             timestamp_ms
         );
     }
@@ -368,7 +371,7 @@ static void aforc_input_internal_emit_protocol_key(
     uint32_t codepoint,
     AFORC_Modifiers modifiers,
     uint32_t event_type,
-    bool emit_text,
+    bool explicit_release,
     uint64_t timestamp_ms
 )
 {
@@ -388,7 +391,8 @@ static void aforc_input_internal_emit_protocol_key(
         codepoint,
         modifiers,
         event_type == 2u,
-        emit_text,
+        explicit_release,
+        false,
         timestamp_ms
     );
 }
@@ -474,13 +478,8 @@ void aforc_input_internal_handle_mouse(
             timestamp_ms
         );
     }
-    if (legacy && (code & 3u) == 3u) {
-        aforc_input_internal_release_mouse_buttons(
-            input,
-            modifiers,
-            timestamp_ms
-        );
-    } else if (release && button == AFORC_MOUSE_NONE) {
+    if ((legacy && (code & 3u) == 3u) ||
+        (release && button == AFORC_MOUSE_NONE)) {
         aforc_input_internal_release_mouse_buttons(
             input,
             modifiers,
@@ -609,7 +608,7 @@ void aforc_input_internal_handle_csi(
             codepoint >= 0x20u && codepoint != 0x7fu ? codepoint : 0u,
             modifiers,
             event_type,
-            codepoint >= 0x20u && codepoint != 0x7fu,
+            count > 2u,
             timestamp_ms
         );
         return;
@@ -648,7 +647,7 @@ void aforc_input_internal_handle_csi(
                 codepoint,
                 modifiers,
                 1u,
-                codepoint >= 0x20u,
+                false,
                 timestamp_ms
             );
             return;
@@ -679,7 +678,7 @@ void aforc_input_internal_handle_csi(
             0u,
             modifiers,
             event_type,
-            false,
+            count > 2u,
             timestamp_ms
         );
     }

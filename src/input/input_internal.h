@@ -7,18 +7,14 @@
 #ifndef AFORC_INPUT_INTERNAL_H
 #define AFORC_INPUT_INTERNAL_H
 
-#include "../../include/aforc/input.h"
-
-#if defined(__GNUC__) || defined(__clang__)
-#define AFORC_INPUT_INTERNAL_API __attribute__((visibility("hidden")))
-#else
-#define AFORC_INPUT_INTERNAL_API
-#endif
+#include "../core/common_internal.h"
+#include "aforc/input.h"
 
 typedef struct AFORC_KeyState {
     bool held;
     bool pressed;
     bool released;
+    bool explicit_release;
     uint64_t expires_at_ms;
 } AFORC_KeyState;
 
@@ -66,79 +62,80 @@ typedef enum AFORC_Utf8Result {
     AFORC_UTF8_INVALID
 } AFORC_Utf8Result;
 
-AFORC_INPUT_INTERNAL_API bool aforc_input_internal_queue_event(
+AFORC_INTERNAL bool aforc_input_internal_queue_event(
     AFORC_Input *input,
     const AFORC_InputEvent *event
 );
-AFORC_INPUT_INTERNAL_API AFORC_InputEvent aforc_input_internal_event(
+AFORC_INTERNAL AFORC_InputEvent aforc_input_internal_event(
     AFORC_InputEventType type,
     uint64_t timestamp_ms
 );
 
-AFORC_INPUT_INTERNAL_API bool aforc_input_internal_key_valid(AFORC_Key key);
-AFORC_INPUT_INTERNAL_API bool aforc_input_internal_mouse_button_valid(
+AFORC_INTERNAL bool aforc_input_internal_key_valid(AFORC_Key key);
+AFORC_INTERNAL bool aforc_input_internal_mouse_button_valid(
     AFORC_MouseButton button
 );
-AFORC_INPUT_INTERNAL_API void aforc_input_internal_emit_text(
+AFORC_INTERNAL void aforc_input_internal_emit_text(
     AFORC_Input *input,
     uint32_t codepoint,
     uint64_t timestamp_ms
 );
-AFORC_INPUT_INTERNAL_API void aforc_input_internal_emit_key_down(
+AFORC_INTERNAL void aforc_input_internal_emit_key_down(
     AFORC_Input *input,
     AFORC_Key key,
     uint32_t codepoint,
     AFORC_Modifiers modifiers,
     bool protocol_repeat,
+    bool explicit_release,
     bool emit_text,
     uint64_t timestamp_ms
 );
-AFORC_INPUT_INTERNAL_API void aforc_input_internal_emit_key_up(
+AFORC_INTERNAL void aforc_input_internal_emit_key_up(
     AFORC_Input *input,
     AFORC_Key key,
     uint32_t codepoint,
     AFORC_Modifiers modifiers,
     uint64_t timestamp_ms
 );
-AFORC_INPUT_INTERNAL_API void aforc_input_internal_release_expired(
+AFORC_INTERNAL void aforc_input_internal_release_expired(
     AFORC_Input *input,
     uint64_t timestamp_ms
 );
-AFORC_INPUT_INTERNAL_API void aforc_input_internal_emit_mouse_button(
+AFORC_INTERNAL void aforc_input_internal_emit_mouse_button(
     AFORC_Input *input,
     AFORC_MouseButton button,
     bool down,
     AFORC_Modifiers modifiers,
     uint64_t timestamp_ms
 );
-AFORC_INPUT_INTERNAL_API void aforc_input_internal_emit_mouse_move(
+AFORC_INTERNAL void aforc_input_internal_emit_mouse_move(
     AFORC_Input *input,
     AFORC_MouseButton button,
     AFORC_Modifiers modifiers,
     uint64_t timestamp_ms
 );
-AFORC_INPUT_INTERNAL_API void aforc_input_internal_release_mouse_buttons(
+AFORC_INTERNAL void aforc_input_internal_release_mouse_buttons(
     AFORC_Input *input,
     AFORC_Modifiers modifiers,
     uint64_t timestamp_ms
 );
-AFORC_INPUT_INTERNAL_API void aforc_input_internal_release_all(
+AFORC_INTERNAL void aforc_input_internal_release_all(
     AFORC_Input *input,
     uint64_t timestamp_ms
 );
-AFORC_INPUT_INTERNAL_API int aforc_input_internal_effective_timeout(
+AFORC_INTERNAL int aforc_input_internal_effective_timeout(
     const AFORC_Input *input,
     int timeout_ms,
     uint64_t now_ms
 );
 
-AFORC_INPUT_INTERNAL_API AFORC_Utf8Result aforc_input_internal_decode_utf8(
+AFORC_INTERNAL AFORC_Utf8Result aforc_input_internal_decode_utf8(
     const unsigned char *bytes,
     size_t size,
     uint32_t *out_codepoint,
     size_t *out_consumed
 );
-AFORC_INPUT_INTERNAL_API AFORC_ParseResult aforc_input_internal_parse_plain(
+AFORC_INTERNAL AFORC_ParseResult aforc_input_internal_parse_plain(
     AFORC_Input *input,
     const unsigned char *bytes,
     size_t size,
@@ -147,7 +144,7 @@ AFORC_INPUT_INTERNAL_API AFORC_ParseResult aforc_input_internal_parse_plain(
     uint64_t timestamp_ms,
     size_t *out_consumed
 );
-AFORC_INPUT_INTERNAL_API void aforc_input_internal_handle_mouse(
+AFORC_INTERNAL void aforc_input_internal_handle_mouse(
     AFORC_Input *input,
     uint32_t code,
     uint32_t column,
@@ -156,25 +153,25 @@ AFORC_INPUT_INTERNAL_API void aforc_input_internal_handle_mouse(
     bool legacy,
     uint64_t timestamp_ms
 );
-AFORC_INPUT_INTERNAL_API void aforc_input_internal_handle_csi(
+AFORC_INTERNAL void aforc_input_internal_handle_csi(
     AFORC_Input *input,
     const unsigned char *payload,
     size_t payload_size,
     unsigned char final_byte,
     uint64_t timestamp_ms
 );
-AFORC_INPUT_INTERNAL_API void aforc_input_internal_handle_ss3(
+AFORC_INTERNAL void aforc_input_internal_handle_ss3(
     AFORC_Input *input,
     unsigned char final_byte,
     uint64_t timestamp_ms
 );
 
-AFORC_INPUT_INTERNAL_API void aforc_input_internal_parse_available(
+AFORC_INTERNAL void aforc_input_internal_parse_available(
     AFORC_Input *input,
     uint64_t timestamp_ms,
     bool force_all
 );
-AFORC_INPUT_INTERNAL_API AFORC_Status aforc_input_internal_feed(
+AFORC_INTERNAL AFORC_Status aforc_input_internal_feed(
     AFORC_Input *input,
     const unsigned char *bytes,
     size_t size,
