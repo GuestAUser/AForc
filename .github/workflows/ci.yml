@@ -1,0 +1,109 @@
+# AForc
+# Author: GuestAUser
+# SPDX-License-Identifier: MIT
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  strict:
+    name: Strict ${{ matrix.compiler }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+    env:
+      CC: ${{ matrix.compiler }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build and smoke-test
+        run: >-
+          make BUILD_DIR="build/ci-${{ matrix.compiler }}"
+          MODE=debug STRICT=1 all test
+
+  sanitizers:
+    name: ASan and UBSan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CC: gcc
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build and smoke-test with sanitizers
+        run: >-
+          make BUILD_DIR="build/ci-sanitize"
+          MODE=debug STRICT=1 SANITIZE=1 all test
+
+  cmake:
+    name: CMake ${{ matrix.compiler }} ${{ matrix.linkage }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compiler: gcc
+            linkage: static
+            shared: "OFF"
+          - compiler: gcc
+            linkage: shared
+            shared: "ON"
+          - compiler: clang
+            linkage: static
+            shared: "OFF"
+          - compiler: clang
+            linkage: shared
+            shared: "ON"
+    env:
+      CC: ${{ matrix.compiler }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Configure
+        run: >-
+          cmake -S . -B "build/ci-cmake-${{ matrix.compiler }}-${{ matrix.linkage }}"
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_SHARED_LIBS=${{ matrix.shared }}
+          -DAFORC_WARNINGS_AS_ERRORS=ON
+      - name: Build
+        run: >-
+          cmake --build
+          "build/ci-cmake-${{ matrix.compiler }}-${{ matrix.linkage }}"
+          --parallel
+      - name: Test
+        run: >-
+          ctest --test-dir
+          "build/ci-cmake-${{ matrix.compiler }}-${{ matrix.linkage }}"
+          --output-on-failure
+
+  cmake-sanitizers:
+    name: CMake ASan and UBSan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CC: clang
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Configure
+        run: >-
+          cmake -S . -B build/ci-cmake-sanitize
+          -DCMAKE_BUILD_TYPE=Debug
+          -DAFORC_ENABLE_SANITIZERS=ON
+          -DAFORC_WARNINGS_AS_ERRORS=ON
+      - name: Build
+        run: cmake --build build/ci-cmake-sanitize --parallel
+      - name: Test
+        run: >-
+          ctest --test-dir build/ci-cmake-sanitize
+          --output-on-failure
