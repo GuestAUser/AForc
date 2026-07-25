@@ -162,7 +162,15 @@ static bool test_open_close_restores_and_borrows_fds(void)
                                 "restored termios");
     }
     if (passed) {
-        passed = contract_check(fcntl(pair.slave, F_GETFL) == flags_before,
+        const int flags_after = fcntl(pair.slave, F_GETFL);
+
+        if (flags_after != flags_before) {
+            (void)fprintf(stderr,
+                          "terminal descriptor flags: before=%#x after=%#x\n",
+                          (unsigned int)flags_before,
+                          (unsigned int)flags_after);
+        }
+        passed = contract_check(flags_after == flags_before,
                                 "restored descriptor flags");
     }
     if (passed) {
