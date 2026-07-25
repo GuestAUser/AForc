@@ -98,5 +98,22 @@ static inline bool aforc_renderer_cells_equal(AFORC_Cell left, AFORC_Cell right)
 }
 
 AFORC_INTERNAL AFORC_Status aforc_renderer_build_ansi(AFORC_Renderer *renderer);
+AFORC_INTERNAL AFORC_Status aforc_renderer_ansi_literal(
+    AFORC_Renderer *renderer,
+    const char *literal);
+AFORC_INTERNAL AFORC_Status aforc_renderer_ansi_cursor(
+    AFORC_Renderer *renderer,
+    uint32_t row,
+    uint32_t column);
+AFORC_INTERNAL AFORC_Status aforc_renderer_ansi_style(
+    AFORC_Renderer *renderer,
+    AFORC_Cell cell);
+AFORC_INTERNAL AFORC_Status aforc_renderer_ansi_codepoint(
+    AFORC_Renderer *renderer,
+    uint32_t codepoint);
+AFORC_INTERNAL size_t aforc_renderer_ansi_cursor_size(uint32_t row,
+                                                      uint32_t column);
+AFORC_INTERNAL size_t aforc_renderer_ansi_style_size(AFORC_Cell cell);
+AFORC_INTERNAL size_t aforc_renderer_ansi_codepoint_size(uint32_t codepoint);
 
 #endif
