@@ -411,6 +411,8 @@ if(BUILD_TESTING)
 
     add_library(aforc_renderer_ansi_test_subject OBJECT
         src/render/renderer_ansi.c
+        src/render/renderer_ansi_encode.c
+        src/render/renderer_ansi_measure.c
     )
     target_include_directories(aforc_renderer_ansi_test_subject PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
