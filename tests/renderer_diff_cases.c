@@ -20,35 +20,6 @@ enum {
 
 typedef void (*RendererDiffPattern)(AFORC_Renderer *renderer);
 
-static bool colors_equal(AFORC_Color left, AFORC_Color right)
-{
-    if (left.mode != right.mode) {
-        return false;
-    }
-    if (left.mode == AFORC_COLOR_DEFAULT) {
-        return true;
-    }
-    if (left.mode == AFORC_COLOR_INDEXED) {
-        return left.red == right.red;
-    }
-    return left.red == right.red && left.green == right.green &&
-           left.blue == right.blue;
-}
-
-static bool cells_equal(AFORC_Cell left, AFORC_Cell right)
-{
-    return left.codepoint == right.codepoint && left.style == right.style &&
-           colors_equal(left.foreground, right.foreground) &&
-           colors_equal(left.background, right.background);
-}
-
-static void fill_cells(AFORC_Cell *cells, size_t count, AFORC_Cell cell)
-{
-    for (size_t index = 0U; index < count; ++index) {
-        cells[index] = cell;
-    }
-}
-
 static AFORC_Cell styled_cell(uint32_t codepoint, uint32_t selector)
 {
     AFORC_Cell cell = aforc_cell_default();
@@ -134,7 +105,7 @@ static bool batch_reaches_back(const AFORC_Renderer *renderer,
         return false;
     }
     for (size_t index = 0U; index < count; ++index) {
-        if (!cells_equal(cells[index], renderer->back[index])) {
+        if (!aforc_renderer_cells_equal(cells[index], renderer->back[index])) {
             matches = false;
             break;
         }
@@ -163,7 +134,7 @@ static bool run_pattern(const char *name, RendererDiffPattern pattern)
         aforc_renderer_destroy(renderer);
         return false;
     }
-    fill_cells(cleared, count, poison);
+    aforc_renderer_fill_cells(cleared, count, poison);
     renderer->invalidated = false;
     pattern(renderer);
     if (aforc_renderer_build_ansi(renderer) != AFORC_OK ||
