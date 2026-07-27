@@ -98,6 +98,7 @@ AFORC_EngineConfig aforc_engine_config_default(void) {
 static bool config_valid(const AFORC_EngineConfig *config) {
     return config != NULL && config->fixed_updates_per_second > 0U &&
            config->fixed_updates_per_second <= UINT32_C(1000000000) &&
+           config->target_frames_per_second <= UINT32_C(1000000000) &&
            config->maximum_fixed_updates_per_frame > 0U &&
            config->maximum_frame_seconds > 0.0 &&
            config->maximum_frame_seconds <= 3600.0 &&

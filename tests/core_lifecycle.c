@@ -212,6 +212,30 @@ static bool test_invalid_frequency_is_rejected_before_allocation(void)
            context.allocation_calls == 0U && context.live_allocations == 0U;
 }
 
+static bool test_invalid_target_frequency_is_rejected_before_allocation(void)
+{
+    AllocationContext context = {0U, 0U, false};
+    AFORC_EngineConfig config = aforc_engine_config_default();
+    AFORC_Engine *engine = (AFORC_Engine *)(uintptr_t)1U;
+    AFORC_Error error;
+    AFORC_Status status;
+
+    config.target_frames_per_second = UINT32_C(1000000001);
+    config.allocator = (AFORC_Allocator){
+        &context,
+        tracked_allocate,
+        tracked_reallocate,
+        tracked_deallocate,
+    };
+    status = aforc_engine_create(&config, &engine, &error);
+    if (status == AFORC_OK) {
+        aforc_engine_destroy(engine);
+        return false;
+    }
+    return status == AFORC_ERROR_INVALID_ARGUMENT && engine == NULL &&
+           context.allocation_calls == 0U && context.live_allocations == 0U;
+}
+
 static bool test_successful_fixed_update_advances_tick_before_quit(void)
 {
     static const AFORC_SceneVTable vtable = {
@@ -264,6 +288,10 @@ int main(void)
     if (!test_invalid_frequency_is_rejected_before_allocation()) {
         (void)fprintf(stderr, "invalid engine frequency validation failed\n");
         return 5;
+    }
+    if (!test_invalid_target_frequency_is_rejected_before_allocation()) {
+        (void)fprintf(stderr, "invalid target frequency validation failed\n");
+        return 6;
     }
     (void)puts("core lifecycle: ok");
     return 0;

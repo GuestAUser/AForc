@@ -49,8 +49,9 @@ typedef struct AFORC_EngineConfig {
  *
  * The fixed-step accumulator clamps long frames and drops excess backlog after
  * maximum_fixed_updates_per_frame to avoid an unbounded spiral of death.
- * fixed_updates_per_second may not exceed the nanosecond timer resolution.
- * Setting target_frames_per_second to zero disables run-loop sleeping.
+ * fixed_updates_per_second and a nonzero target_frames_per_second may not
+ * exceed the nanosecond timer resolution. Setting target_frames_per_second to
+ * zero disables run-loop sleeping.
  * Run and frame own engine execution until they return and are non-reentrant.
  * Calling either from an engine hook or scene callback returns
  * AFORC_ERROR_STATE. Destroy requested during active execution is ignored; the
