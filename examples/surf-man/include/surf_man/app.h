@@ -25,11 +25,32 @@ typedef enum SurfManMenuItem {
     SURF_MAN_MENU_COUNT
 } SurfManMenuItem;
 
+typedef enum SurfManPauseItem {
+    SURF_MAN_PAUSE_RESUME = 0,
+    SURF_MAN_PAUSE_HELP,
+    SURF_MAN_PAUSE_ACCESSIBILITY,
+    SURF_MAN_PAUSE_END_SESSION,
+    SURF_MAN_PAUSE_QUIT,
+    SURF_MAN_PAUSE_COUNT
+} SurfManPauseItem;
+
+typedef enum SurfManAccessibilityItem {
+    SURF_MAN_ACCESSIBILITY_SPEED = 0,
+    SURF_MAN_ACCESSIBILITY_TIMING,
+    SURF_MAN_ACCESSIBILITY_LANDING,
+    SURF_MAN_ACCESSIBILITY_MOTION,
+    SURF_MAN_ACCESSIBILITY_COLOR,
+    SURF_MAN_ACCESSIBILITY_COUNT
+} SurfManAccessibilityItem;
+
 typedef struct SurfManInputState {
     int8_t vertical;
     int8_t horizontal;
     int8_t vertical_tap;
     int8_t horizontal_tap;
+    int8_t vertical_preference;
+    int8_t horizontal_preference;
+    uint16_t directional_holds;
     uint8_t vertical_lease;
     uint8_t horizontal_lease;
     uint8_t action_lease;
@@ -60,7 +81,10 @@ struct SurfManApp {
     SurfManInputState controls;
     uint64_t seed;
     SurfManOverlay overlay;
+    SurfManOverlay overlay_return;
     SurfManMenuItem menu_item;
+    SurfManPauseItem pause_item;
+    SurfManAccessibilityItem accessibility_item;
     AFORC_Size terminal_size;
     bool focused;
     bool smoke;

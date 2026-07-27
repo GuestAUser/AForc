@@ -57,6 +57,8 @@ AFORC_Status surf_man_app_init(SurfManApp *app,
     app->smoke = smoke;
     app->focused = true;
     app->menu_item = SURF_MAN_MENU_SURF;
+    app->pause_item = SURF_MAN_PAUSE_RESUME;
+    app->accessibility_item = SURF_MAN_ACCESSIBILITY_SPEED;
     app->terminal_size = aforc_renderer_size(renderer);
     app->settings = surf_man_settings_default();
     app->scene.vtable = &surf_man_scene_vtable;

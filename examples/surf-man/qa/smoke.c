@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "surf_man_internal.h"
+#include "surf_man/app.h"
+#include "surf_man/qa.h"
 
 #include <string.h>
 
@@ -15,6 +16,21 @@ static AFORC_Status surf_man_qa_smoke_error(AFORC_Error *error,
                                             const char *message) {
     aforc_error_set(error, status, "surf-man qa", "%s", message);
     return status;
+}
+
+static AFORC_Status surf_man_qa_send_key(SurfManApp *app,
+                                         AFORC_Engine *engine,
+                                         AFORC_InputEventType type,
+                                         AFORC_Key key,
+                                         uint32_t codepoint,
+                                         bool repeat) {
+    AFORC_InputEvent event = {0};
+
+    event.type = type;
+    event.data.key.key = key;
+    event.data.key.codepoint = codepoint;
+    event.data.key.repeat = repeat;
+    return surf_man_app_handle_event(app, engine, &event);
 }
 
 static AFORC_Status surf_man_qa_command_checks(SurfManApp *app,
@@ -161,6 +177,310 @@ static AFORC_Status surf_man_qa_command_checks(SurfManApp *app,
             error,
             status,
             "input taps, leases, releases, or one-shot controls were incorrect");
+    }
+    return AFORC_OK;
+}
+
+static AFORC_Status surf_man_qa_direction_alias_checks(SurfManApp *app,
+                                                        AFORC_Engine *engine,
+                                                        AFORC_Error *error) {
+    const SurfManInputState saved_controls = app->controls;
+    const SurfManSimulation saved_simulation = app->simulation;
+    const SurfManOverlay saved_overlay = app->overlay;
+    const bool saved_focused = app->focused;
+    SurfManCommand command;
+    AFORC_Status status = AFORC_OK;
+
+    app->controls = (SurfManInputState){0};
+    app->simulation.phase = SURF_MAN_RIDING;
+    app->overlay = SURF_MAN_OVERLAY_NONE;
+    app->focused = true;
+    status = surf_man_qa_send_key(app,
+                                  engine,
+                                  AFORC_INPUT_EVENT_KEY_DOWN,
+                                  AFORC_KEY_A,
+                                  (uint32_t)'a',
+                                  false);
+    if (status == AFORC_OK) {
+        status = surf_man_qa_send_key(app,
+                                      engine,
+                                      AFORC_INPUT_EVENT_KEY_DOWN,
+                                      AFORC_KEY_LEFT,
+                                      0U,
+                                      false);
+    }
+    if (status == AFORC_OK) {
+        status = surf_man_qa_send_key(app,
+                                      engine,
+                                      AFORC_INPUT_EVENT_KEY_UP,
+                                      AFORC_KEY_LEFT,
+                                      0U,
+                                      false);
+    }
+    if (status == AFORC_OK) {
+        surf_man_input_take_command(app, &command);
+        if (command.horizontal != -1) {
+            status = AFORC_ERROR_STATE;
+        }
+    }
+    if (status == AFORC_OK) {
+        surf_man_input_take_command(app, &command);
+        if (command.horizontal != -1) {
+            status = AFORC_ERROR_STATE;
+        }
+    }
+    if (status == AFORC_OK) {
+        status = surf_man_qa_send_key(app,
+                                      engine,
+                                      AFORC_INPUT_EVENT_KEY_UP,
+                                      AFORC_KEY_A,
+                                      (uint32_t)'a',
+                                      false);
+    }
+    if (status == AFORC_OK) {
+        surf_man_input_take_command(app, &command);
+        if (command.horizontal != 0) {
+            status = AFORC_ERROR_STATE;
+        }
+    }
+
+    if (status == AFORC_OK) {
+        app->controls = (SurfManInputState){0};
+        status = surf_man_qa_send_key(app,
+                                      engine,
+                                      AFORC_INPUT_EVENT_KEY_DOWN,
+                                      AFORC_KEY_LEFT,
+                                      0U,
+                                      false);
+    }
+    if (status == AFORC_OK) {
+        surf_man_input_take_command(app, &command);
+        if (command.horizontal != -1) {
+            status = AFORC_ERROR_STATE;
+        }
+    }
+    if (status == AFORC_OK) {
+        status = surf_man_qa_send_key(app,
+                                      engine,
+                                      AFORC_INPUT_EVENT_KEY_DOWN,
+                                      AFORC_KEY_RIGHT,
+                                      0U,
+                                      false);
+    }
+    if (status == AFORC_OK) {
+        surf_man_input_take_command(app, &command);
+        if (command.horizontal != 1) {
+            status = AFORC_ERROR_STATE;
+        }
+    }
+    if (status == AFORC_OK) {
+        status = surf_man_qa_send_key(app,
+                                      engine,
+                                      AFORC_INPUT_EVENT_KEY_UP,
+                                      AFORC_KEY_RIGHT,
+                                      0U,
+                                      false);
+    }
+    if (status == AFORC_OK) {
+        surf_man_input_take_command(app, &command);
+        if (command.horizontal != -1) {
+            status = AFORC_ERROR_STATE;
+        }
+    }
+    if (status == AFORC_OK) {
+        status = surf_man_qa_send_key(app,
+                                      engine,
+                                      AFORC_INPUT_EVENT_KEY_UP,
+                                      AFORC_KEY_LEFT,
+                                      0U,
+                                      false);
+    }
+    if (status == AFORC_OK) {
+        surf_man_input_take_command(app, &command);
+        if (command.horizontal != 0) {
+            status = AFORC_ERROR_STATE;
+        }
+    }
+
+    app->controls = saved_controls;
+    app->simulation = saved_simulation;
+    app->overlay = saved_overlay;
+    app->focused = saved_focused;
+    if (status != AFORC_OK) {
+        return surf_man_qa_smoke_error(
+            error,
+            status,
+            "direction aliases or opposite-key releases lost held input");
+    }
+    return AFORC_OK;
+}
+
+static AFORC_Status surf_man_qa_pause_menu_checks(SurfManApp *app,
+                                                   AFORC_Engine *engine,
+                                                   AFORC_Error *error) {
+    const SurfManInputState saved_controls = app->controls;
+    const SurfManSimulation saved_simulation = app->simulation;
+    const SurfManOverlay saved_overlay = app->overlay;
+    const SurfManOverlay saved_overlay_return = app->overlay_return;
+    const SurfManMenuItem saved_menu_item = app->menu_item;
+    const SurfManPauseItem saved_pause_item = app->pause_item;
+    const SurfManAccessibilityItem saved_accessibility_item =
+        app->accessibility_item;
+    const bool saved_focused = app->focused;
+    const char *failure = "pause menu input returned an error";
+    uint64_t frame_index;
+    AFORC_Status status;
+
+    app->controls = (SurfManInputState){0};
+    app->simulation.phase = SURF_MAN_RIDING;
+    app->overlay = SURF_MAN_OVERLAY_NONE;
+    app->focused = true;
+    status = surf_man_qa_send_key(app,
+                                  engine,
+                                  AFORC_INPUT_EVENT_KEY_DOWN,
+                                  AFORC_KEY_P,
+                                  (uint32_t)'p',
+                                  false);
+    if (status == AFORC_OK) {
+        status = surf_man_qa_send_key(app,
+                                      engine,
+                                      AFORC_INPUT_EVENT_KEY_DOWN,
+                                      AFORC_KEY_NONE,
+                                      (uint32_t)'?',
+                                      false);
+    }
+    if (status == AFORC_OK && app->overlay != SURF_MAN_OVERLAY_HELP) {
+        status = AFORC_ERROR_STATE;
+        failure = "Pause Help action did not open Help";
+    }
+    if (status == AFORC_OK) {
+        status = surf_man_qa_send_key(app,
+                                      engine,
+                                      AFORC_INPUT_EVENT_KEY_DOWN,
+                                      AFORC_KEY_ESCAPE,
+                                      0U,
+                                      false);
+    }
+    if (status == AFORC_OK && app->overlay != SURF_MAN_OVERLAY_PAUSE) {
+        status = AFORC_ERROR_STATE;
+        failure = "closing Help resumed instead of returning to Pause";
+    }
+
+    for (uint32_t press = 0U; status == AFORC_OK && press < 2U; ++press) {
+        status = surf_man_qa_send_key(app,
+                                      engine,
+                                      AFORC_INPUT_EVENT_KEY_DOWN,
+                                      AFORC_KEY_DOWN,
+                                      0U,
+                                      false);
+    }
+    if (status == AFORC_OK) {
+        status = surf_man_qa_send_key(app,
+                                      engine,
+                                      AFORC_INPUT_EVENT_KEY_DOWN,
+                                      AFORC_KEY_ENTER,
+                                      0U,
+                                      false);
+    }
+    if (status == AFORC_OK &&
+        app->overlay != SURF_MAN_OVERLAY_ACCESSIBILITY) {
+        status = AFORC_ERROR_STATE;
+        failure = "Pause Accessibility action did not open Accessibility";
+    }
+    if (status == AFORC_OK) {
+        status = surf_man_qa_send_key(app,
+                                      engine,
+                                      AFORC_INPUT_EVENT_KEY_DOWN,
+                                      AFORC_KEY_ESCAPE,
+                                      0U,
+                                      false);
+    }
+    if (status == AFORC_OK && app->overlay != SURF_MAN_OVERLAY_PAUSE) {
+        status = AFORC_ERROR_STATE;
+        failure = "closing Accessibility resumed instead of returning to Pause";
+    }
+
+    if (status == AFORC_OK) {
+        status = surf_man_simulation_start_day(&app->simulation, true);
+    }
+    if (status == AFORC_OK) {
+        status = surf_man_simulation_start_wave(&app->simulation);
+    }
+    if (status == AFORC_OK) {
+        app->simulation.phase = SURF_MAN_PRACTICE;
+        app->simulation.pending_score = 250U;
+        status = surf_man_qa_send_key(app,
+                                      engine,
+                                      AFORC_INPUT_EVENT_KEY_DOWN,
+                                      AFORC_KEY_DOWN,
+                                      0U,
+                                      false);
+    }
+    if (status == AFORC_OK) {
+        status = surf_man_qa_send_key(app,
+                                      engine,
+                                      AFORC_INPUT_EVENT_KEY_DOWN,
+                                      AFORC_KEY_ENTER,
+                                      0U,
+                                      false);
+    }
+    if (status == AFORC_OK &&
+        (app->overlay != SURF_MAN_OVERLAY_NONE ||
+         app->simulation.phase != SURF_MAN_SHACK || app->simulation.practice ||
+         app->simulation.wave != 0U || app->simulation.day_score != 0U ||
+         app->simulation.pending_score != 0U)) {
+        status = AFORC_ERROR_STATE;
+        failure = "Practice End Session retained active session telemetry";
+    }
+
+    if (status == AFORC_OK) {
+        app->simulation.phase = SURF_MAN_RIDING;
+        status = surf_man_qa_send_key(app,
+                                      engine,
+                                      AFORC_INPUT_EVENT_KEY_DOWN,
+                                      AFORC_KEY_P,
+                                      (uint32_t)'p',
+                                      false);
+    }
+    for (uint32_t press = 0U; status == AFORC_OK && press < 4U; ++press) {
+        status = surf_man_qa_send_key(app,
+                                      engine,
+                                      AFORC_INPUT_EVENT_KEY_DOWN,
+                                      AFORC_KEY_DOWN,
+                                      0U,
+                                      false);
+    }
+    if (status == AFORC_OK) {
+        status = surf_man_qa_send_key(app,
+                                      engine,
+                                      AFORC_INPUT_EVENT_KEY_DOWN,
+                                      AFORC_KEY_ENTER,
+                                      0U,
+                                      false);
+    }
+    frame_index = aforc_engine_frame_index(engine);
+    if (status == AFORC_OK) {
+        status = aforc_engine_frame(engine, UINT64_C(1000000000), error);
+    }
+    if (status == AFORC_OK &&
+        aforc_engine_frame_index(engine) != frame_index) {
+        status = AFORC_ERROR_STATE;
+        failure = "Pause Quit action did not request engine shutdown";
+    }
+
+    app->controls = saved_controls;
+    app->simulation = saved_simulation;
+    app->overlay = saved_overlay;
+    app->overlay_return = saved_overlay_return;
+    app->menu_item = saved_menu_item;
+    app->pause_item = saved_pause_item;
+    app->accessibility_item = saved_accessibility_item;
+    app->focused = saved_focused;
+    if (status != AFORC_OK) {
+        return surf_man_qa_smoke_error(
+            error,
+            status,
+            failure);
     }
     return AFORC_OK;
 }
@@ -526,7 +846,7 @@ static AFORC_Status surf_man_qa_color_particle_checks(
     probe.settings.color_mode = SURF_MAN_COLOR_HIGH_CONTRAST;
     probe.simulation.settings = probe.settings;
     probe.overlay = SURF_MAN_OVERLAY_ACCESSIBILITY;
-    probe.menu_item = SURF_MAN_MENU_QUIT;
+    probe.accessibility_item = SURF_MAN_ACCESSIBILITY_COLOR;
     probe.terminal_size = (AFORC_Size){SURF_MAN_TARGET_COLUMNS,
                                       SURF_MAN_TARGET_ROWS};
     probe.focused = true;
@@ -590,6 +910,7 @@ static AFORC_Status surf_man_qa_pause_checks(SurfManApp *app,
     const SurfManSimulation saved_simulation = app->simulation;
     const SurfManInputState saved_controls = app->controls;
     const SurfManOverlay saved_overlay = app->overlay;
+    const SurfManOverlay saved_overlay_return = app->overlay_return;
     const AFORC_Size saved_size = app->terminal_size;
     const bool saved_focused = app->focused;
     const bool saved_dirty = app->visuals.dirty;
@@ -652,10 +973,30 @@ static AFORC_Status surf_man_qa_pause_checks(SurfManApp *app,
          surf_man_simulation_hash(&app->simulation) != paused_hash)) {
         status = AFORC_ERROR_STATE;
     }
+    if (status == AFORC_OK) {
+        app->overlay = SURF_MAN_OVERLAY_HELP;
+        app->overlay_return = SURF_MAN_OVERLAY_PAUSE;
+        event.data.resize.size = (AFORC_Size){
+            SURF_MAN_MIN_COLUMNS - 1,
+            SURF_MAN_MIN_ROWS - 1,
+        };
+        status = surf_man_app_handle_event(app, engine, &event);
+    }
+    if (status == AFORC_OK) {
+        event.data.resize.size = (AFORC_Size){
+            SURF_MAN_MIN_COLUMNS,
+            SURF_MAN_MIN_ROWS,
+        };
+        status = surf_man_app_handle_event(app, engine, &event);
+    }
+    if (status == AFORC_OK && app->overlay != SURF_MAN_OVERLAY_PAUSE) {
+        status = AFORC_ERROR_STATE;
+    }
 
     app->simulation = saved_simulation;
     app->controls = saved_controls;
     app->overlay = saved_overlay;
+    app->overlay_return = saved_overlay_return;
     app->terminal_size = saved_size;
     app->focused = saved_focused;
     app->visuals.dirty = saved_dirty;
@@ -705,6 +1046,9 @@ AFORC_Status surf_man_smoke_checks(SurfManApp *app,
         status = surf_man_qa_command_checks(app, engine, error);
     }
     if (status == AFORC_OK) {
+        status = surf_man_qa_direction_alias_checks(app, engine, error);
+    }
+    if (status == AFORC_OK) {
         status = surf_man_qa_pause_checks(app, engine, error);
     }
     if (status == AFORC_OK) {
@@ -721,6 +1065,9 @@ AFORC_Status surf_man_smoke_checks(SurfManApp *app,
     }
     if (status == AFORC_OK) {
         status = surf_man_render_checks(app, error);
+    }
+    if (status == AFORC_OK) {
+        status = surf_man_qa_pause_menu_checks(app, engine, error);
     }
     return status;
 }

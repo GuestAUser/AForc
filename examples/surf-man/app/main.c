@@ -27,12 +27,13 @@ static void surf_man_print_usage(FILE *stream, const char *program)
                   "A deterministic terminal surfing game and AFORC showcase.\n"
                   "\n"
                   "  --seed NUMBER  Reproduce a deterministic session\n"
-                  "  --smoke        Run deterministic off-screen checks\n"
-                  "  --help         Show this help and exit\n"
-                  "\n"
-                  "In-game: arrows/WASD steer, Space acts, Enter confirms,\n"
-                  "? opens help, P or Escape pauses/goes back, and Q quits.\n",
-                  program);
+                   "  --smoke        Run deterministic off-screen checks\n"
+                   "  --help         Show this help and exit\n"
+                   "\n"
+                   "In-game: arrows/WASD steer, Space acts, Enter confirms,\n"
+                   "? opens help, P or Escape opens Pause/goes back, and Q quits.\n"
+                   "Pause offers Resume, Help, Accessibility, End Session, and Quit.\n",
+                   program);
 }
 
 static AFORC_Status surf_man_parse_seed(const char *text, uint64_t *out_seed)

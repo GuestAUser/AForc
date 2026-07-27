@@ -95,11 +95,12 @@ static AFORC_Status render_help(SurfManApp *app,
         "A/D BUILDS LINE MOMENTUM; REVERSE TO CARVE.",
         "HIGH LIP: SPACE LAUNCHES. LOW LIP: SPACE SNAPS.",
         "IN AIR: A/D ROTATES; SPACE GRABS.",
-        "HOLD SPACE THROUGH TUBE SECTIONS.",
+        "TAP SPACE ONCE TO COMMIT THROUGH A TUBE.",
         "STAY HIGH OR MOVE YOUR LINE TO CLEAR HAZARDS.",
         "LAND LEVEL; HOLD A CLEAN LINE 2.5S TO BANK.",
-        "NO CHORDS, RAPID MASHING, OR RELEASE TIMING."};
-    const AFORC_Rect panel = centered_rect(layout, 56, 12);
+        "NO CHORDS, RAPID MASHING, OR RELEASE TIMING.",
+        "PRACTICE: PAUSE, THEN CHOOSE END SESSION."};
+    const AFORC_Rect panel = centered_rect(layout, 56, 14);
     AFORC_Status status = surf_man_draw_panel(app, panel, "HELP");
 
     for (size_t index = 0U;
@@ -111,6 +112,14 @@ static AFORC_Status render_help(SurfManApp *app,
             lines[index],
             index == 7U ? SURF_MAN_TONE_SIGNAL : SURF_MAN_TONE_INK,
             index == 7U ? AFORC_STYLE_BOLD : AFORC_STYLE_NONE);
+    }
+    if (status == AFORC_OK) {
+        status = surf_man_draw_text(
+            app,
+            (AFORC_Point){panel.x + 3, panel.y + 12},
+            "ESC/ENTER/?/P BACK",
+            SURF_MAN_TONE_FRAMEWORK,
+            AFORC_STYLE_DIM);
     }
     return status;
 }
@@ -127,7 +136,7 @@ static AFORC_Status render_accessibility(SurfManApp *app,
     (void)snprintf(rows[3], sizeof(rows[3]), "MOTION            %s", app->settings.reduced_motion ? "REDUCED" : "FULL");
     (void)snprintf(rows[4], sizeof(rows[4]), "COLOR             %s", color_name(app->settings.color_mode));
     for (size_t index = 0U; status == AFORC_OK && index < 5U; ++index) {
-        const bool selected = (size_t)app->menu_item == index;
+        const bool selected = (size_t)app->accessibility_item == index;
         const int32_t row = panel.y + 2 + (int32_t)index;
 
         status = surf_man_draw_char(app,
@@ -157,11 +166,56 @@ static AFORC_Status render_accessibility(SurfManApp *app,
     return status;
 }
 
+static AFORC_Status render_pause(SurfManApp *app,
+                                  const SurfManLayout *layout) {
+    static const char *const labels[] = {
+        "RESUME", "HELP", "ACCESSIBILITY", "END SESSION", "QUIT"};
+    const AFORC_Rect panel = centered_rect(layout, 48, 12);
+    AFORC_Status status = surf_man_draw_panel(app, panel, "PAUSED");
+
+    for (size_t index = 0U;
+         status == AFORC_OK && index < sizeof(labels) / sizeof(labels[0]);
+         ++index) {
+        const bool selected = (size_t)app->pause_item == index;
+        const int32_t row = panel.y + 2 + (int32_t)index;
+
+        status = surf_man_draw_char(app,
+                                    (AFORC_Point){panel.x + 3, row},
+                                    selected ? (uint32_t)'>' : (uint32_t)' ',
+                                    selected ? SURF_MAN_TONE_SIGNAL
+                                             : SURF_MAN_TONE_FRAMEWORK,
+                                    selected ? AFORC_STYLE_BOLD
+                                             : AFORC_STYLE_NONE);
+        if (status == AFORC_OK) {
+            status = surf_man_draw_text(
+                app,
+                (AFORC_Point){panel.x + 5, row},
+                labels[index],
+                selected ? SURF_MAN_TONE_INK : SURF_MAN_TONE_FRAMEWORK,
+                selected ? AFORC_STYLE_BOLD : AFORC_STYLE_NONE);
+        }
+    }
+    if (status == AFORC_OK) {
+        status = surf_man_draw_text(
+            app,
+            (AFORC_Point){panel.x + 10, panel.y + 8},
+            "AUTHORITATIVE TIME STOPPED",
+            SURF_MAN_TONE_SIGNAL,
+            AFORC_STYLE_BOLD);
+    }
+    if (status == AFORC_OK) {
+        status = surf_man_draw_text(
+            app,
+            (AFORC_Point){panel.x + 3, panel.y + 9},
+            "UP/DOWN SELECT  ENTER ACT  P/ESC RESUME",
+            SURF_MAN_TONE_INK,
+            AFORC_STYLE_NONE);
+    }
+    return status;
+}
+
 AFORC_Status surf_man_render_overlay(SurfManApp *app,
                                      const SurfManLayout *layout) {
-    AFORC_Rect panel;
-    AFORC_Status status;
-
     switch (app->overlay) {
     case SURF_MAN_OVERLAY_NONE:
         return AFORC_OK;
@@ -170,25 +224,7 @@ AFORC_Status surf_man_render_overlay(SurfManApp *app,
     case SURF_MAN_OVERLAY_ACCESSIBILITY:
         return render_accessibility(app, layout);
     case SURF_MAN_OVERLAY_PAUSE:
-        panel = centered_rect(layout, 38, 7);
-        status = surf_man_draw_panel(app, panel, "PAUSED");
-        if (status == AFORC_OK) {
-            status = surf_man_draw_text(app,
-                                        (AFORC_Point){panel.x + 7,
-                                                      panel.y + 2},
-                                        "AUTHORITATIVE TIME STOPPED",
-                                        SURF_MAN_TONE_SIGNAL,
-                                        AFORC_STYLE_BOLD);
-        }
-        if (status == AFORC_OK) {
-            status = surf_man_draw_text(app,
-                                        (AFORC_Point){panel.x + 10,
-                                                      panel.y + 4},
-                                        "P OR ESC TO RESUME",
-                                        SURF_MAN_TONE_INK,
-                                        AFORC_STYLE_NONE);
-        }
-        return status;
+        return render_pause(app, layout);
     case SURF_MAN_OVERLAY_RESIZE:
         return surf_man_render_resize(app,
                                       (AFORC_Size){layout->screen.width,
