@@ -184,6 +184,7 @@ typedef struct AFORC_Particle {
     uint32_t age_ms;
     uint32_t lifetime_ms;
     AFORC_Cell cell;
+    size_t free_bits;
     bool active;
 } AFORC_Particle;
 
@@ -191,6 +192,8 @@ typedef struct AFORC_ParticlePool {
     AFORC_Particle *particles;
     size_t capacity;
     size_t active_count;
+    size_t free_head;
+    size_t used_high_water;
     uint32_t random_state;
     bool initialized;
 } AFORC_ParticlePool;
@@ -210,8 +213,9 @@ AFORC_API void aforc_particle_pool_dispose(AFORC_ParticlePool *pool);
 AFORC_API AFORC_Status aforc_particle_pool_clear(AFORC_ParticlePool *pool);
 AFORC_API AFORC_Status aforc_particle_pool_reseed(AFORC_ParticlePool *pool,
                                              uint32_t seed);
-/* Output index/count pointers must not alias pool->capacity or pool->active_count.
- * Such aliases return AFORC_ERROR_INVALID_ARGUMENT without mutating the pool. */
+/* Output index/count pointers must not alias the pool's capacity, active count,
+ * free head, used high-water, or packed free-slot bookkeeping fields. Such
+ * aliases return AFORC_ERROR_INVALID_ARGUMENT without mutating the pool. */
 AFORC_API AFORC_Status aforc_particle_pool_spawn(
     AFORC_ParticlePool *pool,
     const AFORC_ParticleDesc *description,

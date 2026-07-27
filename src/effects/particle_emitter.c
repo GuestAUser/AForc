@@ -91,9 +91,8 @@ static size_t random_index(AFORC_ParticlePool *pool, size_t count) {
 AFORC_Status aforc_particle_pool_emit(AFORC_ParticlePool *pool,
                                       const AFORC_ParticleEmitter *emitter,
                                       size_t requested_count,
-                                      size_t *out_spawned_count) {
+    size_t *out_spawned_count) {
     size_t emit_count;
-    size_t search_index = 0U;
     AFORC_Status status;
 
     if (pool == NULL || out_spawned_count == NULL ||
@@ -116,6 +115,7 @@ AFORC_Status aforc_particle_pool_emit(AFORC_ParticlePool *pool,
     }
     for (size_t count = 0U; count < emit_count; ++count) {
         AFORC_ParticleDesc description;
+        size_t particle_index = 0U;
 
         description.position.x = random_i32(pool, emitter->x);
         description.position.y = random_i32(pool, emitter->y);
@@ -126,17 +126,13 @@ AFORC_Status aforc_particle_pool_emit(AFORC_ParticlePool *pool,
         description.lifetime_ms = random_u32(pool, emitter->lifetime_ms);
         description.cell = emitter->cells[random_index(pool,
                                                         emitter->cell_count)];
-        while (search_index < pool->capacity &&
-               pool->particles[search_index].active) {
-            ++search_index;
-        }
-        if (search_index == pool->capacity) {
+        status = aforc_particle_pool_activate_free(pool,
+                                                   &description,
+                                                   &particle_index);
+        if (status != AFORC_OK) {
             *out_spawned_count = count;
-            return AFORC_ERROR_STATE;
+            return status;
         }
-        aforc_particle_assign(&pool->particles[search_index], &description);
-        ++pool->active_count;
-        ++search_index;
     }
     *out_spawned_count = emit_count;
     return emit_count == requested_count ? AFORC_OK : AFORC_ERROR_LIMIT;
