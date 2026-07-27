@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "surf_man_internal.h"
+#include "surf_man/qa.h"
 
 #include <limits.h>
 #include <string.h>
@@ -13,8 +13,17 @@ enum {
     SURF_MAN_QA_SCHEDULE_TICKS = 20 * SURF_MAN_FIXED_HZ,
     SURF_MAN_QA_MIN_RIDING_TICKS = 5 * SURF_MAN_FIXED_HZ,
     SURF_MAN_QA_SAMPLE_SEARCH_STEPS = 1024,
-    SURF_MAN_QA_CARVE_HOLD_TICKS = SURF_MAN_FIXED_HZ / 3
+    SURF_MAN_QA_CARVE_HOLD_TICKS = SURF_MAN_FIXED_HZ / 3,
+    SURF_MAN_QA_AWARD_TICKS = 2 * SURF_MAN_FIXED_HZ
 };
+
+typedef enum SurfManQaZone {
+    SURF_MAN_QA_ZONE_CLEAR = 0,
+    SURF_MAN_QA_ZONE_POCKET,
+    SURF_MAN_QA_ZONE_FOAM,
+    SURF_MAN_QA_ZONE_TUBE,
+    SURF_MAN_QA_ZONE_HAZARD
+} SurfManQaZone;
 
 typedef struct SurfManQaSchedule {
     AFORC_Scene scene;
@@ -202,6 +211,229 @@ static AFORC_Status surf_man_qa_riding_init(
     return status;
 }
 
+static uint32_t surf_man_qa_sample_role_count(
+    const SurfManWaveSample *sample) {
+    return (sample->pocket ? 1U : 0U) + (sample->foam ? 1U : 0U) +
+           (sample->tube ? 1U : 0U) + (sample->hazard ? 1U : 0U);
+}
+
+static bool surf_man_qa_sample_is_zone(const SurfManWaveSample *sample,
+                                       SurfManQaZone zone) {
+    if (surf_man_qa_sample_role_count(sample) !=
+        (zone == SURF_MAN_QA_ZONE_CLEAR ? 0U : 1U)) {
+        return false;
+    }
+    switch (zone) {
+        case SURF_MAN_QA_ZONE_CLEAR:
+            return !sample->lip;
+        case SURF_MAN_QA_ZONE_POCKET:
+            return sample->pocket;
+        case SURF_MAN_QA_ZONE_FOAM:
+            return sample->foam;
+        case SURF_MAN_QA_ZONE_TUBE:
+            return sample->tube;
+        case SURF_MAN_QA_ZONE_HAZARD:
+            return sample->hazard;
+        default:
+            return false;
+    }
+}
+
+static AFORC_Status surf_man_qa_seek_zone(
+    SurfManSimulation *simulation,
+    SurfManQaZone zone,
+    SurfManWaveSample *out_sample) {
+    const int32_t search_step_q16 = SURF_MAN_Q16_ONE / 4;
+
+    for (uint32_t step = 0U;
+         step < SURF_MAN_QA_SAMPLE_SEARCH_STEPS;
+         ++step) {
+        const int64_t distance_q16 = (int64_t)step * search_step_q16;
+        SurfManWaveSample sample;
+        AFORC_Status status;
+
+        if (distance_q16 > INT32_MAX) {
+            return AFORC_ERROR_LIMIT;
+        }
+        simulation->distance_q16 = (int32_t)distance_q16;
+        status = surf_man_wave_sample(simulation, 0, &sample);
+        if (status != AFORC_OK) {
+            return status;
+        }
+        if (surf_man_qa_sample_is_zone(&sample, zone)) {
+            if (out_sample != NULL) {
+                *out_sample = sample;
+            }
+            return AFORC_OK;
+        }
+    }
+    return AFORC_ERROR_NOT_FOUND;
+}
+
+static AFORC_Status surf_man_qa_tube_commit_contract(uint64_t seed,
+                                                      AFORC_Error *error) {
+    SurfManSimulation simulation;
+    SurfManCommand command;
+    uint64_t pending_score;
+    uint32_t maneuver_count;
+    AFORC_Status status = surf_man_qa_riding_init(
+        &simulation, seed, SURF_MAN_WAVE_TUBE);
+
+    if (status == AFORC_OK) {
+        status = surf_man_qa_seek_zone(
+            &simulation, SURF_MAN_QA_ZONE_TUBE, NULL);
+    }
+    if (status != AFORC_OK) {
+        return surf_man_qa_error(
+            error, status, "tube fixture found no exclusive tube section");
+    }
+
+    pending_score = simulation.pending_score;
+    maneuver_count = simulation.maneuver_count;
+    surf_man_command_clear(&command);
+    command.action = true;
+    status = surf_man_simulation_step(&simulation, &command);
+    if (status != AFORC_OK || simulation.tube_ticks != 1U ||
+        simulation.pending_score != pending_score ||
+        simulation.maneuver_count != maneuver_count ||
+        simulation.last_maneuver != SURF_MAN_MANEUVER_NONE ||
+        !simulation.risk_active) {
+        return surf_man_qa_error(
+            error,
+            status == AFORC_OK ? AFORC_ERROR_STATE : status,
+            "tube tap did not start an unscored committed ride");
+    }
+
+    surf_man_command_clear(&command);
+    for (uint32_t tick = 0U; tick < 4U; ++tick) {
+        status = surf_man_simulation_step(&simulation, &command);
+        if (status != AFORC_OK || simulation.tube_ticks != tick + 2U ||
+            simulation.pending_score != pending_score ||
+            simulation.maneuver_count != maneuver_count) {
+            return surf_man_qa_error(
+                error,
+                status == AFORC_OK ? AFORC_ERROR_STATE : status,
+                "tube tap did not stay committed through the tube section");
+        }
+    }
+    status = surf_man_qa_seek_zone(
+        &simulation, SURF_MAN_QA_ZONE_CLEAR, NULL);
+    if (status == AFORC_OK) {
+        status = surf_man_simulation_step(&simulation, &command);
+    }
+    if (status != AFORC_OK || simulation.tube_ticks != 0U ||
+        simulation.pending_score != pending_score + UINT64_C(40) ||
+        simulation.maneuver_count != maneuver_count + 1U ||
+        simulation.flow != 1U ||
+        simulation.last_maneuver != SURF_MAN_MANEUVER_TUBE ||
+        strcmp(simulation.award, "TUBE") != 0) {
+        return surf_man_qa_error(
+            error,
+            status == AFORC_OK ? AFORC_ERROR_STATE : status,
+            "first committed tube did not score fully and build flow on exit");
+    }
+    return AFORC_OK;
+}
+
+static AFORC_Status surf_man_qa_zone_role_contract(uint64_t seed,
+                                                    AFORC_Error *error) {
+    bool saw_pocket = false;
+    bool saw_foam = false;
+    bool saw_tube = false;
+    bool saw_hazard = false;
+    SurfManSimulation pocket;
+    SurfManSimulation foam;
+    SurfManWaveSample pocket_sample;
+    SurfManWaveSample foam_sample;
+    SurfManCommand command;
+    int32_t pocket_without_role;
+    int32_t foam_without_role;
+    AFORC_Status status;
+
+    for (uint32_t kind = SURF_MAN_WAVE_OPEN;
+         kind <= SURF_MAN_WAVE_CLOSEOUT;
+         ++kind) {
+        SurfManSimulation simulation;
+
+        status = surf_man_qa_riding_init(
+            &simulation, seed, (SurfManWaveKind)kind);
+        if (status != AFORC_OK) {
+            return surf_man_qa_error(
+                error, status, "zone fixture could not initialize wave kind");
+        }
+        for (uint32_t step = 0U;
+             step < SURF_MAN_QA_SAMPLE_SEARCH_STEPS;
+             ++step) {
+            SurfManWaveSample sample;
+
+            simulation.distance_q16 =
+                (int32_t)step * (SURF_MAN_Q16_ONE / 4);
+            status = surf_man_wave_sample(&simulation, 0, &sample);
+            if (status != AFORC_OK) {
+                return surf_man_qa_error(
+                    error, status, "zone fixture could not sample wave roles");
+            }
+            if (surf_man_qa_sample_role_count(&sample) > 1U) {
+                return surf_man_qa_error(
+                    error,
+                    AFORC_ERROR_STATE,
+                    "pocket, foam, tube, and hazard roles overlapped");
+            }
+            saw_pocket = saw_pocket || sample.pocket;
+            saw_foam = saw_foam || sample.foam;
+            saw_tube = saw_tube || sample.tube;
+            saw_hazard = saw_hazard || sample.hazard;
+        }
+    }
+    if (!saw_pocket || !saw_foam || !saw_tube || !saw_hazard) {
+        return surf_man_qa_error(
+            error,
+            AFORC_ERROR_STATE,
+            "wave roles did not expose pocket, foam, tube, and hazard play");
+    }
+
+    status = surf_man_qa_riding_init(
+        &pocket, seed, SURF_MAN_WAVE_OPEN);
+    if (status == AFORC_OK) {
+        status = surf_man_qa_seek_zone(
+            &pocket, SURF_MAN_QA_ZONE_POCKET, &pocket_sample);
+    }
+    if (status == AFORC_OK) {
+        status = surf_man_qa_riding_init(
+            &foam, seed, SURF_MAN_WAVE_CHOP);
+    }
+    if (status == AFORC_OK) {
+        status = surf_man_qa_seek_zone(
+            &foam, SURF_MAN_QA_ZONE_FOAM, &foam_sample);
+    }
+    if (status != AFORC_OK) {
+        return surf_man_qa_error(
+            error, status, "zone fixture could not find pocket and foam roles");
+    }
+
+    pocket.speed_q16 = 4 * SURF_MAN_Q16_ONE;
+    pocket.wave_face_velocity_q16 = 0;
+    foam.speed_q16 = 4 * SURF_MAN_Q16_ONE;
+    foam.wave_face_velocity_q16 = 0;
+    pocket_without_role =
+        pocket.speed_q16 + pocket_sample.push_q16 / SURF_MAN_FIXED_HZ;
+    foam_without_role =
+        foam.speed_q16 + foam_sample.push_q16 / SURF_MAN_FIXED_HZ;
+    surf_man_command_clear(&command);
+    status = surf_man_simulation_step(&pocket, &command);
+    if (status == AFORC_OK) {
+        status = surf_man_simulation_step(&foam, &command);
+    }
+    if (status != AFORC_OK || pocket.speed_q16 <= pocket_without_role ||
+        foam.speed_q16 >= foam_without_role) {
+        return surf_man_qa_error(
+            error,
+            status == AFORC_OK ? AFORC_ERROR_STATE : status,
+            "pocket did not add drive or foam did not remove speed");
+    }
+    return AFORC_OK;
+}
+
 static AFORC_Status surf_man_qa_seek_ground_sample(
     SurfManSimulation *simulation,
     bool require_lip) {
@@ -324,9 +556,9 @@ static AFORC_Status surf_man_qa_steering_contract(uint64_t seed,
     command.horizontal = -1;
     status = surf_man_simulation_step(&simulation, &command);
     if (status != AFORC_OK ||
-        simulation.maneuver_count != maneuver_count + 1U ||
-        simulation.pending_score <= pending_score ||
-        simulation.last_maneuver != SURF_MAN_MANEUVER_CARVE_LEFT ||
+        simulation.maneuver_count != maneuver_count ||
+        simulation.pending_score != pending_score ||
+        simulation.last_maneuver != SURF_MAN_MANEUVER_NONE ||
         simulation.line_velocity_q16 <= 0 ||
         simulation.line_velocity_q16 >= coast_velocity ||
         simulation.line_position_q16 < coast_position ||
@@ -336,8 +568,9 @@ static AFORC_Status surf_man_qa_steering_contract(uint64_t seed,
         return surf_man_qa_error(
             error,
             status == AFORC_OK ? AFORC_ERROR_STATE : status,
-            "turn reversal did not score once while preserving momentum");
+            "opposite tap scored before line velocity reversed");
     }
+    surf_man_command_clear(&command);
     for (uint32_t tick = 0U;
          tick < SURF_MAN_FIXED_HZ && simulation.line_velocity_q16 >= 0;
          ++tick) {
@@ -358,13 +591,33 @@ static AFORC_Status surf_man_qa_steering_contract(uint64_t seed,
                 status == AFORC_OK ? AFORC_ERROR_STATE : status,
                 "reversal motion exceeded its deterministic travel bounds");
         }
+        if (simulation.line_velocity_q16 >= 0 &&
+            (simulation.maneuver_count != maneuver_count ||
+             simulation.pending_score != pending_score ||
+             simulation.last_maneuver != SURF_MAN_MANEUVER_NONE)) {
+            return surf_man_qa_error(
+                error,
+                AFORC_ERROR_STATE,
+                "committed carve scored before crossing into its direction");
+        }
     }
     if (simulation.line_velocity_q16 >= 0 ||
-        simulation.maneuver_count != maneuver_count + 1U) {
+        simulation.maneuver_count != maneuver_count + 1U ||
+        simulation.pending_score <= pending_score ||
+        simulation.last_maneuver != SURF_MAN_MANEUVER_CARVE_LEFT ||
+        strcmp(simulation.award, "LEFT CARVE") != 0) {
         return surf_man_qa_error(
             error,
             AFORC_ERROR_STATE,
-            "reversal did not ease through zero without duplicate scoring");
+            "opposite tap did not score when line velocity crossed direction");
+    }
+    status = surf_man_simulation_step(&simulation, &command);
+    if (status != AFORC_OK ||
+        simulation.maneuver_count != maneuver_count + 1U) {
+        return surf_man_qa_error(
+            error,
+            status == AFORC_OK ? AFORC_ERROR_STATE : status,
+            "committed carve scored more than once after direction crossing");
     }
 
     bounded.line_position_q16 = bounded.rules.line_position_limit_q16 - 1;
@@ -858,6 +1111,47 @@ static AFORC_Status surf_man_qa_recovery_contract(uint64_t seed,
     return AFORC_OK;
 }
 
+static AFORC_Status surf_man_qa_award_expiry_contract(uint64_t seed,
+                                                       AFORC_Error *error) {
+    SurfManSimulation simulation;
+    SurfManCommand command;
+    AFORC_Status status = surf_man_qa_riding_init(
+        &simulation, seed, SURF_MAN_WAVE_OPEN);
+
+    if (status == AFORC_OK) {
+        status = surf_man_qa_seek_ground_sample(&simulation, false);
+    }
+    if (status == AFORC_OK) {
+        status = surf_man_score_maneuver(
+            &simulation, SURF_MAN_MANEUVER_CARVE_LEFT, 0U, false);
+    }
+    if (status != AFORC_OK || strcmp(simulation.award, "LEFT CARVE") != 0) {
+        return surf_man_qa_error(
+            error,
+            status == AFORC_OK ? AFORC_ERROR_STATE : status,
+            "award expiry fixture could not create a carve award");
+    }
+
+    surf_man_command_clear(&command);
+    for (uint32_t tick = 0U; tick < SURF_MAN_QA_AWARD_TICKS; ++tick) {
+        status = surf_man_simulation_step(&simulation, &command);
+        if (status != AFORC_OK) {
+            return surf_man_qa_error(
+                error, status, "award expiry fixture could not advance");
+        }
+        if (tick + 1U < SURF_MAN_QA_AWARD_TICKS &&
+            simulation.award[0] == '\0') {
+            return surf_man_qa_error(
+                error, AFORC_ERROR_STATE, "award expired before two seconds");
+        }
+    }
+    if (simulation.award[0] != '\0') {
+        return surf_man_qa_error(
+            error, AFORC_ERROR_STATE, "award remained stale after two seconds");
+    }
+    return AFORC_OK;
+}
+
 typedef struct SurfManQaHashField {
     size_t offset;
     const char *message;
@@ -874,6 +1168,8 @@ static AFORC_Status surf_man_qa_hash_contract(uint64_t seed,
          "wave-face offset is absent from the simulation hash"},
         {offsetof(SurfManSimulation, wave_face_velocity_q16),
          "wave-face velocity is absent from the simulation hash"},
+        {offsetof(SurfManSimulation, award_ticks),
+         "award lifetime is absent from the simulation hash"},
         {offsetof(SurfManSimulation, rules) +
              offsetof(SurfManRules, line_position_limit_q16),
          "line position limit is absent from the simulation hash"},
@@ -932,6 +1228,13 @@ static AFORC_Status surf_man_qa_hash_contract(uint64_t seed,
                 error, AFORC_ERROR_STATE, fields[index].message);
         }
     }
+    simulation.carve_direction = -1;
+    if (surf_man_simulation_hash(&simulation) == baseline_hash) {
+        return surf_man_qa_error(
+            error,
+            AFORC_ERROR_STATE,
+            "committed carve direction is absent from the simulation hash");
+    }
     return AFORC_OK;
 }
 
@@ -939,6 +1242,9 @@ static AFORC_Status surf_man_qa_gameplay_contracts(uint64_t seed,
                                                     AFORC_Error *error) {
     AFORC_Status status = surf_man_qa_steering_contract(seed, error);
 
+    if (status == AFORC_OK) {
+        status = surf_man_qa_tube_commit_contract(seed, error);
+    }
     if (status == AFORC_OK) {
         status = surf_man_qa_wave_face_contract(seed, error);
     }
@@ -949,6 +1255,9 @@ static AFORC_Status surf_man_qa_gameplay_contracts(uint64_t seed,
         status = surf_man_qa_hazard_contract(seed, error);
     }
     if (status == AFORC_OK) {
+        status = surf_man_qa_zone_role_contract(seed, error);
+    }
+    if (status == AFORC_OK) {
         status = surf_man_qa_timing_threshold_contract(seed, error);
     }
     if (status == AFORC_OK) {
@@ -956,6 +1265,9 @@ static AFORC_Status surf_man_qa_gameplay_contracts(uint64_t seed,
     }
     if (status == AFORC_OK) {
         status = surf_man_qa_recovery_contract(seed, error);
+    }
+    if (status == AFORC_OK) {
+        status = surf_man_qa_award_expiry_contract(seed, error);
     }
     if (status == AFORC_OK) {
         status = surf_man_qa_hash_contract(seed, error);
@@ -1093,6 +1405,185 @@ static AFORC_Status surf_man_qa_score_checks(uint64_t seed,
     return AFORC_OK;
 }
 
+static AFORC_Status surf_man_qa_practice_best_contract(uint64_t seed,
+                                                        AFORC_Error *error) {
+    const SurfManSettings settings = surf_man_settings_default();
+    SurfManSimulation simulation;
+    uint64_t finite_best;
+    AFORC_Status status =
+        surf_man_simulation_init(&simulation, seed, &settings);
+
+    if (status == AFORC_OK) {
+        status = surf_man_simulation_start_day(&simulation, false);
+    }
+    if (status != AFORC_OK) {
+        return surf_man_qa_error(
+            error, status, "best-score fixture could not start normal day");
+    }
+    simulation.pending_score = UINT64_C(500);
+    surf_man_score_bank(&simulation);
+    finite_best = simulation.best_score;
+    if (finite_best != UINT64_C(500)) {
+        return surf_man_qa_error(
+            error, AFORC_ERROR_STATE, "normal day did not establish best score");
+    }
+
+    status = surf_man_simulation_start_day(&simulation, true);
+    if (status != AFORC_OK) {
+        return surf_man_qa_error(
+            error, status, "best-score fixture could not start Practice");
+    }
+    simulation.pending_score = finite_best + UINT64_C(500);
+    surf_man_score_bank(&simulation);
+    if (simulation.day_score <= finite_best ||
+        simulation.best_score != finite_best) {
+        return surf_man_qa_error(
+            error,
+            AFORC_ERROR_STATE,
+            "Practice score mutated finite-day best score");
+    }
+
+    status = surf_man_simulation_start_day(&simulation, false);
+    if (status != AFORC_OK) {
+        return surf_man_qa_error(
+            error, status, "best-score fixture could not resume normal day");
+    }
+    simulation.pending_score = finite_best + UINT64_C(1);
+    surf_man_score_bank(&simulation);
+    if (simulation.best_score != finite_best + UINT64_C(1)) {
+        return surf_man_qa_error(
+            error, AFORC_ERROR_STATE, "later normal day did not raise best score");
+    }
+    return AFORC_OK;
+}
+
+static AFORC_Status surf_man_qa_wave_progression_contract(
+    uint64_t seed,
+    AFORC_Error *error) {
+    const SurfManSettings settings = surf_man_settings_default();
+
+    for (uint32_t trial = 0U; trial < 16U; ++trial) {
+        SurfManSimulation simulation;
+        const uint64_t trial_seed =
+            seed ^ (UINT64_C(0x9e3779b97f4a7c15) * trial);
+        AFORC_Status status =
+            surf_man_simulation_init(&simulation, trial_seed, &settings);
+
+        if (status == AFORC_OK) {
+            status = surf_man_simulation_start_day(&simulation, false);
+        }
+        if (status == AFORC_OK) {
+            status = surf_man_simulation_start_wave(&simulation);
+        }
+        if (status != AFORC_OK || simulation.wave != 1U ||
+            simulation.wave_kind != SURF_MAN_WAVE_OPEN) {
+            return surf_man_qa_error(
+                error,
+                status == AFORC_OK ? AFORC_ERROR_STATE : status,
+                "wave one was not a readable OPEN introduction");
+        }
+
+        status = surf_man_simulation_start_wave(&simulation);
+        if (status != AFORC_OK || simulation.wave != 2U ||
+            (simulation.wave_kind != SURF_MAN_WAVE_STEEP &&
+             simulation.wave_kind != SURF_MAN_WAVE_TUBE)) {
+            return surf_man_qa_error(
+                error,
+                status == AFORC_OK ? AFORC_ERROR_STATE : status,
+                "wave two did not introduce STEEP or TUBE play");
+        }
+
+        status = surf_man_simulation_start_wave(&simulation);
+        if (status != AFORC_OK || simulation.wave != 3U ||
+            (simulation.wave_kind != SURF_MAN_WAVE_CHOP &&
+             simulation.wave_kind != SURF_MAN_WAVE_CLOSEOUT)) {
+            return surf_man_qa_error(
+                error,
+                status == AFORC_OK ? AFORC_ERROR_STATE : status,
+                "wave three did not escalate to CHOP or CLOSEOUT");
+        }
+    }
+    return AFORC_OK;
+}
+
+static AFORC_Status surf_man_qa_end_session_contract(uint64_t seed,
+                                                      AFORC_Error *error) {
+    SurfManSettings settings = surf_man_settings_default();
+    SurfManSimulation simulation;
+    SurfManSimulation uninitialized = {0};
+    uint32_t day;
+    uint64_t best_score;
+    AFORC_Status status;
+
+    if (surf_man_simulation_end_session(NULL) !=
+            AFORC_ERROR_INVALID_ARGUMENT ||
+        surf_man_simulation_end_session(&uninitialized) != AFORC_ERROR_STATE) {
+        return surf_man_qa_error(
+            error, AFORC_ERROR_STATE, "end-session accepted invalid state");
+    }
+
+    settings.speed_percent = 75U;
+    status = surf_man_simulation_init(&simulation, seed, &settings);
+    if (status == AFORC_OK) {
+        status = surf_man_simulation_start_day(&simulation, false);
+    }
+    if (status == AFORC_OK) {
+        status = surf_man_simulation_start_wave(&simulation);
+    }
+    if (status != AFORC_OK) {
+        return surf_man_qa_error(
+            error, status, "end-session fixture could not start normal day");
+    }
+    simulation.phase = SURF_MAN_RIDING;
+    simulation.day_score = UINT64_C(70);
+    simulation.pending_score = UINT64_C(30);
+    simulation.best_score = UINT64_C(70);
+    simulation.flow = 3U;
+    simulation.risk_active = true;
+    day = simulation.day;
+    status = surf_man_simulation_end_session(&simulation);
+    if (status != AFORC_OK || simulation.phase != SURF_MAN_SHACK ||
+        simulation.practice || simulation.wave != 0U ||
+        simulation.wave_kind != SURF_MAN_WAVE_OPEN ||
+        simulation.day_score != 0U ||
+        simulation.pending_score != 0U || simulation.best_score != 70U ||
+        simulation.day != day || simulation.seed != seed ||
+        simulation.settings.speed_percent != 75U ||
+        simulation.wave_ticks_remaining != 0U ||
+        simulation.segment_ticks_remaining != 0U || simulation.flow != 0U ||
+        simulation.risk_active || simulation.award[0] != '\0') {
+        return surf_man_qa_error(
+            error,
+            status == AFORC_OK ? AFORC_ERROR_STATE : status,
+            "normal end-session banked pending score or left ride telemetry");
+    }
+
+    best_score = simulation.best_score;
+    status = surf_man_simulation_start_day(&simulation, true);
+    if (status == AFORC_OK) {
+        status = surf_man_simulation_start_wave(&simulation);
+    }
+    if (status != AFORC_OK) {
+        return surf_man_qa_error(
+            error, status, "end-session fixture could not start Practice");
+    }
+    simulation.phase = SURF_MAN_PRACTICE;
+    simulation.day_score = UINT64_C(40);
+    simulation.pending_score = UINT64_C(20);
+    status = surf_man_simulation_end_session(&simulation);
+    if (status != AFORC_OK || simulation.phase != SURF_MAN_SHACK ||
+        simulation.practice || simulation.day_score != 0U ||
+        simulation.pending_score != 0U ||
+        simulation.best_score != best_score || simulation.day != day ||
+        simulation.wave != 0U || simulation.wave_ticks_remaining != 0U) {
+        return surf_man_qa_error(
+            error,
+            status == AFORC_OK ? AFORC_ERROR_STATE : status,
+            "Practice end-session did not bank pending score and clear state");
+    }
+    return AFORC_OK;
+}
+
 static AFORC_Status surf_man_qa_transition_checks(uint64_t seed,
                                                   AFORC_Error *error) {
     const SurfManSettings settings = surf_man_settings_default();
@@ -1148,6 +1639,15 @@ AFORC_Status surf_man_simulation_checks(uint64_t seed, AFORC_Error *error) {
     }
     if (status == AFORC_OK) {
         status = surf_man_qa_score_checks(seed, error);
+    }
+    if (status == AFORC_OK) {
+        status = surf_man_qa_practice_best_contract(seed, error);
+    }
+    if (status == AFORC_OK) {
+        status = surf_man_qa_wave_progression_contract(seed, error);
+    }
+    if (status == AFORC_OK) {
+        status = surf_man_qa_end_session_contract(seed, error);
     }
     if (status == AFORC_OK) {
         status = surf_man_qa_transition_checks(seed, error);

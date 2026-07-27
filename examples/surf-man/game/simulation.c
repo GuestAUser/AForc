@@ -12,6 +12,41 @@ static void surf_man_tick_u32(uint32_t *value) {
     }
 }
 
+static void surf_man_tick_award(SurfManSimulation *simulation) {
+    if (simulation->award_ticks == 0U) {
+        return;
+    }
+    --simulation->award_ticks;
+    if (simulation->award_ticks == 0U) {
+        simulation->award[0] = '\0';
+    }
+}
+
+static AFORC_Status surf_man_select_wave_kind(
+    SurfManSimulation *simulation,
+    uint32_t *out_kind) {
+    uint32_t choice;
+    AFORC_Status status;
+
+    if (simulation->practice) {
+        return aforc_rng_bounded_u32(&simulation->mechanics_rng,
+                                     SURF_MAN_WAVE_CLOSEOUT + 1U,
+                                     out_kind);
+    }
+    if (simulation->wave == 0U) {
+        *out_kind = SURF_MAN_WAVE_OPEN;
+        return AFORC_OK;
+    }
+    status = aforc_rng_bounded_u32(&simulation->mechanics_rng, 2U, &choice);
+    if (status != AFORC_OK) {
+        return status;
+    }
+    *out_kind = simulation->wave == 1U
+                    ? SURF_MAN_WAVE_STEEP + choice
+                    : SURF_MAN_WAVE_CHOP + choice;
+    return AFORC_OK;
+}
+
 static bool surf_man_settings_valid(const SurfManSettings *settings) {
     return settings->speed_percent >= 50U &&
            settings->speed_percent <= 200U &&
@@ -100,8 +135,7 @@ AFORC_Status surf_man_simulation_start_wave(SurfManSimulation *simulation) {
     if (simulation->wave >= SURF_MAN_WAVES_PER_DAY) {
         return AFORC_ERROR_LIMIT;
     }
-    status = aforc_rng_bounded_u32(
-        &simulation->mechanics_rng, SURF_MAN_WAVE_CLOSEOUT + 1U, &kind);
+    status = surf_man_select_wave_kind(simulation, &kind);
     if (status != AFORC_OK) {
         return status;
     }
@@ -116,6 +150,27 @@ AFORC_Status surf_man_simulation_start_wave(SurfManSimulation *simulation) {
     return status;
 }
 
+AFORC_Status surf_man_simulation_end_session(SurfManSimulation *simulation) {
+    if (simulation == NULL) {
+        return AFORC_ERROR_INVALID_ARGUMENT;
+    }
+    if (!simulation->initialized) {
+        return AFORC_ERROR_STATE;
+    }
+    if (simulation->practice) {
+        surf_man_score_bank(simulation);
+    }
+    surf_man_ride_reset(simulation);
+    simulation->day_score = 0U;
+    simulation->wave = 0U;
+    simulation->wave_ticks_remaining = 0U;
+    simulation->segment_ticks_remaining = 0U;
+    simulation->phase = SURF_MAN_SHACK;
+    simulation->wave_kind = SURF_MAN_WAVE_OPEN;
+    simulation->practice = false;
+    return AFORC_OK;
+}
+
 AFORC_Status surf_man_simulation_step(SurfManSimulation *simulation,
                                       const SurfManCommand *command) {
     if (simulation == NULL || command == NULL || command->vertical < -1 ||
@@ -126,12 +181,12 @@ AFORC_Status surf_man_simulation_step(SurfManSimulation *simulation,
     if (!simulation->initialized) {
         return AFORC_ERROR_STATE;
     }
+    surf_man_tick_award(simulation);
     switch (simulation->phase) {
         case SURF_MAN_COUNT_IN:
             surf_man_tick_u32(&simulation->phase_tick);
             if (command->back) {
-                simulation->phase = SURF_MAN_SHACK;
-                simulation->phase_tick = 0U;
+                return surf_man_simulation_end_session(simulation);
             } else if (simulation->phase_tick >=
                        simulation->rules.count_in_ticks) {
                 simulation->phase = simulation->practice
@@ -143,9 +198,7 @@ AFORC_Status surf_man_simulation_step(SurfManSimulation *simulation,
         case SURF_MAN_RIDING:
         case SURF_MAN_PRACTICE:
             if (simulation->practice && command->back) {
-                surf_man_score_bank(simulation);
-                simulation->phase = SURF_MAN_SHACK;
-                return AFORC_OK;
+                return surf_man_simulation_end_session(simulation);
             }
             return surf_man_ride_step(simulation, command);
         case SURF_MAN_WIPEOUT_RECOVERY:
@@ -153,7 +206,7 @@ AFORC_Status surf_man_simulation_step(SurfManSimulation *simulation,
         case SURF_MAN_WAVE_RECAP:
             surf_man_tick_u32(&simulation->phase_tick);
             if (command->back) {
-                simulation->phase = SURF_MAN_SHACK;
+                return surf_man_simulation_end_session(simulation);
             } else if (command->confirm) {
                 if (simulation->wave < SURF_MAN_WAVES_PER_DAY) {
                     return surf_man_simulation_start_wave(simulation);
@@ -165,8 +218,7 @@ AFORC_Status surf_man_simulation_step(SurfManSimulation *simulation,
         case SURF_MAN_DAY_RECAP:
             surf_man_tick_u32(&simulation->phase_tick);
             if (command->confirm || command->back) {
-                simulation->phase = SURF_MAN_SHACK;
-                simulation->phase_tick = 0U;
+                return surf_man_simulation_end_session(simulation);
             }
             return AFORC_OK;
         case SURF_MAN_SHACK:

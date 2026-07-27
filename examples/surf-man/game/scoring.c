@@ -24,6 +24,7 @@ static void surf_man_award_set(SurfManSimulation *simulation,
         ++index;
     }
     simulation->award[index] = '\0';
+    simulation->award_ticks = SURF_MAN_AWARD_TICKS;
 }
 
 static uint64_t surf_man_maneuver_base(SurfManManeuver maneuver) {
@@ -129,7 +130,8 @@ void surf_man_score_bank(SurfManSimulation *simulation) {
         simulation->day_score =
             surf_man_add_score(simulation->day_score,
                                simulation->pending_score);
-        if (simulation->day_score > simulation->best_score) {
+        if (!simulation->practice &&
+            simulation->day_score > simulation->best_score) {
             simulation->best_score = simulation->day_score;
         }
         surf_man_award_set(simulation, "BANKED");
@@ -151,5 +153,6 @@ void surf_man_score_wipeout(SurfManSimulation *simulation) {
     simulation->grabbed = false;
     simulation->risk_active = false;
     simulation->last_maneuver = SURF_MAN_MANEUVER_NONE;
+    simulation->carve_direction = 0;
     surf_man_award_set(simulation, "WIPEOUT - PENDING LOST");
 }
