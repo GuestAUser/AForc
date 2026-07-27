@@ -11,9 +11,12 @@
 
 #include "../include/aforc/assets.h"
 
+#include <dirent.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/resource.h>
 #include <unistd.h>
 
 static bool test_path_policy(void)
@@ -94,7 +97,7 @@ static bool make_file_path(
 static void cleanup_test_directory(const char *directory)
 {
     static const char *const names[] = {
-        "data.bin", "text.txt", "empty.bin", "nul.txt"
+        "data.bin", "text.txt", "empty.bin", "nul.txt", "atomic.bin"
     };
     char path[256];
     size_t index;
@@ -177,6 +180,134 @@ static bool test_file_io(void)
     return passed;
 }
 
+static bool directory_contains_prefix(
+    const char *directory,
+    const char *prefix)
+{
+    DIR *stream = opendir(directory);
+    struct dirent *entry;
+
+    if (stream == NULL) {
+        return true;
+    }
+    while ((entry = readdir(stream)) != NULL) {
+        if (strncmp(entry->d_name, prefix, strlen(prefix)) == 0) {
+            (void)closedir(stream);
+            return true;
+        }
+    }
+    return closedir(stream) != 0;
+}
+
+static bool test_atomic_file_io(void)
+{
+    static const uint8_t original[] = {0x11u, 0x22u, 0x33u, 0x44u};
+    static const uint8_t replacement[] = {
+        0xa0u, 0xa1u, 0xa2u, 0xa3u, 0xa4u, 0xa5u, 0xa6u, 0xa7u
+    };
+    AFORC_AssetPathPolicy policy = aforc_asset_path_policy_default();
+    AFORC_AssetBlob blob = {0};
+    struct rlimit original_limit;
+    struct rlimit limited;
+    struct sigaction ignored = {0};
+    struct sigaction previous;
+    char directory_template[] = "/tmp/aforc-assets-atomic-XXXXXX";
+    char long_name[256];
+    char long_path[512];
+    char *directory = mkdtemp(directory_template);
+    AFORC_Status failure_status = AFORC_OK;
+    bool limit_changed = false;
+    bool signal_changed = false;
+    bool passed = directory != NULL;
+
+    if (!passed) {
+        return false;
+    }
+    passed = aforc_asset_store_binary_atomic(directory,
+                                             "atomic.bin",
+                                             &policy,
+                                             original,
+                                             sizeof(original),
+                                             sizeof(original)) == AFORC_OK;
+    if (passed) {
+        ignored.sa_handler = SIG_IGN;
+        passed = sigemptyset(&ignored.sa_mask) == 0 &&
+                 sigaction(SIGXFSZ, &ignored, &previous) == 0;
+        signal_changed = passed;
+    }
+    if (passed) {
+        passed = getrlimit(RLIMIT_FSIZE, &original_limit) == 0;
+    }
+    if (passed) {
+        limited = original_limit;
+        limited.rlim_cur = 1;
+        passed = setrlimit(RLIMIT_FSIZE, &limited) == 0;
+        limit_changed = passed;
+    }
+    if (passed) {
+        failure_status = aforc_asset_store_binary_atomic(directory,
+                                                         "atomic.bin",
+                                                         &policy,
+                                                         replacement,
+                                                         sizeof(replacement),
+                                                         sizeof(replacement));
+    }
+    if (limit_changed && setrlimit(RLIMIT_FSIZE, &original_limit) != 0) {
+        passed = false;
+    }
+    if (signal_changed && sigaction(SIGXFSZ, &previous, NULL) != 0) {
+        passed = false;
+    }
+    if (passed) {
+        passed = failure_status == AFORC_ERROR_IO &&
+                 aforc_asset_load_binary(directory,
+                                         "atomic.bin",
+                                         &policy,
+                                         sizeof(original),
+                                         &blob) == AFORC_OK &&
+                 blob.size == sizeof(original) &&
+                 memcmp(blob.data, original, sizeof(original)) == 0 &&
+                 !directory_contains_prefix(directory, ".aforc-asset-");
+    }
+    aforc_asset_blob_release(&blob);
+    if (passed) {
+        passed = aforc_asset_store_binary_atomic(directory,
+                                                 "atomic.bin",
+                                                 &policy,
+                                                 replacement,
+                                                 sizeof(replacement),
+                                                 sizeof(replacement)) == AFORC_OK &&
+                 aforc_asset_load_binary(directory,
+                                         "atomic.bin",
+                                         &policy,
+                                         sizeof(replacement),
+                                         &blob) == AFORC_OK &&
+                 blob.size == sizeof(replacement) &&
+                 memcmp(blob.data, replacement, sizeof(replacement)) == 0 &&
+                 !directory_contains_prefix(directory, ".aforc-asset-");
+    }
+    aforc_asset_blob_release(&blob);
+    (void)memset(long_name, 'x', sizeof(long_name) - 1u);
+    long_name[sizeof(long_name) - 1u] = '\0';
+    if (passed) {
+        passed = aforc_asset_store_binary_atomic(directory,
+                                                 long_name,
+                                                 &policy,
+                                                 original,
+                                                 sizeof(original),
+                                                 sizeof(original)) == AFORC_OK &&
+                 make_file_path(long_path,
+                                sizeof(long_path),
+                                directory,
+                                long_name);
+    }
+    if (passed) {
+        passed = unlink(long_path) == 0;
+    }
+    cleanup_test_directory(directory);
+    return passed;
+}
+
 static bool test_rng_vectors(void)
 {
     static const uint32_t expected[] = {
@@ -217,7 +348,8 @@ static bool test_rng_vectors(void)
 
 int main(void)
 {
-    if (!test_path_policy() || !test_file_io() || !test_rng_vectors()) {
+    if (!test_path_policy() || !test_file_io() || !test_atomic_file_io() ||
+        !test_rng_vectors()) {
         (void)fputs("asset contract regression failed\n", stderr);
         return 1;
     }

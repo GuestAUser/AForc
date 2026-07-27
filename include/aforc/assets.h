@@ -99,6 +99,28 @@ AFORC_API AFORC_Status aforc_asset_store_binary(
     const void *data,
     size_t size,
     size_t max_bytes);
+/*
+ * POSIX atomic replacement writes through an exclusively created, owner-only
+ * temporary file in the destination directory, flushes and synchronizes its
+ * complete contents, closes it, then renames it over the destination and
+ * synchronizes the containing directory. A failure before rename leaves an
+ * existing destination unchanged; a failure after rename may report I/O while
+ * leaving the complete new file installed. Temporary-file cleanup is attempted
+ * on failure. Absent cleanup failures or external filesystem races, the
+ * destination is always the previous complete file or the new complete file.
+ *
+ * The operation does not preserve destination metadata. It retains the path
+ * policy's lexical-only caveats: trusted roots, symlink traversal, path and
+ * mount replacement races, special files, and blocking I/O remain platform
+ * concerns.
+ */
+AFORC_API AFORC_Status aforc_asset_store_binary_atomic(
+    const char *root,
+    const char *relative_path,
+    const AFORC_AssetPathPolicy *policy,
+    const void *data,
+    size_t size,
+    size_t max_bytes);
 AFORC_API void aforc_asset_blob_release(AFORC_AssetBlob *blob);
 AFORC_API void aforc_asset_text_release(AFORC_AssetText *text);
 
