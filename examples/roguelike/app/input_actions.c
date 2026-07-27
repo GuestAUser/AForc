@@ -47,6 +47,12 @@ static AFORC_Status game_report_persistence_result(Game *game,
     return AFORC_OK;
 }
 
+static bool game_viewport_supported(const Game *game) {
+    const AFORC_Size size = aforc_renderer_size(game->renderer);
+
+    return size.width >= GAME_MIN_COLUMNS && size.height >= GAME_MIN_ROWS;
+}
+
 static AFORC_Status game_handle_key(Game *game,
                                     AFORC_Engine *engine,
                                     const AFORC_InputEvent *event,
@@ -75,11 +81,18 @@ static AFORC_Status game_handle_key(Game *game,
     if (game->help_visible) {
         return AFORC_OK;
     }
+    if (codepoint == (uint32_t)'L') {
+        if (!event->data.key.repeat) {
+            status =
+                game_report_persistence_result(game, "Load", game_load(game));
+        }
+        return status;
+    }
     if (game->run_state != GAME_PLAYING) {
         if (codepoint == (uint32_t)'r' || codepoint == (uint32_t)'R') {
             return event->data.key.repeat ? AFORC_OK : game_new_run(game);
         }
-        game_set_message(game, "Press R for a new run or Q to quit.");
+        game_set_message(game, "Press L to load, R for a new run, or Q to quit.");
         return AFORC_OK;
     }
     if (codepoint == (uint32_t)'S') {
@@ -87,12 +100,14 @@ static AFORC_Status game_handle_key(Game *game,
             status =
                 game_report_persistence_result(game, "Save", game_save(game));
         }
-    } else if (codepoint == (uint32_t)'L') {
-        if (!event->data.key.repeat) {
-            status =
-                game_report_persistence_result(game, "Load", game_load(game));
-        }
-    } else if (codepoint == (uint32_t)'>') {
+        return status;
+    }
+    if (!game_viewport_supported(game)) {
+        game_set_message(game,
+                         "Resize terminal to at least 40x14 before acting.");
+        return AFORC_OK;
+    }
+    if (codepoint == (uint32_t)'>') {
         if (!event->data.key.repeat) {
             status = game_descend(game);
         }

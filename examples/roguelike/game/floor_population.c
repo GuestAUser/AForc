@@ -24,6 +24,8 @@ static AFORC_Status game_spawn_enemies(Game *game,
         AFORC_Point point;
         AFORC_Entity occupant = AFORC_ENTITY_INVALID;
         bool occupied = false;
+        const bool sentinel = spawned % 3U == 0U;
+        const int32_t floor_bonus = (int32_t)(game->floor - 1U);
         GameActor enemy;
         AFORC_Status status;
 
@@ -57,12 +59,18 @@ static AFORC_Status game_spawn_enemies(Game *game,
         if (occupied || aforc_world_point_equal(point, game->exit_position)) {
             continue;
         }
-        enemy.health = game->rules.enemy_health + (int32_t)game->floor;
+        enemy.health = game->rules.enemy_health + floor_bonus;
+        if (sentinel) {
+            enemy.health += 5 + floor_bonus;
+        }
         enemy.maximum_health = enemy.health;
-        enemy.attack = game->rules.enemy_attack + (int32_t)(game->floor / 2U);
-        enemy.glyph = spawned % 3U == 0U ? (uint32_t)'S' : (uint32_t)'g';
-        enemy.color = spawned % 3U == 0U ? aforc_color_indexed(141U)
-                                         : aforc_color_indexed(203U);
+        enemy.attack = game->rules.enemy_attack + floor_bonus / 2;
+        if (sentinel) {
+            ++enemy.attack;
+        }
+        enemy.glyph = sentinel ? (uint32_t)'S' : (uint32_t)'g';
+        enemy.color = sentinel ? aforc_color_indexed(141U)
+                               : aforc_color_indexed(203U);
         enemy.hostile = true;
         status = game_create_actor(game, point, enemy, NULL);
         if (status != AFORC_OK) {

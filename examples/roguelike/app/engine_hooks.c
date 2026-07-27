@@ -17,6 +17,32 @@ const AFORC_SceneVTable game_scene_vtable = {
     game_scene_event
 };
 
+static bool game_queued_event_can_take_turn(const Game *game,
+                                            const AFORC_InputEvent *event) {
+    AFORC_Key key;
+    uint32_t codepoint;
+
+    if (event->type != AFORC_INPUT_EVENT_KEY_DOWN || game->help_visible ||
+        game->run_state != GAME_PLAYING) {
+        return false;
+    }
+    key = event->data.key.key;
+    codepoint = event->data.key.codepoint;
+    if (codepoint == 0U && key >= AFORC_KEY_A && key <= AFORC_KEY_Z) {
+        codepoint = (uint32_t)key;
+        if ((event->data.key.modifiers & AFORC_MOD_SHIFT) == 0U) {
+            codepoint += (uint32_t)('a' - 'A');
+        }
+    }
+    return key == AFORC_KEY_SPACE || key == AFORC_KEY_UP ||
+           key == AFORC_KEY_DOWN || key == AFORC_KEY_LEFT ||
+           key == AFORC_KEY_RIGHT || codepoint == (uint32_t)'.' ||
+           codepoint == (uint32_t)'w' || codepoint == (uint32_t)'a' ||
+           codepoint == (uint32_t)'s' || codepoint == (uint32_t)'d' ||
+           codepoint == (uint32_t)'h' || codepoint == (uint32_t)'j' ||
+           codepoint == (uint32_t)'k' || codepoint == (uint32_t)'l';
+}
+
 AFORC_Status game_dispatch_input_queue(Game *game,
                                        AFORC_Engine *engine,
                                        AFORC_Error *error) {
@@ -24,6 +50,12 @@ AFORC_Status game_dispatch_input_queue(Game *game,
     AFORC_Status status = AFORC_OK;
 
     while (aforc_input_next_event(game->input, &event)) {
+        const uint32_t turn_before = game->turn;
+        const uint32_t floor_before = game->floor;
+        const GameRunState run_state_before = game->run_state;
+        const bool saturated_turn_action =
+            turn_before == UINT32_MAX &&
+            game_queued_event_can_take_turn(game, &event);
         bool consumed = false;
 
         status = aforc_engine_dispatch_event(engine,
@@ -31,6 +63,10 @@ AFORC_Status game_dispatch_input_queue(Game *game,
                                              &consumed,
                                              error);
         if (status != AFORC_OK) {
+            break;
+        }
+        if (game->turn != turn_before || game->floor != floor_before ||
+            game->run_state != run_state_before || saturated_turn_action) {
             break;
         }
     }
@@ -53,6 +89,10 @@ AFORC_Status game_poll_events(void *context,
     }
     if (status != AFORC_OK) {
         return game_error(error, status, "input", "terminal input poll failed");
+    }
+    status = game_begin_frame(context, engine, error);
+    if (status != AFORC_OK) {
+        return status;
     }
     return game_dispatch_input_queue(game, engine, error);
 }

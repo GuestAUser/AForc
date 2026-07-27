@@ -16,10 +16,10 @@ static const char game_configuration[] =
     "room_count=15\n"
     "enemy_count=12\n"
     "fov_radius=12\n"
-    "player_health=520\n"
+    "player_health=36\n"
     "player_attack=5\n"
-    "enemy_health=8\n"
-    "enemy_attack=3\n"
+    "enemy_health=6\n"
+    "enemy_attack=2\n"
     "final_floor=5\n";
 
 static AFORC_Status game_parse_u32(const char *text,

@@ -13,19 +13,21 @@
 static AFORC_Status game_render_help(const AFORC_UICanvas *canvas,
                                      AFORC_Size screen) {
     static const char *const lines[] = {
-        "ARROW / WASD / HJKL   Move or attack",
-        ". / SPACE             Wait one turn",
-        ">                     Descend on the exit",
-        "S / L                 Save / load run",
-        "?                     Close this help",
-        "Q / ESC               Quit"};
+        "MOVE  ARROW / WASD / HJKL",
+        "WAIT  . / SPACE",
+        "EXIT  > while standing on exit",
+        "SAVE S   LOAD L (after run ends)",
+        "ENEMY S  Tough, sight 12",
+        "ENEMY g  Frail, sight 7",
+        "HELP ? close",
+        "QUIT Q / ESC"};
     AFORC_Rect panel;
     AFORC_UIPanelStyle style = aforc_ui_panel_style_ascii(
         game_cell((uint32_t)' ', aforc_color_indexed(220U), AFORC_STYLE_BOLD),
         game_cell((uint32_t)' ', aforc_color_indexed(252U), AFORC_STYLE_NONE),
         true);
     int32_t width = screen.width > 56 ? 56 : screen.width;
-    int32_t height = screen.height < 10 ? screen.height : 10;
+    int32_t height = screen.height < 12 ? screen.height : 12;
     AFORC_Status status = aforc_ui_layout_anchor(
         (AFORC_Rect){0, 0, screen.width, screen.height},
         (AFORC_Size){width, height},
@@ -59,8 +61,8 @@ static AFORC_Status game_render_help(const AFORC_UICanvas *canvas,
             strlen(lines[index]),
             AFORC_UI_ALIGN_START,
             game_cell((uint32_t)' ',
-                      aforc_color_indexed(index == 4U ? 220U : 252U),
-                      index == 4U ? AFORC_STYLE_BOLD : AFORC_STYLE_NONE));
+                       aforc_color_indexed(index == 6U ? 220U : 252U),
+                       index == 6U ? AFORC_STYLE_BOLD : AFORC_STYLE_NONE));
     }
     return status;
 }
@@ -70,7 +72,7 @@ static AFORC_Status game_render_overlay(Game *game,
                                         AFORC_Size screen) {
     const bool victory = game->run_state == GAME_VICTORIOUS;
     const char *title = victory ? "VICTORY" : "RUN ENDED";
-    const char *instruction = "Press R for a new run or Q to quit";
+    const char *instruction = "L Load save   R New run   Q Quit";
     AFORC_Rect panel;
     AFORC_UIPanelStyle style = aforc_ui_panel_style_ascii(
         game_cell((uint32_t)' ',
@@ -167,14 +169,25 @@ AFORC_Status game_render_hud(Game *game,
     }
     if (status == AFORC_OK) {
         const int32_t progress_width =
-            screen.width > 30 ? 22 : screen.width - 4;
+            screen.width > 33 ? 22 : screen.width - 7;
 
-        status = aforc_ui_draw_progress(
+        status = aforc_ui_draw_label(
             &canvas,
-            (AFORC_Rect){2, map_rows + 2, progress_width, 1},
-            (uint64_t)(uint32_t)actor->health,
-            (uint64_t)(uint32_t)actor->maximum_health,
-            &health_style);
+            (AFORC_Rect){2, map_rows + 2, 3, 1},
+            "HP ",
+            3U,
+            AFORC_UI_ALIGN_START,
+            game_cell((uint32_t)' ',
+                      aforc_color_indexed(196U),
+                      AFORC_STYLE_BOLD));
+        if (status == AFORC_OK) {
+            status = aforc_ui_draw_progress(
+                &canvas,
+                (AFORC_Rect){5, map_rows + 2, progress_width, 1},
+                (uint64_t)(uint32_t)actor->health,
+                (uint64_t)(uint32_t)actor->maximum_health,
+                &health_style);
+        }
     }
     if (status == AFORC_OK) {
         status = aforc_ui_draw_label(

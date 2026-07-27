@@ -6,6 +6,8 @@
 
 #include "roguelike/internal.h"
 
+#include <string.h>
+
 static AFORC_Status game_point_blocked(Game *game,
                                        AFORC_Point point,
                                        bool *out_blocked) {
@@ -29,11 +31,30 @@ static void game_add_score(Game *game, uint32_t amount) {
     game->score += amount;
 }
 
+static const char *game_target_name(const GameActor *actor) {
+    return actor->glyph == (uint32_t)'S' ? "sentinel" : "goblin";
+}
+
 static AFORC_Status game_take_turn(Game *game) {
+    char action_message[GAME_MESSAGE_CAPACITY];
+    char retaliation_message[GAME_MESSAGE_CAPACITY];
+    AFORC_Status status;
+
+    (void)memcpy(action_message, game->message, sizeof(action_message));
     if (game->turn != UINT32_MAX) {
         ++game->turn;
     }
-    return game_enemy_turns(game);
+    status = game_enemy_turns(game);
+    if (status == AFORC_OK && strcmp(action_message, game->message) != 0) {
+        (void)memcpy(retaliation_message,
+                     game->message,
+                     sizeof(retaliation_message));
+        game_set_message(game,
+                         "%s %s",
+                         action_message,
+                         retaliation_message);
+    }
+    return status;
 }
 
 AFORC_Status game_move_player(Game *game, AFORC_Point delta) {
@@ -70,6 +91,7 @@ AFORC_Status game_move_player(Game *game, AFORC_Point delta) {
     if (occupied) {
         GamePosition *target_position = NULL;
         GameActor *target_actor = NULL;
+        const char *target_name;
 
         if (aforc_entity_equal(target, game->player)) {
             return AFORC_OK;
@@ -81,6 +103,7 @@ AFORC_Status game_move_player(Game *game, AFORC_Point delta) {
         if (status != AFORC_OK || !target_actor->hostile) {
             return status;
         }
+        target_name = game_target_name(target_actor);
         target_actor->health -= player_actor->attack;
         (void)game_emit_burst(game, target_position->point, true);
         if (target_actor->health <= 0) {
@@ -89,12 +112,17 @@ AFORC_Status game_move_player(Game *game, AFORC_Point delta) {
                 return status;
             }
             game_add_score(game, 100U);
-            game_set_message(game, "Sentinel defeated. Score: %u.", game->score);
+            game_set_message(game,
+                             "The %s falls. Score: %u.",
+                             target_name,
+                             game->score);
         } else {
             game_set_message(game,
-                             "You strike for %d. Sentinel health: %d.",
+                             "You strike the %s for %d. Health: %d/%d.",
+                             target_name,
                              player_actor->attack,
-                             target_actor->health);
+                             target_actor->health,
+                             target_actor->maximum_health);
         }
     } else {
         player_position->point = destination;
