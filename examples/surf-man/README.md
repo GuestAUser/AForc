@@ -62,8 +62,10 @@ and state-hash coverage. Render checks assert the 80 by 24 shack, menu, HUD,
 rider, and board contracts; dynamic rider position; ASCII, token, and
 no-blink rules; high-contrast and no-color output; reduced-motion composition;
 and bordered resize notices. Smoke checks cover directional taps, bounded
-action leases and explicit releases, focus/resize pause invariants, the real
-pushed off-screen scene, and no filesystem effects.
+action leases and explicit releases, independent Arrow/WASD aliases, opposite
+direction release fallback, selectable Pause actions and modal return
+provenance, focus/resize pause invariants, the real pushed off-screen scene,
+and no filesystem effects.
 
 ## Session Loop And Scoring
 
@@ -71,7 +73,9 @@ A normal surf day contains three 45-second waves. Each begins with a three-secon
 count-in; a wipeout uses a two-second recovery before the next state. The app
 moves through the shack, count-in, riding, wipeout recovery, wave recap, and
 day recap states. Practice uses the same rules but loops its timed wave instead
-of advancing a normal day; Back banks pending points and returns to the shack.
+of advancing a normal day. `P` or Escape opens Pause; choose End Session to bank
+the final Practice stake, clear Practice-only wave and score telemetry, and
+return to the shack.
 While riding, move along the changing wave face, build and reverse line
 momentum for carves, and use one unchorded action for lip snaps, airs, and
 tubes.
@@ -83,7 +87,10 @@ a bank moves pending points into the day score with `uint64_t`
 saturation. A wipeout clears pending score and resets flow and risk while
 preserving the banked day score. The HUD keeps score, flow, risk, remaining wave
 time, and the current state visible through labels, values, and glyphs rather
-than color alone.
+than color alone. A labelled BANK meter shows stable-line progress, while the
+current rider-local lip, tube, or hazard exposes its relevant Space or movement
+action in every color mode. The shack replaces live day/wave telemetry with
+session selection, persistent best score, and accessibility state.
 
 ## Ride Technique
 
@@ -92,8 +99,8 @@ than color alone.
 - Use `W`/`S` or Up/Down to climb high or drop low on the wave face.
 - At a high lip, press Space alone to launch an air. At a lower lip, Space
   snaps instead. While airborne, steer for rotations and press Space to grab.
-- Hold Space through tube sections to ride them. Stay high or move the line to
-  clear hazards.
+- Tap Space once in a tube section to commit through its exit. Stay high or
+  move the line to clear hazards.
 - Land level, then stay stable for 2.5 seconds to bank pending points.
 - Vary maneuvers. Repeating the immediately previous trick earns half base
   score and does not build FLOW.
@@ -105,21 +112,34 @@ keys and `WASD` provide the same directional input for menu navigation and
 riding: Up/Down climb or drop on the face, while Left/Right build line
 momentum. `Space` is the ride action and activates the selected menu item;
 at a high lip it launches without requiring a directional chord. Directional
-taps survive a key-up that arrives before the next fixed update. Held or
-repeated Space renews a bounded ride-action lease; explicit release clears it
-immediately.
+taps survive a key-up that arrives before the next fixed update. One Space tap
+commits a tube ride through its exit. Held or repeated Space renews a bounded
+ride-action lease for other actions; explicit release clears it immediately.
+Arrow and WASD aliases are tracked independently: releasing one
+alias does not cancel another held alias, and releasing the newer of two
+opposite directions restores the direction that remains held.
 `Enter` activates the selected menu item. `Escape` returns from a panel or
 pauses the session, `P` pauses or resumes, `?` opens Help, and `Q` or `Ctrl-C`
 requests quit. The in-game Help panel teaches riding technique during play.
 Select Accessibility from the main menu with Up/Down and Enter or Space; in
 the panel, Up/Down selects, Left/Right changes, and Escape returns.
 
+Pause is a keyboard menu with Resume, Help, Accessibility, End Session, and
+Quit. Use Up/Down and Enter or Space; `P` or Escape resumes directly. Help and
+Accessibility return to Pause when opened from Pause, so inspecting either
+panel never resumes authoritative time. Practice keeps an explicit
+`P/ESC PAUSE > END SESSION` cue on its HUD. Count-in states that ride controls
+start at GO rather than implying that inert pre-start steering changes the
+line.
+
 Surf-Man targets 80 by 24 cells and remains playable at 60 by 20 or larger. A
 smaller terminal, focus loss, or resize pause stops authoritative time without
-consuming a wave, score, or flow. The Accessibility panel provides wide timing,
-75-percent speed, landing assistance, high-contrast and no-color modes, and
-reduced motion. Reduced motion freezes decorative beach and wave-phase motion,
-suppresses cosmetic spray, and preserves all rule-state cues. Static and
+consuming a wave, score, or flow. Restoring the terminal preserves an existing
+Pause, including one behind Help or Accessibility. The Accessibility panel
+provides wide timing, 75-percent speed, landing assistance, high-contrast and
+no-color modes, and reduced motion. Reduced motion freezes decorative beach
+and wave-phase motion, suppresses cosmetic spray, and preserves all rule-state
+cues. Static and
 reduced-motion surfaces compose only after a rule-state, input, resize, or
 remaining-effect change.
 
