@@ -247,7 +247,7 @@ void aforc_input_internal_release_all(
     size_t index = 1u;
 
     for (index = 1u; index < AFORC_KEY_COUNT; ++index) {
-        if (input->keys[index].held && !input->keys[index].explicit_release) {
+        if (input->keys[index].held) {
             aforc_input_internal_emit_key_up(
                 input,
                 (AFORC_Key)index,

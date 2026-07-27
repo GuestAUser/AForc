@@ -59,6 +59,32 @@ static bool test_kitty_explicit_release_owns_key_lifetime(void)
     return passed;
 }
 
+static bool test_release_all_clears_explicit_release_key(void)
+{
+    static const unsigned char press[] = "\x1b[97;1:1u";
+    AFORC_Input *input = NULL;
+    AFORC_InputEvent event;
+    bool passed = false;
+
+    if (!create_input(&input, 8U, 10U)) {
+        return false;
+    }
+    if (aforc_input_feed(input, press, sizeof(press) - 1U, 100U) == AFORC_OK &&
+        aforc_input_next_event(input, &event) &&
+        event.type == AFORC_INPUT_EVENT_KEY_DOWN &&
+        event.data.key.key == AFORC_KEY_A && no_events(input) &&
+        aforc_input_key_held(input, AFORC_KEY_A)) {
+        aforc_input_release_all(input, 101U);
+        passed = aforc_input_next_event(input, &event) &&
+                 event.type == AFORC_INPUT_EVENT_KEY_UP &&
+                 event.data.key.key == AFORC_KEY_A && no_events(input) &&
+                 !aforc_input_key_held(input, AFORC_KEY_A) &&
+                 aforc_input_key_released(input, AFORC_KEY_A);
+    }
+    aforc_input_destroy(input);
+    return passed;
+}
+
 static bool test_unsupported_kitty_function_is_not_text(void)
 {
     static const unsigned char caps_lock[] = "\x1b[57358;1:1u";
@@ -196,25 +222,29 @@ int main(void)
         (void)fprintf(stderr, "Kitty explicit-release lifecycle failed\n");
         return 1;
     }
+    if (!test_release_all_clears_explicit_release_key()) {
+        (void)fprintf(stderr, "explicit-release release-all failed\n");
+        return 2;
+    }
     if (!test_unsupported_kitty_function_is_not_text()) {
         (void)fprintf(stderr, "Kitty functional-key filtering failed\n");
-        return 2;
+        return 3;
     }
     if (!test_incremental_utf8_and_paste_boundaries()) {
         (void)fprintf(stderr, "incremental parser boundary failed\n");
-        return 3;
+        return 4;
     }
     if (!test_legacy_alt_key_is_not_text()) {
         (void)fprintf(stderr, "legacy Alt text filtering failed\n");
-        return 4;
+        return 5;
     }
     if (!test_bounded_escape_forces_progress()) {
         (void)fprintf(stderr, "bounded escape progress failed\n");
-        return 5;
+        return 6;
     }
     if (!test_queue_overflow_preserves_state_and_order()) {
         (void)fprintf(stderr, "input queue overflow contract failed\n");
-        return 6;
+        return 7;
     }
     (void)puts("input protocol: ok");
     return 0;
