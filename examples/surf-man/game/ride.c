@@ -60,6 +60,7 @@ void surf_man_ride_reset(SurfManSimulation *simulation) {
     simulation->wave_ticks_remaining = simulation->rules.wave_ticks;
     simulation->segment_ticks_remaining = SURF_MAN_SEGMENT_TICKS;
     simulation->bank_ticks = 0U;
+    simulation->award_ticks = 0U;
     simulation->tube_ticks = 0U;
     simulation->air_half_turns = 0U;
     simulation->maneuver_count = 0U;
@@ -79,6 +80,7 @@ void surf_man_ride_reset(SurfManSimulation *simulation) {
     simulation->angular_velocity_q16 = 0;
     simulation->last_maneuver = SURF_MAN_MANEUVER_NONE;
     simulation->last_turn = 0;
+    simulation->carve_direction = 0;
     simulation->flow = 0U;
     simulation->airborne = false;
     simulation->grabbed = false;
@@ -96,6 +98,7 @@ static void surf_man_begin_wipeout(SurfManSimulation *simulation) {
     simulation->angle_q16 = 0;
     simulation->angular_velocity_q16 = 0;
     simulation->last_turn = 0;
+    simulation->carve_direction = 0;
 }
 
 static AFORC_Status surf_man_finish_tube(SurfManSimulation *simulation) {
@@ -131,6 +134,7 @@ static AFORC_Status surf_man_finish_wave(SurfManSimulation *simulation) {
             surf_man_neutral_wave_face_offset_q16(simulation);
         simulation->wave_face_velocity_q16 = 0;
         simulation->last_turn = 0;
+        simulation->carve_direction = 0;
     } else {
         simulation->phase = SURF_MAN_WAVE_RECAP;
     }
@@ -244,7 +248,6 @@ static AFORC_Status surf_man_ground_actions(SurfManSimulation *simulation,
     if (sample->tube && command->action && simulation->tube_ticks == 0U) {
         simulation->tube_ticks = 1U;
         simulation->risk_active = true;
-        simulation->last_maneuver = SURF_MAN_MANEUVER_TUBE;
     } else if (simulation->tube_ticks != 0U && sample->tube) {
         surf_man_tick_u32(&simulation->tube_ticks);
     }
@@ -303,30 +306,30 @@ static AFORC_Status surf_man_integrate_line(
         simulation->rules.line_acceleration_q16 / SURF_MAN_FIXED_HZ;
     const int32_t drag =
         simulation->rules.line_drag_q16 / SURF_MAN_FIXED_HZ;
+    const int32_t previous_velocity_q16 = simulation->line_velocity_q16;
+    int8_t steering_direction = command->horizontal;
     int32_t magnitude = surf_man_abs_q16(simulation->line_velocity_q16);
     AFORC_Status status = AFORC_OK;
 
     if (simulation->last_turn != 0 && magnitude < threshold / 2) {
         simulation->last_turn = 0;
     }
-    if (command->horizontal != 0 && simulation->last_turn != 0 &&
+    if (simulation->carve_direction == 0 && command->horizontal != 0 &&
+        simulation->last_turn != 0 &&
         command->horizontal != simulation->last_turn &&
         simulation->tube_ticks == 0U) {
-        status = surf_man_score_maneuver(
-            simulation,
-            surf_man_carve_maneuver(command->horizontal),
-            0U,
-            false);
-        simulation->last_turn = 0;
+        simulation->carve_direction = command->horizontal;
     }
-    if (status != AFORC_OK) {
-        return status;
+    if (simulation->carve_direction != 0) {
+        steering_direction = simulation->tube_ticks == 0U
+                                 ? simulation->carve_direction
+                                 : 0;
     }
 
-    if (command->horizontal != 0) {
+    if (steering_direction != 0) {
         simulation->line_velocity_q16 = surf_man_sim_clamp(
             (int64_t)simulation->line_velocity_q16 +
-                (int64_t)command->horizontal * acceleration,
+                (int64_t)steering_direction * acceleration,
             -simulation->rules.line_maximum_velocity_q16,
             simulation->rules.line_maximum_velocity_q16);
     } else {
@@ -347,12 +350,33 @@ static AFORC_Status surf_man_integrate_line(
         simulation->line_velocity_q16 = 0;
     }
 
+    if (simulation->carve_direction != 0 &&
+        simulation->tube_ticks == 0U &&
+        surf_man_sign_q16(previous_velocity_q16) !=
+            simulation->carve_direction &&
+        surf_man_sign_q16(simulation->line_velocity_q16) ==
+            simulation->carve_direction) {
+        const int8_t completed_direction = simulation->carve_direction;
+
+        simulation->carve_direction = 0;
+        simulation->last_turn = 0;
+        status = surf_man_score_maneuver(
+            simulation,
+            surf_man_carve_maneuver(completed_direction),
+            0U,
+            false);
+        if (status != AFORC_OK) {
+            return status;
+        }
+    }
+
     magnitude = surf_man_abs_q16(simulation->line_velocity_q16);
-    if (simulation->last_turn == 0 && command->horizontal != 0 &&
+    if (simulation->last_turn == 0 &&
+        simulation->carve_direction == 0 && steering_direction != 0 &&
         magnitude >= threshold &&
         surf_man_sign_q16(simulation->line_velocity_q16) ==
-            command->horizontal) {
-        simulation->last_turn = command->horizontal;
+            steering_direction) {
+        simulation->last_turn = steering_direction;
     }
     return AFORC_OK;
 }
@@ -404,6 +428,9 @@ static void surf_man_integrate_face(SurfManSimulation *simulation,
 
     acceleration += (int64_t)command->vertical * 2 * SURF_MAN_Q16_ONE;
     acceleration -= (int64_t)simulation->wave_face_velocity_q16 * 2;
+    if (sample->pocket) {
+        acceleration += SURF_MAN_Q16_ONE;
+    }
     if (sample->foam) {
         acceleration -= SURF_MAN_Q16_ONE;
     }

@@ -133,6 +133,10 @@ AFORC_Status surf_man_wave_sample(const SurfManSimulation *simulation,
     int32_t face_q16;
     int32_t slope_q16;
     int32_t accent_slope_q16;
+    bool pocket;
+    bool tube;
+    bool foam;
+    bool hazard;
     AFORC_Status status;
 
     if (simulation == NULL || out_sample == NULL) {
@@ -182,23 +186,27 @@ AFORC_Status surf_man_wave_sample(const SurfManSimulation *simulation,
             accent_slope_q16,
         -2 * SURF_MAN_Q16_ONE,
         2 * SURF_MAN_Q16_ONE);
+    tube = current.tube &&
+           fraction_q16 >= SURF_MAN_Q16_ONE / 8 &&
+           fraction_q16 <= (7 * SURF_MAN_Q16_ONE) / 8;
+    hazard = !tube && current.hazard &&
+             fraction_q16 >= (2 * SURF_MAN_Q16_ONE) / 5 &&
+             fraction_q16 <= (3 * SURF_MAN_Q16_ONE) / 5;
+    foam = !tube && !hazard && current.foam &&
+           fraction_q16 >= SURF_MAN_Q16_ONE / 2;
+    pocket = !tube && !hazard && !foam && current.pocket &&
+             fraction_q16 >= SURF_MAN_Q16_ONE / 4 &&
+             fraction_q16 <= (3 * SURF_MAN_Q16_ONE) / 4;
 
     *out_sample = (SurfManWaveSample){0};
     out_sample->face_q16 = face_q16;
     out_sample->slope_q16 = slope_q16;
     out_sample->push_q16 = current.push_q16;
-    out_sample->lip = current.lip && fraction_q16 >=
-                                          (3 * SURF_MAN_Q16_ONE) / 4;
-    out_sample->pocket = current.pocket &&
-                         fraction_q16 >= SURF_MAN_Q16_ONE / 4 &&
-                         fraction_q16 <= (3 * SURF_MAN_Q16_ONE) / 4;
-    out_sample->tube = current.tube &&
-                       fraction_q16 >= SURF_MAN_Q16_ONE / 8 &&
-                       fraction_q16 <= (7 * SURF_MAN_Q16_ONE) / 8;
-    out_sample->foam = current.foam &&
-                       fraction_q16 >= SURF_MAN_Q16_ONE / 2;
-    out_sample->hazard = current.hazard &&
-                         fraction_q16 >= (2 * SURF_MAN_Q16_ONE) / 5 &&
-                         fraction_q16 <= (3 * SURF_MAN_Q16_ONE) / 5;
+    out_sample->lip = current.lip && !tube && !hazard &&
+                      fraction_q16 >= (3 * SURF_MAN_Q16_ONE) / 4;
+    out_sample->pocket = pocket;
+    out_sample->tube = tube;
+    out_sample->foam = foam;
+    out_sample->hazard = hazard;
     return AFORC_OK;
 }
