@@ -5,13 +5,18 @@
 CC ?= cc
 AR ?= ar
 RANLIB ?= ranlib
+PKG_CONFIG ?= pkg-config
 
 PREFIX ?= /usr/local
+INSTALL_LIBDIR ?= lib
+INSTALL_INCLUDEDIR ?= include
+INSTALL_DATADIR ?= share
 BUILD_DIR ?= build/make
 MODE ?= release
 STRICT ?= 0
 SANITIZE ?= 0
 HARDEN ?= 1
+AFORC_VERSION := 0.1.0
 
 SOURCES := $(sort $(wildcard src/*/*.c))
 OBJECTS := $(patsubst src/%.c,$(BUILD_DIR)/obj/%.o,$(SOURCES))
@@ -111,6 +116,10 @@ ECS_SUBJECT_OBJECTS := $(BUILD_DIR)/obj/ecs/component.o $(BUILD_DIR)/obj/ecs/com
 ECS_SUBJECT_OBJECTS += $(BUILD_DIR)/obj/ecs/component_store.o $(BUILD_DIR)/obj/ecs/ecs.o
 ECS_SUBJECT_OBJECTS += $(BUILD_DIR)/obj/ecs/entity.o $(BUILD_DIR)/obj/ecs/view.o
 LIBRARY := $(BUILD_DIR)/lib/libaforc.a
+PKG_CONFIG_FILE := $(BUILD_DIR)/aforc.pc
+PACKAGE_TEST_ROOT ?= $(BUILD_DIR)/package-test
+PACKAGE_TEST_STAGE := $(abspath $(PACKAGE_TEST_ROOT)/stage)
+PACKAGE_TEST_CONSUMER_BUILD := $(abspath $(PACKAGE_TEST_ROOT)/consumer)
 ROGUELIKE := $(BUILD_DIR)/bin/aforc-roguelike
 SURF_MAN := $(BUILD_DIR)/bin/aforc-surf-man
 SCENE_TEST := $(BUILD_DIR)/bin/aforc-scene-reentrancy-test
@@ -142,7 +151,7 @@ AFORC_ROGUELIKE_CPPFLAGS := -Iexamples/roguelike/include
 AFORC_SURF_MAN_CPPFLAGS := -Iexamples/surf-man/include
 AFORC_CFLAGS := -std=c17 -Wall -Wextra -Wpedantic
 AFORC_CFLAGS += -Wconversion -Wshadow -Wstrict-prototypes -Wmissing-prototypes
-AFORC_LDLIBS := -lm -pthread
+AFORC_LDLIBS :=
 AFORC_LIBRARY_CPPFLAGS :=
 AFORC_LIBRARY_CFLAGS :=
 AFORC_PROGRAM_CFLAGS :=
@@ -195,7 +204,7 @@ endif
 
 .DEFAULT_GOAL := all
 
-.PHONY: all library example debug release strict sanitize smoke test run run-surf-man install clean help FORCE
+.PHONY: all library example debug release strict sanitize smoke test package-test run run-surf-man install clean help FORCE
 
 FORCE:
 
@@ -221,6 +230,17 @@ $(LIBRARY): $(OBJECTS)
 	@mkdir -p "$(@D)"
 	$(AR) rcs "$@" $(OBJECTS)
 	$(RANLIB) "$@"
+
+$(PKG_CONFIG_FILE): cmake/aforc.pc.in Makefile
+	@mkdir -p "$(@D)"
+	@pc_prefix_relative="$$(printf '%s\n' "$(INSTALL_LIBDIR)" | \
+		awk -F/ '{ relative=".."; for (part=1; part<=NF; ++part) relative="../" relative; print relative }')"; \
+	sed \
+		-e 's|@PROJECT_VERSION@|$(AFORC_VERSION)|g' \
+		-e 's|@CMAKE_INSTALL_LIBDIR@|$(INSTALL_LIBDIR)|g' \
+		-e 's|@CMAKE_INSTALL_INCLUDEDIR@|$(INSTALL_INCLUDEDIR)|g' \
+		-e "s|@AFORC_PC_PREFIX_RELATIVE@|$$pc_prefix_relative|g" \
+		"$<" > "$@"
 
 $(BUILD_DIR)/obj/%.o: src/%.c $(FLAGS_STAMP)
 	@mkdir -p "$(@D)"
@@ -361,16 +381,33 @@ test: smoke $(TEST_BINARIES)
 	"$(EFFECTS_TEST)"
 	"$(UI_TEST)"
 
+package-test: $(LIBRARY) $(PKG_CONFIG_FILE)
+	rm -rf "$(PACKAGE_TEST_ROOT)"
+	$(MAKE) BUILD_DIR="$(BUILD_DIR)" DESTDIR="$(PACKAGE_TEST_STAGE)" PREFIX="$(PREFIX)" INSTALL_LIBDIR="$(INSTALL_LIBDIR)" INSTALL_INCLUDEDIR="$(INSTALL_INCLUDEDIR)" INSTALL_DATADIR="$(INSTALL_DATADIR)" install
+	test -f "$(PACKAGE_TEST_STAGE)$(PREFIX)/$(INSTALL_LIBDIR)/libaforc.a"
+	test -f "$(PACKAGE_TEST_STAGE)$(PREFIX)/$(INSTALL_INCLUDEDIR)/aforc/aforc.h"
+	test -f "$(PACKAGE_TEST_STAGE)$(PREFIX)/$(INSTALL_LIBDIR)/pkgconfig/aforc.pc"
+	cmp -s LICENSE "$(PACKAGE_TEST_STAGE)$(PREFIX)/$(INSTALL_DATADIR)/licenses/aforc/LICENSE"
+	cmp -s THIRD_PARTY_NOTICES.md "$(PACKAGE_TEST_STAGE)$(PREFIX)/$(INSTALL_DATADIR)/licenses/aforc/THIRD_PARTY_NOTICES.md"
+	test "$$(PKG_CONFIG_PATH="$(PACKAGE_TEST_STAGE)$(PREFIX)/$(INSTALL_LIBDIR)/pkgconfig" $(PKG_CONFIG) --modversion aforc)" = "$(AFORC_VERSION)"
+	PKG_CONFIG_PATH="$(PACKAGE_TEST_STAGE)$(PREFIX)/$(INSTALL_LIBDIR)/pkgconfig" $(MAKE) -C tests/package_consumer BUILD_DIR="$(PACKAGE_TEST_CONSUMER_BUILD)" CC="$(CC)" PKG_CONFIG="$(PKG_CONFIG)" all test
+
 run: $(ROGUELIKE)
 	"$(ROGUELIKE)"
 
 run-surf-man: $(SURF_MAN)
 	"$(SURF_MAN)"
 
-install: $(LIBRARY)
-	install -d "$(DESTDIR)$(PREFIX)/lib" "$(DESTDIR)$(PREFIX)/include"
-	install -m 0644 "$(LIBRARY)" "$(DESTDIR)$(PREFIX)/lib/libaforc.a"
-	cp -R include/aforc "$(DESTDIR)$(PREFIX)/include/"
+install: $(LIBRARY) $(PKG_CONFIG_FILE)
+	install -d \
+		"$(DESTDIR)$(PREFIX)/$(INSTALL_LIBDIR)" \
+		"$(DESTDIR)$(PREFIX)/$(INSTALL_LIBDIR)/pkgconfig" \
+		"$(DESTDIR)$(PREFIX)/$(INSTALL_INCLUDEDIR)" \
+		"$(DESTDIR)$(PREFIX)/$(INSTALL_DATADIR)/licenses/aforc"
+	install -m 0644 "$(LIBRARY)" "$(DESTDIR)$(PREFIX)/$(INSTALL_LIBDIR)/libaforc.a"
+	cp -R include/aforc "$(DESTDIR)$(PREFIX)/$(INSTALL_INCLUDEDIR)/"
+	install -m 0644 "$(PKG_CONFIG_FILE)" "$(DESTDIR)$(PREFIX)/$(INSTALL_LIBDIR)/pkgconfig/aforc.pc"
+	install -m 0644 LICENSE THIRD_PARTY_NOTICES.md "$(DESTDIR)$(PREFIX)/$(INSTALL_DATADIR)/licenses/aforc/"
 
 clean:
 	rm -rf "$(BUILD_DIR)"
@@ -385,9 +422,10 @@ help:
 		'sanitize  Rebuild with ASan/UBSan, then test' \
 		'smoke     Run deterministic, non-interactive example smokes' \
 		'test      Run example CLI checks, smoke, and regression tests' \
+		'package-test Stage the Make install and run its pkg-config consumer' \
 		'run       Launch the playable terminal roguelike' \
 		'run-surf-man Launch the playable terminal Surf-Man example' \
-		'install   Install the static library and public headers' \
+		'install   Install the library, headers, metadata, and licenses' \
 		'HARDEN=0  Disable supported build hardening (default: 1)' \
 		'clean     Remove Make build artifacts'
 
