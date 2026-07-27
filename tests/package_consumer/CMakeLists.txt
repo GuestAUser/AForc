@@ -13,6 +13,7 @@ find_package(aforc ${AFORC_REQUIRED_VERSION} CONFIG REQUIRED)
 
 add_executable(aforc_package_consumer main.c)
 target_compile_features(aforc_package_consumer PRIVATE c_std_17)
+set_target_properties(aforc_package_consumer PROPERTIES C_EXTENSIONS OFF)
 target_link_libraries(aforc_package_consumer PRIVATE aforc::aforc)
 
 enable_testing()

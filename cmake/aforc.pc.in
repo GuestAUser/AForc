@@ -1,0 +1,10 @@
+prefix=${pcfiledir}/@AFORC_PC_PREFIX_RELATIVE@
+exec_prefix=${prefix}
+libdir=${prefix}/@CMAKE_INSTALL_LIBDIR@
+includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+
+Name: aforc
+Description: An ASCII C game engine for 2D planes
+Version: @PROJECT_VERSION@
+Libs: -L${libdir} -laforc
+Cflags: -I${includedir}

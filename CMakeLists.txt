@@ -11,7 +11,6 @@ project(
     LANGUAGES C
 )
 
-include(CTest)
 include(CheckCCompilerFlag)
 include(CheckCSourceCompiles)
 include(CheckPIESupported)
@@ -19,10 +18,25 @@ include(CMakePushCheckState)
 include(CMakePackageConfigHelpers)
 include(GNUInstallDirs)
 
-option(AFORC_BUILD_EXAMPLES "Build AForc example programs" ON)
+if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+    set(AFORC_IS_TOP_LEVEL ON)
+else()
+    set(AFORC_IS_TOP_LEVEL OFF)
+endif()
+
+option(
+    AFORC_BUILD_EXAMPLES
+    "Build AForc example programs"
+    "${AFORC_IS_TOP_LEVEL}"
+)
+option(
+    AFORC_BUILD_TESTS
+    "Build AForc regression tests"
+    "${AFORC_IS_TOP_LEVEL}"
+)
 option(AFORC_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(AFORC_ENABLE_SANITIZERS "Enable address and undefined-behavior sanitizers" OFF)
-if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+if(AFORC_IS_TOP_LEVEL)
     set(AFORC_HARDENING_DEFAULT ON)
 else()
     set(AFORC_HARDENING_DEFAULT OFF)
@@ -33,6 +47,17 @@ option(
     "${AFORC_HARDENING_DEFAULT}"
 )
 unset(AFORC_HARDENING_DEFAULT)
+
+if(AFORC_IS_TOP_LEVEL)
+    include(CTest)
+    if(BUILD_TESTING)
+        set(AFORC_TESTS_ACTIVE "${AFORC_BUILD_TESTS}")
+    else()
+        set(AFORC_TESTS_ACTIVE OFF)
+    endif()
+else()
+    set(AFORC_TESTS_ACTIVE "${AFORC_BUILD_TESTS}")
+endif()
 
 if(NOT UNIX)
     message(FATAL_ERROR "AForc currently requires a POSIX terminal backend")
@@ -231,11 +256,18 @@ add_library(aforc
 add_library(aforc::aforc ALIAS aforc)
 
 target_compile_features(aforc PUBLIC c_std_17)
+if(PROJECT_VERSION_MAJOR EQUAL 0)
+    set(AFORC_ABI_VERSION
+        "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
+    )
+else()
+    set(AFORC_ABI_VERSION "${PROJECT_VERSION_MAJOR}")
+endif()
 set_target_properties(aforc PROPERTIES
     C_EXTENSIONS OFF
     POSITION_INDEPENDENT_CODE ON
     VERSION "${PROJECT_VERSION}"
-    SOVERSION "${PROJECT_VERSION_MAJOR}"
+    SOVERSION "${AFORC_ABI_VERSION}"
 )
 if(AFORC_HARDENING_ACTIVE AND BUILD_SHARED_LIBS)
     set_target_properties(aforc PROPERTIES
@@ -249,9 +281,6 @@ target_include_directories(aforc
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
-
-find_package(Threads REQUIRED)
-target_link_libraries(aforc PUBLIC Threads::Threads m)
 
 if(BUILD_SHARED_LIBS)
     target_compile_definitions(aforc
@@ -294,7 +323,7 @@ if(AFORC_BUILD_EXAMPLES)
     aforc_configure_owned_target(aforc_roguelike)
     target_link_libraries(aforc_roguelike PRIVATE aforc::aforc)
 
-    if(BUILD_TESTING)
+    if(AFORC_TESTS_ACTIVE)
         add_test(NAME roguelike_smoke COMMAND aforc_roguelike --smoke)
         set_tests_properties(roguelike_smoke PROPERTIES TIMEOUT 15)
         add_test(
@@ -356,7 +385,7 @@ if(AFORC_BUILD_EXAMPLES)
     aforc_configure_owned_target(aforc_surf_man)
     target_link_libraries(aforc_surf_man PRIVATE aforc::aforc)
 
-    if(BUILD_TESTING)
+    if(AFORC_TESTS_ACTIVE)
         add_test(NAME surf_man_help COMMAND aforc_surf_man --help)
         set_tests_properties(surf_man_help PROPERTIES TIMEOUT 15)
         add_test(NAME surf_man_smoke COMMAND aforc_surf_man --smoke)
@@ -380,7 +409,7 @@ if(AFORC_BUILD_EXAMPLES)
     endif()
 endif()
 
-if(BUILD_TESTING)
+if(AFORC_TESTS_ACTIVE)
     function(aforc_register_regression target test_name)
         aforc_configure_owned_target(${target})
         add_test(NAME ${test_name} COMMAND ${target})
@@ -468,10 +497,6 @@ if(BUILD_TESTING)
     target_include_directories(aforc_config_parser_scale_test PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
-    target_link_libraries(aforc_config_parser_scale_test PRIVATE
-        Threads::Threads
-        m
-    )
     aforc_register_regression(
         aforc_config_parser_scale_test
         config_parser_scale
@@ -526,10 +551,6 @@ if(BUILD_TESTING)
     target_include_directories(aforc_ecs_optimization_test PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
-    target_link_libraries(aforc_ecs_optimization_test PRIVATE
-        Threads::Threads
-        m
-    )
     aforc_register_regression(aforc_ecs_optimization_test ecs_optimization)
 endif()
 
@@ -557,6 +578,15 @@ configure_package_config_file(
     "${CMAKE_CURRENT_BINARY_DIR}/aforcConfig.cmake"
     INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/aforc"
 )
+file(RELATIVE_PATH AFORC_PC_PREFIX_RELATIVE
+    "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/pkgconfig"
+    "${CMAKE_INSTALL_PREFIX}"
+)
+configure_file(
+    cmake/aforc.pc.in
+    "${CMAKE_CURRENT_BINARY_DIR}/aforc.pc"
+    @ONLY
+)
 write_basic_package_version_file(
     "${CMAKE_CURRENT_BINARY_DIR}/aforcConfigVersion.cmake"
     VERSION "${PROJECT_VERSION}"
@@ -567,4 +597,12 @@ install(
         "${CMAKE_CURRENT_BINARY_DIR}/aforcConfig.cmake"
         "${CMAKE_CURRENT_BINARY_DIR}/aforcConfigVersion.cmake"
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/aforc"
+)
+install(
+    FILES "${CMAKE_CURRENT_BINARY_DIR}/aforc.pc"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig"
+)
+install(
+    FILES LICENSE THIRD_PARTY_NOTICES.md
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/licenses/aforc"
 )
