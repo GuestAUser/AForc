@@ -4,14 +4,19 @@
  * SPDX-License-Identifier: MIT
  */
 
+#define _POSIX_C_SOURCE 200809L
+
 #include "renderer_diff_cases.h"
 #include "renderer_diff_model.h"
 
+#include "../src/platform/terminal_internal.h"
 #include "../src/render/renderer_internal.h"
 
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 enum {
     RENDERER_DIFF_WIDTH = 80,
@@ -253,6 +258,86 @@ static bool non_ascii_repositions_following_cell(void)
     return passed;
 }
 
+static bool empty_present_skips_front_copy(void)
+{
+    AFORC_RendererConfig config = aforc_renderer_config_default();
+    AFORC_Renderer *renderer = NULL;
+    AFORC_Terminal terminal = {0};
+    bool passed;
+
+    config.size = (AFORC_Size){8, 2};
+    if (aforc_renderer_create(&renderer, &config) != AFORC_OK) {
+        return false;
+    }
+    renderer->invalidated = false;
+    renderer->back[0].foreground.red = UINT8_C(0x5a);
+    terminal.active = true;
+    terminal.size = config.size;
+
+    passed = aforc_renderer_present(renderer, &terminal) == AFORC_OK &&
+             renderer->batch_size == 0U &&
+             renderer->front[0].foreground.red == 0U &&
+             renderer->back[0].foreground.red == UINT8_C(0x5a) &&
+             !renderer->invalidated;
+    aforc_renderer_destroy(renderer);
+    return passed;
+}
+
+int renderer_diff_run_benchmark(void)
+{
+    enum {
+        BENCHMARK_ITERATIONS = 2000
+    };
+    AFORC_RendererConfig config = aforc_renderer_config_default();
+    AFORC_Renderer *renderer = NULL;
+    AFORC_Terminal terminal = {0};
+    struct timespec started;
+    struct timespec finished;
+    uint64_t elapsed_ns;
+    int result = 1;
+
+    config.size = (AFORC_Size){320, 120};
+    if (aforc_renderer_create(&renderer, &config) != AFORC_OK) {
+        return result;
+    }
+    renderer->invalidated = false;
+    terminal.active = true;
+    terminal.size = config.size;
+    if (clock_gettime(CLOCK_MONOTONIC, &started) != 0) {
+        goto cleanup;
+    }
+    for (size_t iteration = 0U;
+         iteration < (size_t)BENCHMARK_ITERATIONS;
+         ++iteration) {
+        if (aforc_renderer_present(renderer, &terminal) != AFORC_OK ||
+            renderer->batch_size != 0U) {
+            goto cleanup;
+        }
+    }
+    if (clock_gettime(CLOCK_MONOTONIC, &finished) != 0) {
+        goto cleanup;
+    }
+    elapsed_ns = (uint64_t)(finished.tv_sec - started.tv_sec) *
+                 UINT64_C(1000000000);
+    if (finished.tv_nsec >= started.tv_nsec) {
+        elapsed_ns += (uint64_t)(finished.tv_nsec - started.tv_nsec);
+    } else {
+        elapsed_ns -= (uint64_t)(started.tv_nsec - finished.tv_nsec);
+    }
+    (void)printf("renderer empty-present benchmark: iterations=%d "
+                 "cells=%d elapsed_ns=%" PRIu64 " ns_per_present=%" PRIu64
+                 "\n",
+                 BENCHMARK_ITERATIONS,
+                 config.size.width * config.size.height,
+                 elapsed_ns,
+                 elapsed_ns / (uint64_t)BENCHMARK_ITERATIONS);
+    result = 0;
+
+cleanup:
+    aforc_renderer_destroy(renderer);
+    return result;
+}
+
 int renderer_diff_run_cases(void)
 {
     int result = 0;
@@ -280,6 +365,10 @@ int renderer_diff_run_cases(void)
     if (!non_ascii_repositions_following_cell()) {
         (void)fprintf(stderr, "renderer Unicode cursor recovery failed\n");
         result = 6;
+    }
+    if (!empty_present_skips_front_copy()) {
+        (void)fprintf(stderr, "empty renderer diff copied the front buffer\n");
+        result = 7;
     }
     return result;
 }

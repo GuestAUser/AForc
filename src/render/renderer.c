@@ -181,6 +181,9 @@ AFORC_Status aforc_renderer_present(AFORC_Renderer *renderer,
     if (status != AFORC_OK) {
         return status;
     }
+    if (renderer->batch_size == 0u && !renderer->invalidated) {
+        return AFORC_OK;
+    }
     /* Front advances only after the whole batch is written; any failure keeps
      * the previous frame intact so the same diff remains retryable. */
     status = aforc_renderer_cell_count(renderer->size, &count);
