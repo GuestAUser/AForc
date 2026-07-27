@@ -127,12 +127,17 @@ copying individual signed artworks.
   to the corresponding simulation event. No effect obscures the rider, board,
   pocket, or hazard cue.
 - **Meter:** labelled progress row with filled and empty glyphs. Labels and
-  numeric values remain present in no-color mode.
+  numeric values remain present in no-color mode. Surf-Man's BANK meter always
+  uses both `=`/`-` fill and a percentage; color may reinforce but never replace
+  its progress.
 - **Menu row:** one text action per row. Selection uses both a leading marker
   and bold style; disabled state uses a reason label rather than dimming alone.
+  Pause uses the same primitive for Resume, Help, Accessibility, End Session,
+  and Quit.
 - **Modal panel:** centered bordered region for help, pause, accessibility,
   recap, and resize requirements. It must preserve the underlying context when
-  that context remains relevant.
+  that context remains relevant. Help and Accessibility opened from Pause
+  return to Pause instead of implicitly resuming authoritative time.
 
 ### Surf-Man Changed And Retained Contract
 
@@ -148,6 +153,11 @@ identity:
 - Space is a bounded action command. At a high lip it launches an air without a
   directional chord; at a lower lip it snaps. Repeats can renew the bounded
   action, while explicit key release clears it.
+- Arrow and WASD aliases are independent held sources. Releasing one alias
+  cannot cancel another held alias; when opposite directions are held, the
+  latest non-repeat press wins and its release restores the remaining source.
+- Count-in copy states that ride controls start at GO. It never instructs the
+  player to set a line while directional commands are inert.
 - The anchored wave field remains readable while the rider, board, wake, and
   spray move through adjacent cells from authoritative line, face, and air
   state.
@@ -170,6 +180,10 @@ focus or undersize pauses that do not consume gameplay time.
 - Motion must explain speed, wave phase, score banking, landing, wipeout, or
   scene transition. No blinking, idle scanlines, random shimmer, or perpetual
   motion without gameplay meaning.
+- The riding HUD samples the rider-local wave and names the immediate lip,
+  tube, or hazard action. It exposes labelled BANK fill and percentage in every
+  color mode. Practice names the Pause > End Session path; Shack replaces live
+  day, wave, and timer telemetry with menu, best-score, and settings state.
 - Wave layers advance at different deterministic rates derived from active
   visual time and board speed. The field remains anchored while rider and board
   position, pose, wake, and spray follow rider-local wave samples, bounded line
