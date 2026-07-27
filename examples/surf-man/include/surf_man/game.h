@@ -27,6 +27,7 @@ enum {
     SURF_MAN_HAZARD_CAPACITY = 64,
     SURF_MAN_MESSAGE_CAPACITY = 160,
     SURF_MAN_AWARD_CAPACITY = 128,
+    SURF_MAN_AWARD_TICKS = 2 * SURF_MAN_FIXED_HZ,
     SURF_MAN_COMMAND_LEASE_TICKS = 8,
     SURF_MAN_FLOW_MAX = 5,
     SURF_MAN_Q16_SHIFT = 16
@@ -140,6 +141,7 @@ typedef struct SurfManSimulation {
     uint32_t wave_ticks_remaining;
     uint32_t segment_ticks_remaining;
     uint32_t bank_ticks;
+    uint32_t award_ticks;
     uint32_t tube_ticks;
     uint32_t air_half_turns;
     uint32_t maneuver_count;
@@ -159,6 +161,7 @@ typedef struct SurfManSimulation {
     SurfManWaveKind wave_kind;
     SurfManManeuver last_maneuver;
     int8_t last_turn;
+    int8_t carve_direction;
     uint8_t flow;
     bool practice;
     bool airborne;
@@ -177,6 +180,7 @@ AFORC_Status surf_man_simulation_init(SurfManSimulation *simulation,
 AFORC_Status surf_man_simulation_start_day(SurfManSimulation *simulation,
                                            bool practice);
 AFORC_Status surf_man_simulation_start_wave(SurfManSimulation *simulation);
+AFORC_Status surf_man_simulation_end_session(SurfManSimulation *simulation);
 void surf_man_ride_reset(SurfManSimulation *simulation);
 AFORC_Status surf_man_ride_step(SurfManSimulation *simulation,
                                 const SurfManCommand *command);

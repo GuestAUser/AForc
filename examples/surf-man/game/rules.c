@@ -127,6 +127,7 @@ uint64_t surf_man_simulation_hash(const SurfManSimulation *simulation) {
     surf_man_hash_u32(&hash, simulation->wave_ticks_remaining);
     surf_man_hash_u32(&hash, simulation->segment_ticks_remaining);
     surf_man_hash_u32(&hash, simulation->bank_ticks);
+    surf_man_hash_u32(&hash, simulation->award_ticks);
     surf_man_hash_u32(&hash, simulation->tube_ticks);
     surf_man_hash_u32(&hash, simulation->air_half_turns);
     surf_man_hash_u32(&hash, simulation->maneuver_count);
@@ -146,6 +147,7 @@ uint64_t surf_man_simulation_hash(const SurfManSimulation *simulation) {
     surf_man_hash_u32(&hash, (uint32_t)simulation->wave_kind);
     surf_man_hash_u32(&hash, (uint32_t)simulation->last_maneuver);
     surf_man_hash_u32(&hash, (uint8_t)simulation->last_turn);
+    surf_man_hash_u32(&hash, (uint8_t)simulation->carve_direction);
     surf_man_hash_u32(&hash, simulation->flow);
     surf_man_hash_u32(&hash, simulation->practice ? 1U : 0U);
     surf_man_hash_u32(&hash, simulation->airborne ? 1U : 0U);
