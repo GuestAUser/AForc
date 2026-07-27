@@ -32,6 +32,11 @@ jobs:
         run: >-
           make BUILD_DIR="build/ci-${{ matrix.compiler }}"
           MODE=debug STRICT=1 all test
+      - name: Stage Make package and test pkg-config consumer
+        run: >-
+          make BUILD_DIR="build/ci-${{ matrix.compiler }}"
+          PACKAGE_TEST_ROOT="build/ci-package-${{ matrix.compiler }}"
+          MODE=debug STRICT=1 package-test
 
   sanitizers:
     name: ASan and UBSan
@@ -58,34 +63,46 @@ jobs:
             compiler: gcc
             linkage: static
             shared: "OFF"
+            install_libdir: lib/x86_64-linux-gnu
           - os: ubuntu-latest
             compiler: gcc
             linkage: shared
             shared: "ON"
+            install_libdir: lib
           - os: ubuntu-latest
             compiler: clang
             linkage: static
             shared: "OFF"
+            install_libdir: lib
           - os: ubuntu-latest
             compiler: clang
             linkage: shared
             shared: "ON"
+            install_libdir: lib
           - os: macos-latest
             compiler: clang
             linkage: static
             shared: "OFF"
+            install_libdir: lib
           - os: macos-latest
             compiler: clang
             linkage: shared
             shared: "ON"
+            install_libdir: lib
     env:
       CC: ${{ matrix.compiler }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Verify subproject defaults
+        run: >-
+          cmake -S tests/package_consumer/subproject
+          -B "build/ci-subproject-${{ matrix.compiler }}-${{ matrix.linkage }}"
+          -DAFORC_SOURCE_DIR="${{ github.workspace }}"
       - name: Configure
         run: >-
           cmake -S . -B "build/ci-cmake-${{ matrix.compiler }}-${{ matrix.linkage }}"
           -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_INSTALL_LIBDIR=${{ matrix.install_libdir }}
           -DBUILD_SHARED_LIBS=${{ matrix.shared }}
           -DAFORC_WARNINGS_AS_ERRORS=ON
       - name: Build
@@ -104,12 +121,19 @@ jobs:
           "build/ci-cmake-${{ matrix.compiler }}-${{ matrix.linkage }}"
           --prefix
           "${{ github.workspace }}/build/ci-install-${{ matrix.compiler }}-${{ matrix.linkage }}"
+      - name: Validate installed manifest
+        run: >-
+          cmake
+          -DAFORC_INSTALL_PREFIX="${{ github.workspace }}/build/ci-install-${{ matrix.compiler }}-${{ matrix.linkage }}"
+          -DAFORC_INSTALL_LIBDIR=${{ matrix.install_libdir }}
+          -P tests/package_consumer/check_install.cmake
       - name: Configure installed-package consumer
         run: >-
           cmake -S tests/package_consumer
           -B "build/ci-consumer-${{ matrix.compiler }}-${{ matrix.linkage }}"
           -DCMAKE_BUILD_TYPE=Release
           -DCMAKE_PREFIX_PATH="${{ github.workspace }}/build/ci-install-${{ matrix.compiler }}-${{ matrix.linkage }}"
+          -Daforc_DIR="${{ github.workspace }}/build/ci-install-${{ matrix.compiler }}-${{ matrix.linkage }}/${{ matrix.install_libdir }}/cmake/aforc"
       - name: Build installed-package consumer
         run: >-
           cmake --build
@@ -125,6 +149,7 @@ jobs:
           if cmake -S tests/package_consumer \
             -B "build/ci-consumer-incompatible-${{ matrix.compiler }}-${{ matrix.linkage }}" \
             -DCMAKE_PREFIX_PATH="${{ github.workspace }}/build/ci-install-${{ matrix.compiler }}-${{ matrix.linkage }}" \
+            -Daforc_DIR="${{ github.workspace }}/build/ci-install-${{ matrix.compiler }}-${{ matrix.linkage }}/${{ matrix.install_libdir }}/cmake/aforc" \
             -DAFORC_REQUIRED_VERSION=0.0; then
             printf '%s\n' 'AForc 0.1 must not satisfy a 0.0 requirement.' >&2
             exit 1
