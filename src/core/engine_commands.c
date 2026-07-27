@@ -68,6 +68,7 @@ AFORC_Status aforc_engine_apply_scene_commands(AFORC_Engine *engine,
     size_t processed = 0U;
 
     while (processed < engine->command_count) {
+        const size_t command_count_before_apply = engine->command_count;
         const AFORC_EngineSceneCommand command = engine->commands[processed++];
         AFORC_Status status;
 
@@ -88,15 +89,14 @@ AFORC_Status aforc_engine_apply_scene_commands(AFORC_Engine *engine,
                                          error);
         }
         if (status != AFORC_OK) {
-            /* Failed and completed commands leave the queue; later requests
-             * retain their original order for the next safe boundary. */
-            if (processed < engine->command_count) {
+            const size_t retained_count = command_count_before_apply - processed;
+
+            if (retained_count != 0U) {
                 (void)memmove(engine->commands,
                               &engine->commands[processed],
-                              (engine->command_count - processed) *
-                                  sizeof(*engine->commands));
+                              retained_count * sizeof(*engine->commands));
             }
-            engine->command_count -= processed;
+            engine->command_count = retained_count;
             return status;
         }
     }

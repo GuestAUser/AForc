@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "aforc/scene.h"
+#include "aforc/engine.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -14,6 +14,43 @@ typedef struct MutationAttempt {
     AFORC_Status status;
     bool attempted;
 } MutationAttempt;
+typedef struct EnterRecord {
+    size_t *count;
+    int *order;
+    int identifier;
+} EnterRecord;
+typedef struct RejectingEnter {
+    AFORC_Scene *queued_scene;
+    AFORC_Status queue_status;
+} RejectingEnter;
+
+static AFORC_Status record_enter(AFORC_Scene *scene,
+                                 AFORC_Engine *engine,
+                                 AFORC_Error *error)
+{
+    EnterRecord *record = (EnterRecord *)scene->user_data;
+
+    (void)engine;
+    (void)error;
+    record->order[(*record->count)++] = record->identifier;
+    return AFORC_OK;
+}
+
+static AFORC_Status queue_then_reject_enter(AFORC_Scene *scene,
+                                             AFORC_Engine *engine,
+                                             AFORC_Error *error)
+{
+    RejectingEnter *rejecting = (RejectingEnter *)scene->user_data;
+
+    rejecting->queue_status = aforc_engine_request_push(
+        engine,
+        rejecting->queued_scene,
+        error
+    );
+    return rejecting->queue_status == AFORC_OK ? AFORC_ERROR_STATE
+                                                : rejecting->queue_status;
+}
+
 static AFORC_Status attempt_pop_on_enter(AFORC_Scene *scene,
                                          AFORC_Engine *engine,
                                          AFORC_Error *error)
@@ -222,6 +259,77 @@ static bool test_dispose_rejects_pop_from_leave(void)
            stack.items == NULL && stack.count == 0u;
 }
 
+static bool test_failed_enter_discards_new_commands_and_preserves_pending_order(void)
+{
+    static const AFORC_SceneVTable empty_vtable = {0};
+    static const AFORC_SceneVTable record_vtable = {
+        .enter = record_enter,
+    };
+    static const AFORC_SceneVTable rejected_vtable = {
+        .enter = queue_then_reject_enter,
+    };
+    int order[3] = {0, 0, 0};
+    size_t count = 0U;
+    EnterRecord first_record = {&count, order, 1};
+    EnterRecord second_record = {&count, order, 2};
+    EnterRecord leaked_record = {&count, order, 3};
+    AFORC_Scene base = {.vtable = &empty_vtable};
+    AFORC_Scene first = {
+        .vtable = &record_vtable,
+        .user_data = &first_record,
+    };
+    AFORC_Scene second = {
+        .vtable = &record_vtable,
+        .user_data = &second_record,
+    };
+    AFORC_Scene leaked = {
+        .vtable = &record_vtable,
+        .user_data = &leaked_record,
+    };
+    RejectingEnter rejecting = {&leaked, AFORC_OK};
+    AFORC_Scene rejected = {
+        .vtable = &rejected_vtable,
+        .user_data = &rejecting,
+    };
+    AFORC_EngineConfig config = aforc_engine_config_default();
+    AFORC_Engine *engine = NULL;
+    AFORC_Error error;
+    AFORC_Status status;
+    bool passed = false;
+
+    config.quit_when_scene_stack_empty = false;
+    config.target_frames_per_second = 0U;
+    config.scene_capacity = 4U;
+    config.scene_command_capacity = 4U;
+    status = aforc_engine_create(&config, &engine, &error);
+    if (status == AFORC_OK) {
+        status = aforc_engine_request_push(engine, &base, &error);
+    }
+    if (status == AFORC_OK) {
+        status = aforc_engine_frame(engine, 0U, &error);
+    }
+    if (status == AFORC_OK) {
+        status = aforc_engine_request_push(engine, &rejected, &error);
+    }
+    if (status == AFORC_OK) {
+        status = aforc_engine_request_push(engine, &first, &error);
+    }
+    if (status == AFORC_OK) {
+        status = aforc_engine_request_push(engine, &second, &error);
+    }
+    if (status == AFORC_OK) {
+        status = aforc_engine_frame(engine, 1U, &error);
+    }
+    if (status == AFORC_ERROR_STATE && rejecting.queue_status == AFORC_OK &&
+        aforc_engine_scene(engine) == &base && count == 0U) {
+        status = aforc_engine_frame(engine, 2U, &error);
+        passed = status == AFORC_OK && count == 2U && order[0] == 1 &&
+                 order[1] == 2 && aforc_engine_scene(engine) == &second;
+    }
+    aforc_engine_destroy(engine);
+    return passed;
+}
+
 int main(void)
 {
     if (!test_replace_rejects_pop_from_enter()) {
@@ -243,6 +351,10 @@ int main(void)
     if (!test_dispose_rejects_pop_from_leave()) {
         (void)fprintf(stderr, "dispose leave reentrancy guard failed\n");
         return 5;
+    }
+    if (!test_failed_enter_discards_new_commands_and_preserves_pending_order()) {
+        (void)fprintf(stderr, "failed-enter command rollback failed\n");
+        return 6;
     }
     (void)puts("scene reentrancy: ok");
     return 0;
