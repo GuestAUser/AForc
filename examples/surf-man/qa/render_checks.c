@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "surf_man_internal.h"
+#include "surf_man/app.h"
+#include "surf_man/qa.h"
 
 #include "../presentation/presentation_internal.h"
 
@@ -615,11 +616,220 @@ static AFORC_Status surf_man_qa_shack_cells(SurfManApp *app,
             AFORC_ERROR_STATE,
             "shack art or menu cells differed from the 80x24 composition");
     }
+    if (!surf_man_qa_find_text(app->renderer, "SHACK MENU", NULL) ||
+        !surf_man_qa_find_text(app->renderer, "BEST SCORE", NULL) ||
+        surf_man_qa_find_text(app->renderer, "DAY 9  WAVE 3/3", NULL) ||
+        surf_man_qa_find_text(app->renderer, "TIME 01s", NULL)) {
+        return surf_man_qa_render_error(
+            error,
+            AFORC_ERROR_STATE,
+            "shack HUD retained stale day, wave, or timer telemetry");
+    }
     if (!surf_man_qa_tokens_are_valid(app->renderer)) {
         return surf_man_qa_render_error(
             error,
             AFORC_ERROR_STATE,
             "shack used non-ASCII, blinking, or out-of-contract color cells");
+    }
+    return AFORC_OK;
+}
+
+static AFORC_Status surf_man_qa_pause_actions(SurfManApp *app,
+                                               AFORC_Error *error) {
+    const SurfManSimulation saved_simulation = app->simulation;
+    const SurfManOverlay saved_overlay = app->overlay;
+    AFORC_Status status;
+
+    app->simulation.phase = SURF_MAN_PRACTICE;
+    app->overlay = SURF_MAN_OVERLAY_PAUSE;
+    surf_man_visuals_mark_dirty(&app->visuals);
+    status = surf_man_render_frame(app, 0.0, error);
+    if (status == AFORC_OK &&
+        (!surf_man_qa_find_text(app->renderer, "RESUME", NULL) ||
+         !surf_man_qa_find_text(app->renderer, "HELP", NULL) ||
+         !surf_man_qa_find_text(app->renderer, "ACCESSIBILITY", NULL) ||
+         !surf_man_qa_find_text(app->renderer, "END SESSION", NULL) ||
+         !surf_man_qa_find_text(app->renderer, "QUIT", NULL) ||
+         !surf_man_qa_find_text(
+              app->renderer, "UP/DOWN SELECT  ENTER ACT", NULL))) {
+        status = AFORC_ERROR_STATE;
+    }
+    if (status == AFORC_OK) {
+        app->overlay = SURF_MAN_OVERLAY_HELP;
+        surf_man_visuals_mark_dirty(&app->visuals);
+        status = surf_man_render_frame(app, 0.0, error);
+    }
+    if (status == AFORC_OK &&
+        !surf_man_qa_find_text(
+            app->renderer, "ESC/ENTER/?/P BACK", NULL)) {
+        status = AFORC_ERROR_STATE;
+    }
+
+    app->simulation = saved_simulation;
+    app->overlay = saved_overlay;
+    if (status != AFORC_OK) {
+        return surf_man_qa_render_error(
+            error,
+            status,
+            "pause or help panel omitted its keyboard controls");
+    }
+    return AFORC_OK;
+}
+
+typedef enum SurfManQACue {
+    SURF_MAN_QA_CUE_LIP = 0,
+    SURF_MAN_QA_CUE_TUBE,
+    SURF_MAN_QA_CUE_HAZARD
+} SurfManQACue;
+
+static bool surf_man_qa_sample_has_cue(const SurfManWaveSample *sample,
+                                       SurfManQACue cue) {
+    switch (cue) {
+    case SURF_MAN_QA_CUE_LIP:
+        return sample->lip && !sample->tube && !sample->hazard;
+    case SURF_MAN_QA_CUE_TUBE:
+        return sample->tube && !sample->hazard;
+    case SURF_MAN_QA_CUE_HAZARD:
+        return sample->hazard;
+    }
+    return false;
+}
+
+static AFORC_Status surf_man_qa_seek_cue(SurfManSimulation *simulation,
+                                          SurfManQACue cue) {
+    enum { SURF_MAN_QA_CUE_SEARCH_STEPS = 4096 };
+    const int32_t step_q16 = SURF_MAN_Q16_ONE / 4;
+
+    for (int kind = (int)SURF_MAN_WAVE_OPEN;
+         kind <= (int)SURF_MAN_WAVE_CLOSEOUT;
+         ++kind) {
+        simulation->wave_kind = (SurfManWaveKind)kind;
+        for (uint32_t step = 0U; step < SURF_MAN_QA_CUE_SEARCH_STEPS; ++step) {
+            SurfManWaveSample sample;
+            AFORC_Status status;
+
+            simulation->distance_q16 = (int32_t)step * step_q16;
+            status = surf_man_wave_sample(
+                simulation, simulation->line_position_q16, &sample);
+            if (status != AFORC_OK) {
+                return status;
+            }
+            if (surf_man_qa_sample_has_cue(&sample, cue)) {
+                return AFORC_OK;
+            }
+        }
+    }
+    return AFORC_ERROR_NOT_FOUND;
+}
+
+static AFORC_Status surf_man_qa_context_and_bank(SurfManApp *app,
+                                                  AFORC_Error *error) {
+    static const struct {
+        SurfManQACue cue;
+        const char *text;
+    } cues[] = {
+        {SURF_MAN_QA_CUE_LIP, "LIP: SPACE LAUNCH"},
+        {SURF_MAN_QA_CUE_TUBE, "TUBE: TAP SPACE TO COMMIT"},
+        {SURF_MAN_QA_CUE_HAZARD, "HAZARD: CLIMB OR CHANGE LINE"},
+    };
+    static const SurfManColorMode modes[] = {
+        SURF_MAN_COLOR_STANDARD,
+        SURF_MAN_COLOR_HIGH_CONTRAST,
+        SURF_MAN_COLOR_NONE,
+    };
+    const SurfManSimulation saved_simulation = app->simulation;
+    const SurfManSettings saved_settings = app->settings;
+    AFORC_Status status = AFORC_OK;
+
+    app->simulation.phase = SURF_MAN_RIDING;
+    app->simulation.line_position_q16 = 0;
+    app->simulation.wave_face_offset_q16 =
+        app->simulation.rules.air_face_threshold_q16;
+    app->simulation.pending_score = 500U;
+    app->simulation.bank_ticks = app->simulation.rules.bank_delay_ticks;
+    app->simulation.award[0] = '\0';
+    surf_man_visuals_mark_dirty(&app->visuals);
+    status = surf_man_render_frame(app, 0.0, error);
+    if (status == AFORC_OK &&
+        !surf_man_qa_find_text(app->renderer, "BANK [-----] 0%", NULL)) {
+        status = AFORC_ERROR_STATE;
+    }
+    app->simulation.bank_ticks = app->simulation.rules.bank_delay_ticks / 2U;
+    for (size_t cue_index = 0U;
+         status == AFORC_OK && cue_index < sizeof(cues) / sizeof(cues[0]);
+         ++cue_index) {
+        status = surf_man_qa_seek_cue(&app->simulation, cues[cue_index].cue);
+        for (size_t mode_index = 0U;
+             status == AFORC_OK &&
+             mode_index < sizeof(modes) / sizeof(modes[0]);
+             ++mode_index) {
+            app->settings.color_mode = modes[mode_index];
+            app->simulation.settings = app->settings;
+            surf_man_visuals_mark_dirty(&app->visuals);
+            status = surf_man_render_frame(app, 0.0, error);
+            if (status == AFORC_OK &&
+                (!surf_man_qa_find_text(
+                     app->renderer, cues[cue_index].text, NULL) ||
+                 !surf_man_qa_find_text(
+                     app->renderer, "BANK [==---] 50%", NULL))) {
+                status = AFORC_ERROR_STATE;
+            }
+            if (status == AFORC_OK &&
+                modes[mode_index] == SURF_MAN_COLOR_NONE &&
+                !surf_man_qa_no_color_is_valid(app->renderer)) {
+                status = AFORC_ERROR_STATE;
+            }
+        }
+    }
+    if (status == AFORC_OK) {
+        status = surf_man_qa_seek_cue(&app->simulation,
+                                      SURF_MAN_QA_CUE_TUBE);
+    }
+    if (status == AFORC_OK) {
+        app->simulation.tube_ticks = 1U;
+        surf_man_visuals_mark_dirty(&app->visuals);
+        status = surf_man_render_frame(app, 0.0, error);
+    }
+    if (status == AFORC_OK &&
+        !surf_man_qa_find_text(app->renderer,
+                               "TUBE: COMMITTED - HOLD LINE",
+                               NULL)) {
+        status = AFORC_ERROR_STATE;
+    }
+
+    app->simulation = saved_simulation;
+    app->settings = saved_settings;
+    if (status != AFORC_OK) {
+        return surf_man_qa_render_error(
+            error,
+            status,
+            "context action cue or labelled bank progress was not redundant");
+    }
+    return AFORC_OK;
+}
+
+static AFORC_Status surf_man_qa_count_in_copy(SurfManApp *app,
+                                               AFORC_Error *error) {
+    const SurfManSimulation saved_simulation = app->simulation;
+    AFORC_Status status;
+
+    app->simulation.phase = SURF_MAN_COUNT_IN;
+    app->simulation.award[0] = '\0';
+    surf_man_visuals_mark_dirty(&app->visuals);
+    status = surf_man_render_frame(app, 0.0, error);
+    if (status == AFORC_OK &&
+        (!surf_man_qa_find_text(
+             app->renderer, "GET READY. RIDE CONTROLS START AT GO.", NULL) ||
+         surf_man_qa_find_text(app->renderer, "SET YOUR LINE.", NULL))) {
+        status = AFORC_ERROR_STATE;
+    }
+
+    app->simulation = saved_simulation;
+    if (status != AFORC_OK) {
+        return surf_man_qa_render_error(
+            error,
+            status,
+            "count-in copy claimed inactive steering was available");
     }
     return AFORC_OK;
 }
@@ -867,7 +1077,10 @@ AFORC_Status surf_man_render_checks(SurfManApp *app, AFORC_Error *error) {
     SurfManSimulation saved_simulation;
     SurfManSettings saved_settings;
     SurfManOverlay saved_overlay;
+    SurfManOverlay saved_overlay_return;
     SurfManMenuItem saved_menu_item;
+    SurfManPauseItem saved_pause_item;
+    SurfManAccessibilityItem saved_accessibility_item;
     AFORC_Size saved_terminal_size;
     bool saved_focused;
     bool saved_dirty;
@@ -889,7 +1102,10 @@ AFORC_Status surf_man_render_checks(SurfManApp *app, AFORC_Error *error) {
     saved_simulation = app->simulation;
     saved_settings = app->settings;
     saved_overlay = app->overlay;
+    saved_overlay_return = app->overlay_return;
     saved_menu_item = app->menu_item;
+    saved_pause_item = app->pause_item;
+    saved_accessibility_item = app->accessibility_item;
     saved_terminal_size = app->terminal_size;
     saved_focused = app->focused;
     saved_dirty = app->visuals.dirty;
@@ -898,6 +1114,10 @@ AFORC_Status surf_man_render_checks(SurfManApp *app, AFORC_Error *error) {
     app->settings = surf_man_settings_default();
     app->simulation.settings = app->settings;
     app->simulation.phase = SURF_MAN_SHACK;
+    app->simulation.day = 9U;
+    app->simulation.wave = SURF_MAN_WAVES_PER_DAY;
+    app->simulation.wave_ticks_remaining = SURF_MAN_FIXED_HZ;
+    app->simulation.best_score = 43210U;
     app->overlay = SURF_MAN_OVERLAY_NONE;
     app->menu_item = SURF_MAN_MENU_SURF;
     app->terminal_size = (AFORC_Size){
@@ -935,6 +1155,15 @@ AFORC_Status surf_man_render_checks(SurfManApp *app, AFORC_Error *error) {
         status = surf_man_qa_color_mode_checks(app, error);
     }
     if (status == AFORC_OK) {
+        status = surf_man_qa_pause_actions(app, error);
+    }
+    if (status == AFORC_OK) {
+        status = surf_man_qa_context_and_bank(app, error);
+    }
+    if (status == AFORC_OK) {
+        status = surf_man_qa_count_in_copy(app, error);
+    }
+    if (status == AFORC_OK) {
         status = surf_man_qa_rider_legend(app, error);
     }
     if (status == AFORC_OK) {
@@ -950,7 +1179,10 @@ AFORC_Status surf_man_render_checks(SurfManApp *app, AFORC_Error *error) {
     app->simulation = saved_simulation;
     app->settings = saved_settings;
     app->overlay = saved_overlay;
+    app->overlay_return = saved_overlay_return;
     app->menu_item = saved_menu_item;
+    app->pause_item = saved_pause_item;
+    app->accessibility_item = saved_accessibility_item;
     app->terminal_size = saved_terminal_size;
     app->focused = saved_focused;
     app->visuals.dirty = saved_dirty;
