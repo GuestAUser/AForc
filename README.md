@@ -119,12 +119,16 @@ Important CMake options:
 
 | Option | Default | Purpose |
 | --- | --- | --- |
-| `AFORC_BUILD_EXAMPLES` | `ON` | Build `aforc-roguelike` and `aforc-surf-man` |
+| `AFORC_BUILD_EXAMPLES` | Top-level `ON` | Build `aforc-roguelike` and `aforc-surf-man` |
+| `AFORC_BUILD_TESTS` | Top-level `ON` | Build AForc regression tests |
 | `AFORC_WARNINGS_AS_ERRORS` | `OFF` | Promote project warnings to errors |
 | `AFORC_ENABLE_SANITIZERS` | `OFF` | Enable AddressSanitizer and UBSan |
 | `AFORC_ENABLE_HARDENING` | Top-level `ON` | Harden supported project-owned targets |
 | `BUILD_SHARED_LIBS` | `OFF` | Build AForc as a shared library |
-| `BUILD_TESTING` | `ON` | Register smoke and all regression tests |
+
+Examples and tests default to `OFF` when AForc is added as a subproject. AForc
+does not define or change the parent project's `BUILD_TESTING` option. Embedded
+builds that opt into `AFORC_BUILD_TESTS` must enable testing in the parent.
 
 Useful Make targets:
 
@@ -132,6 +136,7 @@ Useful Make targets:
 make strict      # clean debug build, -Werror, then all tests
 make sanitize    # strict ASan/UBSan build, then all tests
 make smoke       # deterministic non-TTY integration checks
+make package-test  # stage install and exercise its pkg-config consumer
 make run         # launch the roguelike
 make run-surf-man  # launch Surf-Man
 make help        # list all supported targets
@@ -191,6 +196,13 @@ find_package(aforc 0.1 CONFIG REQUIRED)
 target_link_libraries(your_game PRIVATE aforc::aforc)
 ```
 
+Both CMake and Make installs include a relocatable `aforc.pc`, so Make or
+direct compiler consumers can use pkg-config without hard-coded prefixes:
+
+```sh
+cc -std=c17 game.c $(pkg-config --cflags --libs aforc)
+```
+
 Installed consumers can include only the subsystems they use:
 
 ```c
@@ -245,4 +257,7 @@ boundaries, parser limits, filesystem caveats, and hardening guidance.
 
 ## License
 
-AForc is available under the MIT License. See [LICENSE](LICENSE).
+AForc is available under the MIT License. See [LICENSE](LICENSE). Notices for
+the bundled PCG-derived implementation and zlib-derived CRC-32 table are in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Package installs include both
+documents under `share/licenses/aforc`.
