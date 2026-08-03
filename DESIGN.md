@@ -90,6 +90,10 @@ communicates simulation state rather than decorating empty space.
 | Framework | `243` | Border, horizon, inactive meter, or dim style |
 | Signal | `77` | Unique active glyph, marker, or filled meter cell |
 
+Required instructions, interactive labels, and state copy use Ink without the
+dim style. Framework remains reserved for borders, environmental depth, and
+inactive meter marks; its lower contrast never carries required information.
+
 Terminal emulators may remap indexed colors. Every state must therefore remain
 understandable when all four tokens render as one monochrome ramp. Raw RGB and
 additional indexed colors are not part of the example-game contract.
@@ -108,6 +112,10 @@ copying individual signed artworks.
   `/`, `\\`, `|`, and `V` geometry. A quiet horizon and rear swell establish depth; the
   playable face, lip, pocket, tube, shoulder, and foam remain distinct in
   monochrome through density and contour rather than color.
+  The playable crest is one continuous contour; feature marks sit below or
+  immediately above it instead of replacing long crest runs with solid noise.
+  Texture density falls toward the rider so motion never creates a rectangular
+  static cutout around the focal sprite.
 - **Rider sprite:** a classic sports-stickman silhouette uses `O` for the head,
   `|` for an unmistakable torso, `/` and `\\` for limbs, and `_` or `-` only
   for deliberate arm extension. The body occupies exactly three rows: head,
@@ -129,7 +137,9 @@ copying individual signed artworks.
 - **Meter:** labelled progress row with filled and empty glyphs. Labels and
   numeric values remain present in no-color mode. Surf-Man's BANK meter always
   uses both `=`/`-` fill and a percentage; color may reinforce but never replace
-  its progress.
+  its progress. Riding also exposes compact LINE and FACE position gauges so a
+  single directional update has visible feedback before a coarse LEFT/RIGHT or
+  LOW/HIGH label boundary is crossed.
 - **Menu row:** one text action per row. Selection uses both a leading marker
   and bold style; disabled state uses a reason label rather than dimming alone.
   Pause uses the same primitive for Resume, Help, Accessibility, End Session,
@@ -171,12 +181,18 @@ focus or undersize pauses that do not consume gameplay time.
 
 - Design target: `80 x 24` cells. Play is supported at `60 x 20` or larger.
   Smaller terminals pause authoritative time and display the exact requirement.
+  On taller terminals, the active wave/rider band keeps the target-height
+  proportions and centers vertically instead of stretching texture across the
+  added rows; surrounding cells remain quiet context.
 - A four-cell rhythm governs major horizontal and vertical regions; one-cell
   spacing is permitted only inside sprites, meters, and compact status rows.
 - Authoritative simulation and active normal-play visual composition run at 60
   ticks per second. Clean frames skip composition. Renderer presentation may
   still scan the cell diff, but it emits and writes no unchanged cells;
   reduced-motion and static menus remain event-driven.
+- Sparse texture and stable HUD labels keep routine 80x24 riding output below
+  25 KB/s with p95 update bursts below 2 KB; visual simplification must remove
+  churn rather than lower the 60 Hz interaction cadence.
 - Motion must explain speed, wave phase, score banking, landing, wipeout, or
   scene transition. No blinking, idle scanlines, random shimmer, or perpetual
   motion without gameplay meaning.
@@ -206,6 +222,10 @@ focus or undersize pauses that do not consume gameplay time.
   Bounded action repeats support tubes and grabs, while explicit release clears
   the action immediately. A high lip plus Space launches an air; direction can
   modify the resulting motion but cannot gate eligibility.
+- Repeat-labelled directions remain valid menu navigation. Modal activation,
+  dismissal, and setting changes require a fresh one-shot press; only a second
+  `P` inside the rapid double-tap window may resume Pause, while later host
+  auto-repeat cannot undo the state it opened.
 - Arrow and WASD controls, persistent help, wide timing,
   75-percent speed, landing assistance, no-color/high-contrast, and reduced
   motion are first-class states rather than undocumented debug switches.

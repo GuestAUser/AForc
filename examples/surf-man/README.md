@@ -60,9 +60,12 @@ covering immediate directional response, bounded line and wave-face travel,
 momentum reversals, rider-local wave sampling, recovery, scoring, saturation,
 and state-hash coverage. Render checks assert the 80 by 24 shack, menu, HUD,
 rider, and board contracts; dynamic rider position; ASCII, token, and
-no-blink rules; high-contrast and no-color output; reduced-motion composition;
-and bordered resize notices. Smoke checks cover directional taps, bounded
-action leases and explicit releases, independent Arrow/WASD aliases, opposite
+no-blink rules; a continuous sparse wave crest; transparent rider padding;
+compact minimum-size Help; labelled LINE/FACE gauges; high-contrast and
+no-color output; reduced-motion composition; and bordered resize notices.
+Smoke checks cover directional taps, rapid repeat-labelled menu navigation,
+held directions through explicit or synthesized release, bounded action leases
+and explicit releases, independent Arrow/WASD aliases, opposite
 direction release fallback, selectable Pause actions and modal return
 provenance, focus/resize pause invariants, the real pushed off-screen scene,
 and no filesystem effects.
@@ -87,10 +90,12 @@ a bank moves pending points into the day score with `uint64_t`
 saturation. A wipeout clears pending score and resets flow and risk while
 preserving the banked day score. The HUD keeps score, flow, risk, remaining wave
 time, and the current state visible through labels, values, and glyphs rather
-than color alone. A labelled BANK meter shows stable-line progress, while the
-current rider-local lip, tube, or hazard exposes its relevant Space or movement
-action in every color mode. The shack replaces live day/wave telemetry with
-session selection, persistent best score, and accessibility state.
+than color alone. A labelled BANK meter shows stable-line progress. Compact
+LINE and FACE gauges expose both position and current input direction before a
+coarse LEFT/RIGHT or LOW/HIGH boundary changes, while the current rider-local
+lip, tube, or hazard exposes its relevant Space or movement action in every
+color mode. The shack replaces live day/wave telemetry with session selection,
+persistent best score, and accessibility state.
 
 ## Ride Technique
 
@@ -112,7 +117,13 @@ keys and `WASD` provide the same directional input for menu navigation and
 riding: Up/Down climb or drop on the face, while Left/Right build line
 momentum. `Space` is the ride action and activates the selected menu item;
 at a high lip it launches without requiring a directional chord. Directional
-taps survive a key-up that arrives before the next fixed update. One Space tap
+taps survive a key-up that arrives before the next fixed update. Directions
+remain active until AForc reports an explicit or synthesized key-up, so the
+initial host key-repeat delay cannot interrupt a held turn. Repeated Up/Down
+navigation remains valid in Shack, Pause, and Accessibility menus; rapid
+discrete taps therefore stay responsive on legacy terminals that cannot
+distinguish them from auto-repeat bytes. Setting changes and modal actions
+still require a fresh press. One Space tap
 commits a tube ride through its exit. Held or repeated Space renews a bounded
 ride-action lease for other actions; explicit release clears it immediately.
 Arrow and WASD aliases are tracked independently: releasing one
@@ -120,7 +131,9 @@ alias does not cancel another held alias, and releasing the newer of two
 opposite directions restores the direction that remains held.
 `Enter` activates the selected menu item. `Escape` returns from a panel or
 pauses the session, `P` pauses or resumes, `?` opens Help, and `Q` or `Ctrl-C`
-requests quit. The in-game Help panel teaches riding technique during play.
+requests quit. A rapid second `P` resumes even when a legacy terminal labels
+the byte as repeat; later held-key repeats cannot immediately undo Pause or
+another modal state. The in-game Help panel teaches riding technique during play.
 Select Accessibility from the main menu with Up/Down and Enter or Space; in
 the panel, Up/Down selects, Left/Right changes, and Escape returns.
 
