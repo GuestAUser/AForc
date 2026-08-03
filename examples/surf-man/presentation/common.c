@@ -13,6 +13,8 @@
 #include <stdio.h>
 #include <string.h>
 
+enum { SURF_MAN_ACTIVE_PLAY_ROWS = SURF_MAN_TARGET_ROWS - 8 };
+
 static uint8_t tone_index(SurfManTone tone) {
     switch (tone) {
     case SURF_MAN_TONE_CANVAS:
@@ -106,9 +108,13 @@ int32_t surf_man_rider_center_x(const SurfManSimulation *simulation,
 }
 
 int32_t surf_man_wave_surface_row(const SurfManWaveSample *sample,
-                                  AFORC_Rect play) {
+                                   AFORC_Rect play) {
     int64_t face = sample->face_q16;
-    const int32_t maximum_rise = play.height > 7 ? play.height - 6 : 1;
+    const int32_t active_height =
+        play.height > SURF_MAN_ACTIVE_PLAY_ROWS ? SURF_MAN_ACTIVE_PLAY_ROWS
+                                                : play.height;
+    const int32_t active_y = play.y + (play.height - active_height) / 2;
+    const int32_t maximum_rise = active_height > 7 ? active_height - 6 : 1;
     int32_t rise;
 
     if (face < 0) {
@@ -120,7 +126,7 @@ int32_t surf_man_wave_surface_row(const SurfManWaveSample *sample,
     rise = 1 + (int32_t)(face * (maximum_rise - 1) /
                           ((int64_t)SURF_MAN_Q16_ONE *
                            SURF_MAN_VISUAL_FACE_UNITS));
-    return play.y + play.height - 2 - rise;
+    return active_y + active_height - 2 - rise;
 }
 
 AFORC_Cell surf_man_cell(uint32_t codepoint,
