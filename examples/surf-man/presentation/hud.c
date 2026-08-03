@@ -263,7 +263,7 @@ static AFORC_Status render_shack_hud(SurfManApp *app,
                                     (AFORC_Point){layout->hud.x + 1,
                                                   layout->hud.y + 2},
                                     settings,
-                                    SURF_MAN_TONE_FRAMEWORK,
+                                    SURF_MAN_TONE_INK,
                                     AFORC_STYLE_NONE);
     }
     if (status == AFORC_OK) {
@@ -287,14 +287,14 @@ static AFORC_Status render_shack_hud(SurfManApp *app,
             app,
             (AFORC_Point){layout->hud.x + 1, layout->hud.y + 4},
             "UP/DOWN SELECT  ENTER START  ? HELP  Q QUIT",
-            SURF_MAN_TONE_FRAMEWORK,
-            AFORC_STYLE_DIM);
+            SURF_MAN_TONE_INK,
+            AFORC_STYLE_NONE);
     }
     return status;
 }
 
 static AFORC_Status contextual_action(const SurfManApp *app,
-                                      const char **out_action) {
+                                       const char **out_action) {
     SurfManWaveSample sample;
     AFORC_Status status;
 
@@ -336,11 +336,51 @@ static AFORC_Status contextual_action(const SurfManApp *app,
     return AFORC_OK;
 }
 
+static size_t gauge_index(int32_t value, int32_t limit, size_t slots) {
+    int64_t bounded = value;
+    int64_t scaled;
+
+    if (slots < 2U || limit <= 0) {
+        return 0U;
+    }
+    if (bounded < -(int64_t)limit) {
+        bounded = -(int64_t)limit;
+    } else if (bounded > limit) {
+        bounded = limit;
+    }
+    scaled = (bounded + limit) * (int64_t)(slots - 1U);
+    scaled = (scaled + limit) / ((int64_t)limit * 2);
+    return (size_t)scaled;
+}
+
+static void format_gauge(char *gauge,
+                         size_t slots,
+                         int32_t value,
+                         int32_t limit,
+                         int32_t input,
+                         char negative,
+                         char positive) {
+    const size_t marker = gauge_index(value, limit, slots);
+    char glyph = 'O';
+
+    if (input < 0) {
+        glyph = negative;
+    } else if (input > 0) {
+        glyph = positive;
+    }
+    for (size_t index = 0U; index < slots; ++index) {
+        gauge[index] = index == marker ? glyph : '-';
+    }
+    gauge[slots] = '\0';
+}
+
 AFORC_Status surf_man_render_hud(SurfManApp *app,
                                   const SurfManLayout *layout) {
     char primary[128];
     char state[128];
-    char accessibility[128];
+    char context[128];
+    char line_gauge[10];
+    char face_gauge[6];
     const uint32_t seconds =
         (app->simulation.wave_ticks_remaining + SURF_MAN_FIXED_HZ - 1U) /
         SURF_MAN_FIXED_HZ;
@@ -354,7 +394,24 @@ AFORC_Status surf_man_render_hud(SurfManApp *app,
         return render_shack_hud(app, layout);
     }
 
-    if (layout->hud.width >= 70) {
+    if (app->simulation.phase == SURF_MAN_PRACTICE &&
+        layout->hud.width >= 70) {
+        (void)snprintf(primary,
+                       sizeof(primary),
+                       "PRACTICE  %-8s  TIME %02us  SCORE %" PRIu64
+                       "  BEST %" PRIu64,
+                       wave_name(app->simulation.wave_kind),
+                       seconds,
+                       app->simulation.day_score,
+                       app->simulation.best_score);
+    } else if (app->simulation.phase == SURF_MAN_PRACTICE) {
+        (void)snprintf(primary,
+                       sizeof(primary),
+                       "PRACTICE %s TIME %us SCORE %" PRIu64,
+                       wave_name(app->simulation.wave_kind),
+                       seconds,
+                       app->simulation.day_score);
+    } else if (layout->hud.width >= 70) {
         (void)snprintf(primary,
                        sizeof(primary),
                        "DAY %u  WAVE %u/%u  %-8s  TIME %02us  SCORE %" PRIu64
@@ -383,51 +440,72 @@ AFORC_Status surf_man_render_hud(SurfManApp *app,
                                 primary,
                                 SURF_MAN_TONE_INK,
                                 AFORC_STYLE_BOLD);
-    if (status == AFORC_OK) {
-        status = draw_flow_meter(app,
-                                 (AFORC_Point){layout->hud.x + 1,
-                                               layout->hud.y + 1});
-    }
-    if (status == AFORC_OK) {
-        status = draw_bank_progress(
-            app,
-            (AFORC_Point){layout->hud.x + 20, layout->hud.y + 1},
-            layout->hud.width < 70);
-    }
-    status = status == AFORC_OK ? contextual_action(app, &action) : status;
+    format_gauge(line_gauge,
+                 sizeof(line_gauge) - 1U,
+                 app->simulation.line_position_q16,
+                 app->simulation.rules.line_position_limit_q16,
+                 app->controls.horizontal,
+                 '<',
+                 '>');
+    format_gauge(face_gauge,
+                 sizeof(face_gauge) - 1U,
+                 app->simulation.wave_face_offset_q16,
+                 app->simulation.rules.wave_face_offset_limit_q16,
+                 app->controls.vertical,
+                 '^',
+                 'v');
     if (layout->hud.width >= 70) {
         (void)snprintf(state,
                        sizeof(state),
-                       "LINE %s  FACE %s  SPEED %" PRId64 ".%" PRId64
-                       "  RISK %s | %s",
+                       "LINE [%s] %-6s  FACE [%s] %-4s  SPEED %" PRId64
+                       ".%" PRId64,
+                       line_gauge,
                        line_name(&app->simulation),
+                       face_gauge,
                        face_name(&app->simulation),
                        speed_tenths / 10,
                        speed_tenths < 0 ? -(speed_tenths % 10)
-                                         : speed_tenths % 10,
-                       app->simulation.risk_active ? "ACTIVE" : "CLEAR",
-                       action);
+                                         : speed_tenths % 10);
     } else {
         (void)snprintf(state,
                        sizeof(state),
-                       "LINE:%s FACE:%s | %s",
-                       line_name(&app->simulation),
-                       face_name(&app->simulation),
-                       action);
+                       "LINE[%s] FACE[%s] SPD %" PRId64 ".%" PRId64,
+                       line_gauge,
+                       face_gauge,
+                       speed_tenths / 10,
+                       speed_tenths < 0 ? -(speed_tenths % 10)
+                                         : speed_tenths % 10);
     }
     if (status == AFORC_OK) {
         status = surf_man_draw_text(app,
                                     (AFORC_Point){layout->hud.x + 1,
-                                                  layout->hud.y + 2},
+                                                  layout->hud.y + 1},
                                     state,
-                                    SURF_MAN_TONE_FRAMEWORK,
+                                    SURF_MAN_TONE_INK,
                                     AFORC_STYLE_NONE);
     }
+    if (status == AFORC_OK) {
+        status = draw_flow_meter(app,
+                                 (AFORC_Point){layout->hud.x + 1,
+                                               layout->hud.y + 2});
+    }
+    if (status == AFORC_OK) {
+        status = draw_bank_progress(
+            app,
+            (AFORC_Point){layout->hud.x + 20, layout->hud.y + 2},
+            layout->hud.width < 70);
+    }
+    status = status == AFORC_OK ? contextual_action(app, &action) : status;
+    (void)snprintf(context,
+                   sizeof(context),
+                   "RISK %s | %s",
+                   app->simulation.risk_active ? "ACTIVE" : "CLEAR",
+                   action);
     if (status == AFORC_OK) {
         status = surf_man_draw_char(app,
                                     (AFORC_Point){layout->hud.x + 1,
                                                   layout->hud.y + 3},
-                                    (uint32_t)'!',
+                                    (uint32_t)'>',
                                     SURF_MAN_TONE_SIGNAL,
                                     AFORC_STYLE_BOLD);
     }
@@ -435,38 +513,17 @@ AFORC_Status surf_man_render_hud(SurfManApp *app,
         status = surf_man_draw_text(app,
                                     (AFORC_Point){layout->hud.x + 3,
                                                   layout->hud.y + 3},
-                                    message,
+                                    context,
                                     SURF_MAN_TONE_INK,
                                     AFORC_STYLE_BOLD);
-    }
-    if (layout->hud.width >= 70) {
-        if (app->simulation.phase == SURF_MAN_PRACTICE) {
-            (void)snprintf(
-                accessibility,
-                sizeof(accessibility),
-                "W/S FACE A/D LINE SPACE ACTION | P/ESC PAUSE > END SESSION");
-        } else {
-            (void)snprintf(
-                accessibility,
-                sizeof(accessibility),
-                "W/S FACE A/D LINE SPACE ACTION ? HELP P/ESC PAUSE | M:%s C:%s",
-                app->settings.reduced_motion ? "RED" : "FULL",
-                color_name(app->settings.color_mode));
-        }
-    } else {
-        (void)snprintf(accessibility,
-                       sizeof(accessibility),
-                       app->simulation.phase == SURF_MAN_PRACTICE
-                           ? "W/S A/D SPACE | P/ESC PAUSE > END SESSION"
-                           : "W/S FACE A/D LINE SPACE ACTION P/ESC PAUSE");
     }
     if (status == AFORC_OK) {
         status = surf_man_draw_text(app,
                                     (AFORC_Point){layout->hud.x + 1,
                                                   layout->hud.y + 4},
-                                    accessibility,
-                                    SURF_MAN_TONE_FRAMEWORK,
-                                    AFORC_STYLE_DIM);
+                                    message,
+                                    SURF_MAN_TONE_INK,
+                                    AFORC_STYLE_NONE);
     }
     return status;
 }

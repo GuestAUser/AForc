@@ -73,7 +73,7 @@ AFORC_Status surf_man_render_menu(SurfManApp *app,
                 app,
                 (AFORC_Point){panel.x + 4, row},
                 labels[index],
-                selected ? SURF_MAN_TONE_INK : SURF_MAN_TONE_FRAMEWORK,
+                SURF_MAN_TONE_INK,
                 selected ? AFORC_STYLE_BOLD : AFORC_STYLE_NONE);
         }
     }
@@ -82,15 +82,15 @@ AFORC_Status surf_man_render_menu(SurfManApp *app,
                                     (AFORC_Point){panel.x + 2,
                                                   panel.y + height - 2},
                                     "UP/DOWN  ENTER",
-                                    SURF_MAN_TONE_FRAMEWORK,
-                                    AFORC_STYLE_DIM);
+                                    SURF_MAN_TONE_INK,
+                                    AFORC_STYLE_NONE);
     }
     return status;
 }
 
 static AFORC_Status render_help(SurfManApp *app,
-                                const SurfManLayout *layout) {
-    static const char *const lines[] = {
+                                 const SurfManLayout *layout) {
+    static const char *const full_lines[] = {
         "W/S CLIMBS HIGH OR DROPS LOW ON THE WAVE FACE.",
         "A/D BUILDS LINE MOMENTUM; REVERSE TO CARVE.",
         "HIGH LIP: SPACE LAUNCHES. LOW LIP: SPACE SNAPS.",
@@ -100,26 +100,44 @@ static AFORC_Status render_help(SurfManApp *app,
         "LAND LEVEL; HOLD A CLEAN LINE 2.5S TO BANK.",
         "NO CHORDS, RAPID MASHING, OR RELEASE TIMING.",
         "PRACTICE: PAUSE, THEN CHOOSE END SESSION."};
-    const AFORC_Rect panel = centered_rect(layout, 56, 14);
+    static const char *const compact_lines[] = {
+        "W/S: CLIMB HIGH OR DROP LOW ON THE FACE.",
+        "A/D: BUILD LINE SPEED; REVERSE TO CARVE.",
+        "LIP: SPACE LAUNCHES HIGH, SNAPS LOW.",
+        "AIR: A/D ROTATES; SPACE GRABS.",
+        "TUBE: TAP SPACE TO COMMIT.",
+        "HAZARD: CLIMB OR MOVE YOUR LINE.",
+        "LAND LEVEL; HOLD CLEAN 2.5S TO BANK.",
+        "NO CHORDS/RELEASE TIMING. P: PAUSE > END."};
+    const bool compact = layout->play.height < 14;
+    const char *const *lines = compact ? compact_lines : full_lines;
+    const size_t line_count = compact
+                                  ? sizeof(compact_lines) /
+                                        sizeof(compact_lines[0])
+                                  : sizeof(full_lines) / sizeof(full_lines[0]);
+    const int32_t panel_height = compact ? 12 : 14;
+    const AFORC_Rect panel = centered_rect(layout, 56, panel_height);
     AFORC_Status status = surf_man_draw_panel(app, panel, "HELP");
 
     for (size_t index = 0U;
-         status == AFORC_OK && index < sizeof(lines) / sizeof(lines[0]);
+         status == AFORC_OK && index < line_count;
          ++index) {
         status = surf_man_draw_text(
             app,
             (AFORC_Point){panel.x + 3, panel.y + 2 + (int32_t)index},
             lines[index],
-            index == 7U ? SURF_MAN_TONE_SIGNAL : SURF_MAN_TONE_INK,
-            index == 7U ? AFORC_STYLE_BOLD : AFORC_STYLE_NONE);
+            (!compact && index == 7U) ? SURF_MAN_TONE_SIGNAL
+                                      : SURF_MAN_TONE_INK,
+            (!compact && index == 7U) ? AFORC_STYLE_BOLD
+                                      : AFORC_STYLE_NONE);
     }
     if (status == AFORC_OK) {
         status = surf_man_draw_text(
             app,
-            (AFORC_Point){panel.x + 3, panel.y + 12},
+            (AFORC_Point){panel.x + 3, panel.y + panel.height - 2},
             "ESC/ENTER/?/P BACK",
-            SURF_MAN_TONE_FRAMEWORK,
-            AFORC_STYLE_DIM);
+            SURF_MAN_TONE_INK,
+            AFORC_STYLE_NONE);
     }
     return status;
 }
@@ -151,7 +169,7 @@ static AFORC_Status render_accessibility(SurfManApp *app,
                 app,
                 (AFORC_Point){panel.x + 5, row},
                 rows[index],
-                selected ? SURF_MAN_TONE_INK : SURF_MAN_TONE_FRAMEWORK,
+                SURF_MAN_TONE_INK,
                 selected ? AFORC_STYLE_BOLD : AFORC_STYLE_NONE);
         }
     }
@@ -160,8 +178,8 @@ static AFORC_Status render_accessibility(SurfManApp *app,
             app,
             (AFORC_Point){panel.x + 3, panel.y + 8},
             "UP/DOWN SELECT  LEFT/RIGHT CHANGE  ESC BACK",
-            SURF_MAN_TONE_FRAMEWORK,
-            AFORC_STYLE_DIM);
+            SURF_MAN_TONE_INK,
+            AFORC_STYLE_NONE);
     }
     return status;
 }
@@ -191,7 +209,7 @@ static AFORC_Status render_pause(SurfManApp *app,
                 app,
                 (AFORC_Point){panel.x + 5, row},
                 labels[index],
-                selected ? SURF_MAN_TONE_INK : SURF_MAN_TONE_FRAMEWORK,
+                SURF_MAN_TONE_INK,
                 selected ? AFORC_STYLE_BOLD : AFORC_STYLE_NONE);
         }
     }
@@ -318,11 +336,11 @@ AFORC_Status surf_man_render_phase_modal(SurfManApp *app,
         }
         if (status == AFORC_OK) {
             status = surf_man_draw_text(app,
-                                        (AFORC_Point){panel.x + 4,
-                                                      panel.y + 6},
-                                        "ENTER NEXT WAVE   ESC SHACK",
-                                        SURF_MAN_TONE_FRAMEWORK,
-                                        AFORC_STYLE_NONE);
+                                         (AFORC_Point){panel.x + 4,
+                                                       panel.y + 6},
+                                         "ENTER NEXT WAVE   ESC SHACK",
+                                         SURF_MAN_TONE_INK,
+                                         AFORC_STYLE_NONE);
         }
         return status;
     }
@@ -355,11 +373,11 @@ AFORC_Status surf_man_render_phase_modal(SurfManApp *app,
         }
         if (status == AFORC_OK) {
             status = surf_man_draw_text(app,
-                                        (AFORC_Point){panel.x + 4,
-                                                      panel.y + 6},
-                                        "ENTER RETURN TO SHACK",
-                                        SURF_MAN_TONE_FRAMEWORK,
-                                        AFORC_STYLE_NONE);
+                                         (AFORC_Point){panel.x + 4,
+                                                       panel.y + 6},
+                                         "ENTER RETURN TO SHACK",
+                                         SURF_MAN_TONE_INK,
+                                         AFORC_STYLE_NONE);
         }
         return status;
     }
@@ -415,10 +433,10 @@ AFORC_Status surf_man_render_resize(SurfManApp *app, AFORC_Size size) {
         if (status == AFORC_OK) {
             status = surf_man_draw_text(
                 app,
-                (AFORC_Point){centered_text_x(panel, paused), panel.y + 5},
-                paused,
-                SURF_MAN_TONE_FRAMEWORK,
-                AFORC_STYLE_NONE);
+                 (AFORC_Point){centered_text_x(panel, paused), panel.y + 5},
+                 paused,
+                 SURF_MAN_TONE_INK,
+                 AFORC_STYLE_NONE);
         }
         return status;
     }
