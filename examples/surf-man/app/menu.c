@@ -236,14 +236,16 @@ AFORC_Status surf_man_menu_handle_modal_key(
         return AFORC_OK;
     }
     if (app->overlay == SURF_MAN_OVERLAY_PAUSE) {
-        if (input->key == AFORC_KEY_ESCAPE || input->pause) {
+        if ((!input->repeat && input->key == AFORC_KEY_ESCAPE) ||
+            input->pause) {
             surf_man_close_overlay(app);
         } else if (input->vertical != 0) {
             surf_man_move_pause_menu(app, input->vertical);
-        } else if (input->key == AFORC_KEY_ENTER ||
-                   input->key == AFORC_KEY_SPACE) {
+        } else if (!input->repeat &&
+                   (input->key == AFORC_KEY_ENTER ||
+                    input->key == AFORC_KEY_SPACE)) {
             return surf_man_activate_pause(app, engine);
-        } else if (input->codepoint == (uint32_t)'?') {
+        } else if (!input->repeat && input->codepoint == (uint32_t)'?') {
             app->overlay = SURF_MAN_OVERLAY_HELP;
             app->overlay_return = SURF_MAN_OVERLAY_PAUSE;
             surf_man_visuals_mark_dirty(&app->visuals);
@@ -251,22 +253,26 @@ AFORC_Status surf_man_menu_handle_modal_key(
         return AFORC_OK;
     }
     if (app->overlay == SURF_MAN_OVERLAY_HELP) {
-        if (input->key == AFORC_KEY_ESCAPE ||
-            input->key == AFORC_KEY_ENTER ||
-            input->codepoint == (uint32_t)'?' || input->pause) {
+        if (input->pause ||
+            (!input->repeat &&
+             (input->key == AFORC_KEY_ESCAPE ||
+              input->key == AFORC_KEY_ENTER ||
+              input->codepoint == (uint32_t)'?'))) {
             surf_man_close_overlay(app);
         }
         return AFORC_OK;
     }
     if (app->overlay == SURF_MAN_OVERLAY_ACCESSIBILITY) {
-        if (input->key == AFORC_KEY_ESCAPE || input->pause) {
+        if ((!input->repeat && input->key == AFORC_KEY_ESCAPE) ||
+            input->pause) {
             surf_man_close_overlay(app);
         } else if (input->vertical != 0) {
             surf_man_move_accessibility_menu(app, input->vertical);
-        } else if (input->horizontal != 0) {
+        } else if (!input->repeat && input->horizontal != 0) {
             return surf_man_adjust_setting(app, input->horizontal);
-        } else if (input->key == AFORC_KEY_ENTER ||
-                   input->key == AFORC_KEY_SPACE) {
+        } else if (!input->repeat &&
+                   (input->key == AFORC_KEY_ENTER ||
+                    input->key == AFORC_KEY_SPACE)) {
             return surf_man_adjust_setting(app, 1);
         }
     }
@@ -278,17 +284,15 @@ AFORC_Status surf_man_menu_handle_shack_key(
     AFORC_Engine *engine,
     const SurfManInputKey *input)
 {
-    if (input->repeat) {
-        return AFORC_OK;
-    }
     if (input->vertical != 0) {
         surf_man_move_menu(app, input->vertical);
         return AFORC_OK;
     }
-    if (input->key == AFORC_KEY_ENTER || input->key == AFORC_KEY_SPACE) {
+    if (!input->repeat &&
+        (input->key == AFORC_KEY_ENTER || input->key == AFORC_KEY_SPACE)) {
         return surf_man_activate_menu(app, engine);
     }
-    if (input->key == AFORC_KEY_ESCAPE) {
+    if (!input->repeat && input->key == AFORC_KEY_ESCAPE) {
         aforc_engine_request_quit(engine);
     }
     return AFORC_OK;

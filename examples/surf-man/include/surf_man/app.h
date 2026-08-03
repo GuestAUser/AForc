@@ -51,8 +51,6 @@ typedef struct SurfManInputState {
     int8_t vertical_preference;
     int8_t horizontal_preference;
     uint16_t directional_holds;
-    uint8_t vertical_lease;
-    uint8_t horizontal_lease;
     uint8_t action_lease;
     bool action_tap;
     bool confirm_latched;
@@ -80,6 +78,7 @@ struct SurfManApp {
     SurfManSettings settings;
     SurfManInputState controls;
     uint64_t seed;
+    uint64_t pause_pressed_at_ms;
     SurfManOverlay overlay;
     SurfManOverlay overlay_return;
     SurfManMenuItem menu_item;
@@ -87,6 +86,7 @@ struct SurfManApp {
     SurfManAccessibilityItem accessibility_item;
     AFORC_Size terminal_size;
     bool focused;
+    bool pause_repeat_armed;
     bool smoke;
     bool initialized;
     char message[SURF_MAN_MESSAGE_CAPACITY];

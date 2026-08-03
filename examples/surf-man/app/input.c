@@ -28,7 +28,8 @@ enum {
     SURF_MAN_HOLD_VERTICAL =
         SURF_MAN_HOLD_VERTICAL_NEGATIVE | SURF_MAN_HOLD_VERTICAL_POSITIVE,
     SURF_MAN_HOLD_HORIZONTAL =
-        SURF_MAN_HOLD_HORIZONTAL_NEGATIVE | SURF_MAN_HOLD_HORIZONTAL_POSITIVE
+        SURF_MAN_HOLD_HORIZONTAL_NEGATIVE | SURF_MAN_HOLD_HORIZONTAL_POSITIVE,
+    SURF_MAN_PAUSE_REPEAT_TAP_WINDOW_MS = 200
 };
 
 static void surf_man_clear_controls(SurfManApp *app)
@@ -186,16 +187,41 @@ static SurfManInputKey surf_man_normalize_key(
     };
 }
 
+static bool surf_man_accept_pause_press(SurfManApp *app,
+                                        const AFORC_InputEvent *event,
+                                        bool repeat)
+{
+    uint64_t elapsed_ms;
+
+    if (!repeat) {
+        app->pause_pressed_at_ms = event->timestamp_ms;
+        app->pause_repeat_armed = true;
+        return true;
+    }
+    if (!app->pause_repeat_armed ||
+        event->timestamp_ms < app->pause_pressed_at_ms) {
+        app->pause_repeat_armed = false;
+        return false;
+    }
+    elapsed_ms = event->timestamp_ms - app->pause_pressed_at_ms;
+    app->pause_repeat_armed = false;
+    return elapsed_ms <= SURF_MAN_PAUSE_REPEAT_TAP_WINDOW_MS;
+}
+
 static AFORC_Status surf_man_handle_key_down(SurfManApp *app,
                                               AFORC_Engine *engine,
                                               const AFORC_InputEvent *event)
 {
-    const SurfManInputKey input = surf_man_normalize_key(event);
+    SurfManInputKey input = surf_man_normalize_key(event);
+
+    if (input.pause) {
+        input.pause = surf_man_accept_pause_press(app, event, input.repeat);
+    } else {
+        app->pause_repeat_armed = false;
+    }
 
     if (app->overlay != SURF_MAN_OVERLAY_NONE) {
-        return input.repeat
-                   ? AFORC_OK
-                   : surf_man_menu_handle_modal_key(app, engine, &input);
+        return surf_man_menu_handle_modal_key(app, engine, &input);
     }
     if (input.quit) {
         aforc_engine_request_quit(engine);
@@ -234,7 +260,6 @@ static AFORC_Status surf_man_handle_key_down(SurfManApp *app,
             app->controls.vertical_preference = (int8_t)input.vertical;
         }
         surf_man_refresh_directions(&app->controls);
-        app->controls.vertical_lease = SURF_MAN_COMMAND_LEASE_TICKS;
         if (!input.repeat) {
             app->controls.vertical_tap = (int8_t)input.vertical;
         }
@@ -248,7 +273,6 @@ static AFORC_Status surf_man_handle_key_down(SurfManApp *app,
             app->controls.horizontal_preference = (int8_t)input.horizontal;
         }
         surf_man_refresh_directions(&app->controls);
-        app->controls.horizontal_lease = SURF_MAN_COMMAND_LEASE_TICKS;
         if (!input.repeat) {
             app->controls.horizontal_tap = (int8_t)input.horizontal;
         }
@@ -275,11 +299,9 @@ static void surf_man_handle_key_up(SurfManApp *app,
 
     app->controls.directional_holds &= (uint16_t)~source;
     surf_man_refresh_directions(&app->controls);
-    if ((app->controls.directional_holds & SURF_MAN_HOLD_VERTICAL) == 0U) {
-        app->controls.vertical_lease = 0U;
-    }
-    if ((app->controls.directional_holds & SURF_MAN_HOLD_HORIZONTAL) == 0U) {
-        app->controls.horizontal_lease = 0U;
+    if (event->data.key.key == AFORC_KEY_P ||
+        surf_man_codepoint_is(codepoint, 'p')) {
+        app->pause_repeat_armed = false;
     }
     if (event->data.key.key == AFORC_KEY_SPACE || codepoint == (uint32_t)' ') {
         app->controls.action_lease = 0U;
@@ -296,6 +318,7 @@ static void surf_man_handle_resize(SurfManApp *app, AFORC_Size size)
 
     app->terminal_size = size;
     surf_man_clear_controls(app);
+    app->pause_repeat_armed = false;
     if (!surf_man_size_supported(size)) {
         app->overlay = SURF_MAN_OVERLAY_RESIZE;
         app->overlay_return = return_to_pause ? SURF_MAN_OVERLAY_PAUSE
@@ -338,6 +361,7 @@ AFORC_Status surf_man_app_handle_event(SurfManApp *app,
         case AFORC_INPUT_EVENT_FOCUS_OUT:
             app->focused = false;
             surf_man_clear_controls(app);
+            app->pause_repeat_armed = false;
             if (app->overlay == SURF_MAN_OVERLAY_NONE &&
                 app->simulation.phase != SURF_MAN_SHACK) {
                 app->overlay = SURF_MAN_OVERLAY_PAUSE;
@@ -388,17 +412,5 @@ void surf_man_input_take_command(SurfManApp *app,
     app->controls.back_latched = false;
     if (app->controls.action_lease > 0U) {
         --app->controls.action_lease;
-    }
-    if (app->controls.vertical_lease > 0U &&
-        --app->controls.vertical_lease == 0U) {
-        app->controls.vertical = 0;
-        app->controls.directional_holds &=
-            (uint16_t)~SURF_MAN_HOLD_VERTICAL;
-    }
-    if (app->controls.horizontal_lease > 0U &&
-        --app->controls.horizontal_lease == 0U) {
-        app->controls.horizontal = 0;
-        app->controls.directional_holds &=
-            (uint16_t)~SURF_MAN_HOLD_HORIZONTAL;
     }
 }
