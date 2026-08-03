@@ -190,6 +190,7 @@ static bool surf_man_qa_rider_pose_present(const AFORC_Renderer *renderer,
                                             AFORC_Point *out_board_position) {
     const AFORC_Size size = aforc_renderer_size(renderer);
     const size_t board_length = strlen(board);
+    const size_t body_width = strlen(body[0]);
     int32_t y;
 
     for (y = 1; y < size.height; ++y) {
@@ -218,28 +219,35 @@ static bool surf_man_qa_rider_pose_present(const AFORC_Renderer *renderer,
             if (!exact) {
                 continue;
             }
-            body_left = x - 1;
-            if (body_left < 0 || y < 3 || body_left + 11 > size.width) {
+            body_left = x - (int32_t)((body_width - board_length) / 2U);
+            if (body_width < board_length || body_width > 11U ||
+                body_left < 0 || y < 3 ||
+                body_left + (int32_t)body_width > size.width) {
                 continue;
             }
             for (size_t row = 0U; row < 3U && exact; ++row) {
-                for (size_t column = 0U; column < 11U; ++column) {
+                if (strlen(body[row]) != body_width) {
+                    exact = false;
+                    break;
+                }
+                for (size_t column = 0U; column < body_width; ++column) {
                     const unsigned char glyph =
                         (unsigned char)body[row][column];
-                    const uint8_t color = glyph == (unsigned char)' '
-                                              ? SURF_MAN_QA_CANVAS
-                                          : glyph == (unsigned char)'O'
-                                              ? SURF_MAN_QA_SIGNAL
-                                              : SURF_MAN_QA_INK;
-                    const AFORC_CellStyle style =
-                        glyph == (unsigned char)' ' ? AFORC_STYLE_NONE
-                                                    : AFORC_STYLE_BOLD;
+                    const uint8_t color = glyph == (unsigned char)'O'
+                                               ? SURF_MAN_QA_SIGNAL
+                                               : SURF_MAN_QA_INK;
+
+                    if (glyph == (unsigned char)' ') {
+                        continue;
+                    }
 
                     if (!surf_man_qa_cell_at(
                             renderer,
                             (AFORC_Point){body_left + (int32_t)column,
-                                          y - 3 + (int32_t)row},
-                            surf_man_cell((uint32_t)glyph, color, style))) {
+                                           y - 3 + (int32_t)row},
+                            surf_man_cell((uint32_t)glyph,
+                                          color,
+                                          AFORC_STYLE_BOLD))) {
                         exact = false;
                         break;
                     }
@@ -321,32 +329,32 @@ static AFORC_Status surf_man_qa_all_rider_poses(SurfManApp *app,
                                                 AFORC_Error *error) {
     static const SurfManQARiderExpectation expectations[] = {
         {SURF_MAN_QA_RIDER_NEUTRAL,
-         {"     O     ", "    /|\\    ", "    / \\    "},
-         "<=======>"},
+         {"    O    ", "   /|\\   ", "   / \\   "},
+         "<=====>"},
         {SURF_MAN_QA_RIDER_PADDLE,
-         {"     O     ", "    /|\\    ", "    / \\    "},
-         "<=======>"},
+         {"    O    ", "   /|\\   ", "   / \\   "},
+         "<=====>"},
         {SURF_MAN_QA_RIDER_CARVE_LEFT,
-         {"    O      ", "   /|\\     ", "   / \\     "},
-         "\\=======/"},
+         {"   O     ", "  /|\\    ", "  / \\    "},
+         "\\=====/"},
         {SURF_MAN_QA_RIDER_CARVE_RIGHT,
-         {"      O    ", "     /|\\   ", "     / \\   "},
-         "/=======\\"},
+         {"     O   ", "    /|\\  ", "    / \\  "},
+         "/=====\\"},
         {SURF_MAN_QA_RIDER_AIR,
-         {"     O     ", "    \\|/    ", "    / \\    "},
-         "/=======\\"},
+         {"    O    ", "   \\|/   ", "   / \\   "},
+         "/=====\\"},
         {SURF_MAN_QA_RIDER_GRAB,
-         {"      O    ", "    _/|/   ", "     / \\   "},
-         "/=======\\"},
+         {"     O   ", "   _/|/  ", "    / \\  "},
+         "/=====\\"},
         {SURF_MAN_QA_RIDER_LANDING,
-         {"     O     ", "   \\_|_/   ", "    / \\    "},
-         "<=======>"},
+         {"    O    ", "  \\_|_/  ", "   / \\   "},
+         "<=====>"},
         {SURF_MAN_QA_RIDER_TUBE,
-         {"    O      ", "   /|_     ", "   / \\     "},
-         "<=======>"},
+         {"   O     ", "  /|_    ", "  / \\    "},
+         "<=====>"},
         {SURF_MAN_QA_RIDER_WIPEOUT,
-         {"     O     ", "   __|__   ", "   _/ \\_   "},
-         "/=======\\"},
+         {"    O    ", "  __|__  ", "  _/ \\_  "},
+         "/=====\\"},
     };
     const SurfManSimulation saved_simulation = app->simulation;
     const SurfManSettings saved_settings = app->settings;
@@ -386,8 +394,8 @@ static AFORC_Status surf_man_qa_all_rider_poses(SurfManApp *app,
 static AFORC_Status surf_man_qa_dynamic_rider_motion(SurfManApp *app,
                                                       AFORC_Error *error) {
     static const char body[][12] = {
-        "     O     ", "    /|\\    ", "    / \\    "};
-    static const char board[] = "<=======>";
+        "    O    ", "   /|\\   ", "   / \\   "};
+    static const char board[] = "<=====>";
     const SurfManSimulation saved_simulation = app->simulation;
     const SurfManSettings saved_settings = app->settings;
     AFORC_Point center;
@@ -437,14 +445,118 @@ static AFORC_Status surf_man_qa_dynamic_rider_motion(SurfManApp *app,
     return AFORC_OK;
 }
 
+static AFORC_Status surf_man_qa_rider_preserves_background(
+    SurfManApp *app,
+    AFORC_Error *error) {
+    static const char body[][12] = {
+        "    O    ", "   /|\\   ", "   / \\   "};
+    static const char board[] = "<=====>";
+    const SurfManSimulation saved_simulation = app->simulation;
+    const SurfManSettings saved_settings = app->settings;
+    const SurfManLayout layout = surf_man_layout_for_size(
+        aforc_renderer_size(app->renderer));
+    const AFORC_Cell background = surf_man_cell(
+        (uint32_t)'.', SURF_MAN_QA_FRAMEWORK, AFORC_STYLE_DIM);
+    const int32_t surface_y = layout.play.y + layout.play.height / 2;
+    AFORC_Point board_position;
+    AFORC_Status status = aforc_renderer_clear(app->renderer, background);
+
+    surf_man_qa_select_rider_case(app, SURF_MAN_QA_RIDER_NEUTRAL);
+    if (status == AFORC_OK) {
+        status = surf_man_render_rider(app, &layout, surface_y);
+    }
+    if (status == AFORC_OK &&
+        (!surf_man_qa_rider_pose_present(
+             app->renderer, body, board, &board_position) ||
+         !surf_man_qa_cell_at(
+             app->renderer,
+             (AFORC_Point){board_position.x - 1, board_position.y - 3},
+             background))) {
+        status = AFORC_ERROR_STATE;
+    }
+
+    app->simulation = saved_simulation;
+    app->settings = saved_settings;
+    if (status != AFORC_OK) {
+        return surf_man_qa_render_error(
+            error,
+            status,
+            "rider padding erased the wave field as a rectangular cutout");
+    }
+    return AFORC_OK;
+}
+
+static bool surf_man_qa_is_contour_glyph(uint32_t codepoint) {
+    return codepoint == (uint32_t)'~' || codepoint == (uint32_t)'/' ||
+           codepoint == (uint32_t)'\\' || codepoint == (uint32_t)'^' ||
+           codepoint == (uint32_t)'_';
+}
+
+static AFORC_Status surf_man_qa_wave_contour_is_continuous(
+    SurfManApp *app,
+    AFORC_Error *error) {
+    const SurfManLayout layout = surf_man_layout_for_size(
+        aforc_renderer_size(app->renderer));
+    const int32_t anchor = layout.play.width / 3;
+    const int32_t rider =
+        surf_man_rider_center_x(&app->simulation, layout.play) - layout.play.x;
+    int32_t bad_column = -1;
+    uint32_t bad_glyph = 0U;
+    AFORC_Status status = AFORC_OK;
+
+    for (int32_t column = 0;
+         status == AFORC_OK && column < layout.play.width;
+         ++column) {
+        const int32_t rider_distance = column - rider;
+        const int32_t relative = column - anchor;
+        const int32_t offset_q16 =
+            (int32_t)((int64_t)relative * SURF_MAN_Q16_ONE / 2);
+        SurfManWaveSample sample;
+        AFORC_Cell cell;
+        int32_t row;
+
+        if (rider_distance >= -4 && rider_distance <= 4) {
+            continue;
+        }
+        status = surf_man_wave_sample(&app->simulation,
+                                      offset_q16,
+                                      &sample);
+        if (status != AFORC_OK) {
+            break;
+        }
+        row = surf_man_wave_surface_row(&sample, layout.play);
+        status = aforc_renderer_get(
+            app->renderer,
+            (AFORC_Point){layout.play.x + column, row},
+            &cell);
+        if (status == AFORC_OK &&
+            !surf_man_qa_is_contour_glyph(cell.codepoint)) {
+            bad_column = column;
+            bad_glyph = cell.codepoint;
+            status = AFORC_ERROR_STATE;
+        }
+    }
+    if (status != AFORC_OK) {
+        aforc_error_set(error,
+                        status,
+                        "surf-man qa",
+                        "wave crest lost at column %d to glyph %u",
+                        bad_column,
+                        bad_glyph);
+        return status;
+    }
+    return AFORC_OK;
+}
+
 static AFORC_Status surf_man_qa_rider_legend(SurfManApp *app,
                                               AFORC_Error *error) {
     static const char body[][12] = {
-        "     O     ", "    /|\\    ", "    / \\    "};
-    static const char board[] = "<=======>";
-    static const char legend[] = "W/S FACE   A/D LINE   SPACE ACTION   ? HELP";
+        "    O    ", "   /|\\   ", "   / \\   "};
+    static const char board[] = "<=====>";
+    static const char legend[] =
+        "W/S FACE  A/D LINE  SPACE ACTION  P PAUSE  ? HELP";
     enum {
-        SURF_MAN_QA_LEGEND_ROWS = 1,
+        SURF_MAN_QA_SKY_ROWS = 3,
         SURF_MAN_QA_RIDER_BODY_ROWS = 3
     };
     static const AFORC_Size sizes[] = {
@@ -485,16 +597,16 @@ static AFORC_Status surf_man_qa_rider_legend(SurfManApp *app,
         if (status == AFORC_OK &&
             (!surf_man_qa_text_at(
                  app->renderer,
-                 (AFORC_Point){layout.play.x + 1, layout.play.y},
-                 legend,
-                 SURF_MAN_QA_FRAMEWORK,
-                 AFORC_STYLE_DIM) ||
+                  (AFORC_Point){layout.play.x + 1, layout.play.y},
+                  legend,
+                  SURF_MAN_QA_INK,
+                  AFORC_STYLE_NONE) ||
              !surf_man_qa_rider_pose_present(
                  app->renderer, body, board, &board_position) ||
              board_position.x < layout.play.x ||
              board_position.x + (int32_t)strlen(board) >
                  layout.play.x + layout.play.width ||
-             board_position.y < layout.play.y + SURF_MAN_QA_LEGEND_ROWS +
+              board_position.y < layout.play.y + SURF_MAN_QA_SKY_ROWS +
                                     SURF_MAN_QA_RIDER_BODY_ROWS ||
              board_position.y >= layout.play.y + layout.play.height)) {
             status = AFORC_ERROR_STATE;
@@ -530,7 +642,7 @@ static AFORC_Status surf_man_qa_particle_layering(SurfManApp *app,
     const AFORC_Cell particle = surf_man_tone_cell(
         app, (uint32_t)'*', SURF_MAN_TONE_SIGNAL, AFORC_STYLE_BOLD);
     const AFORC_Cell cue = surf_man_tone_cell(
-        app, (uint32_t)'W', SURF_MAN_TONE_FRAMEWORK, AFORC_STYLE_DIM);
+        app, (uint32_t)'W', SURF_MAN_TONE_INK, AFORC_STYLE_NONE);
     AFORC_ParticleDesc description = {0};
     AFORC_Status status =
         aforc_particle_pool_init(&test_pool, particles, 2U, UINT32_C(1));
@@ -576,10 +688,12 @@ static AFORC_Status surf_man_qa_particle_layering(SurfManApp *app,
 static AFORC_Status surf_man_qa_shack_cells(SurfManApp *app,
                                             AFORC_Error *error) {
     const AFORC_Size size = aforc_renderer_size(app->renderer);
+    const SurfManLayout layout = surf_man_layout_for_size(size);
     const AFORC_Cell frame = surf_man_cell(
         (uint32_t)'+', SURF_MAN_QA_FRAMEWORK, AFORC_STYLE_NONE);
     const AFORC_Cell marker = surf_man_cell(
         (uint32_t)'>', SURF_MAN_QA_SIGNAL, AFORC_STYLE_BOLD);
+    size_t strong_shore_cells = 0U;
     surf_man_visuals_mark_dirty(&app->visuals);
     AFORC_Status status = surf_man_render_frame(app, 0.0, error);
 
@@ -602,19 +716,55 @@ static AFORC_Status surf_man_qa_shack_cells(SurfManApp *app,
     }
     if (!surf_man_qa_cell_at(app->renderer, (AFORC_Point){57, 4}, marker) ||
         !surf_man_qa_text_at(app->renderer,
-                             (AFORC_Point){59, 5},
-                             "PRACTICE",
-                             SURF_MAN_QA_FRAMEWORK,
-                             AFORC_STYLE_NONE) ||
-        !surf_man_qa_text_at(app->renderer,
-                             (AFORC_Point){8, 4},
-                             "SURF SHACK",
-                             SURF_MAN_QA_INK,
-                             AFORC_STYLE_BOLD)) {
+                              (AFORC_Point){59, 5},
+                              "PRACTICE",
+                              SURF_MAN_QA_INK,
+                              AFORC_STYLE_NONE) ||
+         !surf_man_qa_text_at(app->renderer,
+                              (AFORC_Point){8, 4},
+                              "SURF SHACK",
+                              SURF_MAN_QA_INK,
+                              AFORC_STYLE_BOLD) ||
+         !surf_man_qa_text_at(app->renderer,
+                              (AFORC_Point){57, 9},
+                              "UP/DOWN  ENTER",
+                              SURF_MAN_QA_INK,
+                              AFORC_STYLE_NONE) ||
+         !surf_man_qa_text_at(
+              app->renderer,
+              (AFORC_Point){2, 22},
+              "UP/DOWN SELECT  ENTER START  ? HELP  Q QUIT",
+              SURF_MAN_QA_INK,
+              AFORC_STYLE_NONE)) {
         return surf_man_qa_render_error(
             error,
             AFORC_ERROR_STATE,
             "shack art or menu cells differed from the 80x24 composition");
+    }
+    for (int32_t column = 0; column < layout.play.width; ++column) {
+        AFORC_Cell cell;
+
+        if (aforc_renderer_get(
+                app->renderer,
+                (AFORC_Point){layout.play.x + column,
+                               layout.play.y + layout.play.height - 2},
+                &cell) != AFORC_OK) {
+            return surf_man_qa_render_error(
+                error,
+                AFORC_ERROR_STATE,
+                "shack shoreline row could not be inspected");
+        }
+        if (cell.codepoint != (uint32_t)' ' &&
+            cell.foreground.mode == AFORC_COLOR_INDEXED &&
+            cell.foreground.red == SURF_MAN_QA_INK) {
+            ++strong_shore_cells;
+        }
+    }
+    if (strong_shore_cells > (size_t)layout.play.width / 4U) {
+        return surf_man_qa_render_error(
+            error,
+            AFORC_ERROR_STATE,
+            "shack shoreline overpowered the title and session menu");
     }
     if (!surf_man_qa_find_text(app->renderer, "SHACK MENU", NULL) ||
         !surf_man_qa_find_text(app->renderer, "BEST SCORE", NULL) ||
@@ -638,6 +788,7 @@ static AFORC_Status surf_man_qa_pause_actions(SurfManApp *app,
                                                AFORC_Error *error) {
     const SurfManSimulation saved_simulation = app->simulation;
     const SurfManOverlay saved_overlay = app->overlay;
+    AFORC_Point controls_position;
     AFORC_Status status;
 
     app->simulation.phase = SURF_MAN_PRACTICE;
@@ -650,8 +801,9 @@ static AFORC_Status surf_man_qa_pause_actions(SurfManApp *app,
          !surf_man_qa_find_text(app->renderer, "ACCESSIBILITY", NULL) ||
          !surf_man_qa_find_text(app->renderer, "END SESSION", NULL) ||
          !surf_man_qa_find_text(app->renderer, "QUIT", NULL) ||
-         !surf_man_qa_find_text(
-              app->renderer, "UP/DOWN SELECT  ENTER ACT", NULL))) {
+          !surf_man_qa_find_text(
+               app->renderer, "UP/DOWN SELECT  ENTER ACT", NULL) ||
+          surf_man_qa_find_text(app->renderer, "DAY 0", NULL))) {
         status = AFORC_ERROR_STATE;
     }
     if (status == AFORC_OK) {
@@ -660,8 +812,30 @@ static AFORC_Status surf_man_qa_pause_actions(SurfManApp *app,
         status = surf_man_render_frame(app, 0.0, error);
     }
     if (status == AFORC_OK &&
-        !surf_man_qa_find_text(
-            app->renderer, "ESC/ENTER/?/P BACK", NULL)) {
+        (!surf_man_qa_find_text(
+             app->renderer, "ESC/ENTER/?/P BACK", &controls_position) ||
+         !surf_man_qa_text_at(app->renderer,
+                              controls_position,
+                              "ESC/ENTER/?/P BACK",
+                              SURF_MAN_QA_INK,
+                              AFORC_STYLE_NONE))) {
+        status = AFORC_ERROR_STATE;
+    }
+    if (status == AFORC_OK) {
+        app->overlay = SURF_MAN_OVERLAY_ACCESSIBILITY;
+        surf_man_visuals_mark_dirty(&app->visuals);
+        status = surf_man_render_frame(app, 0.0, error);
+    }
+    if (status == AFORC_OK &&
+        (!surf_man_qa_find_text(app->renderer,
+                                "UP/DOWN SELECT  LEFT/RIGHT CHANGE  ESC BACK",
+                                &controls_position) ||
+         !surf_man_qa_text_at(
+              app->renderer,
+              controls_position,
+              "UP/DOWN SELECT  LEFT/RIGHT CHANGE  ESC BACK",
+              SURF_MAN_QA_INK,
+              AFORC_STYLE_NONE))) {
         status = AFORC_ERROR_STATE;
     }
 
@@ -834,6 +1008,49 @@ static AFORC_Status surf_man_qa_count_in_copy(SurfManApp *app,
     return AFORC_OK;
 }
 
+static AFORC_Status surf_man_qa_input_gauges(SurfManApp *app,
+                                              AFORC_Error *error) {
+    const SurfManInputState saved_controls = app->controls;
+    const SurfManSimulation saved_simulation = app->simulation;
+    AFORC_Status status;
+
+    app->controls.horizontal = 1;
+    app->controls.vertical = -1;
+    app->simulation.line_position_q16 = 0;
+    app->simulation.wave_face_offset_q16 = 0;
+    app->simulation.line_velocity_q16 = -SURF_MAN_Q16_ONE;
+    app->simulation.wave_face_velocity_q16 = SURF_MAN_Q16_ONE;
+    app->simulation.risk_active = false;
+    surf_man_visuals_mark_dirty(&app->visuals);
+    status = surf_man_render_frame(app, 0.0, error);
+    if (status == AFORC_OK &&
+        (!surf_man_qa_find_text(
+             app->renderer, "LINE [---->----]", NULL) ||
+         !surf_man_qa_find_text(app->renderer, "FACE [--^--]", NULL) ||
+         !surf_man_qa_find_text(app->renderer, "RISK CLEAR", NULL))) {
+        status = AFORC_ERROR_STATE;
+    }
+    if (status == AFORC_OK) {
+        app->simulation.risk_active = true;
+        surf_man_visuals_mark_dirty(&app->visuals);
+        status = surf_man_render_frame(app, 0.0, error);
+    }
+    if (status == AFORC_OK &&
+        !surf_man_qa_find_text(app->renderer, "RISK ACTIVE", NULL)) {
+        status = AFORC_ERROR_STATE;
+    }
+
+    app->controls = saved_controls;
+    app->simulation = saved_simulation;
+    if (status != AFORC_OK) {
+        return surf_man_qa_render_error(
+            error,
+            status,
+            "LINE/FACE gauges hid held input or omitted explicit risk state");
+    }
+    return AFORC_OK;
+}
+
 static AFORC_Status surf_man_qa_riding_cells(SurfManApp *app,
                                               AFORC_Error *error) {
     surf_man_visuals_mark_dirty(&app->visuals);
@@ -845,7 +1062,9 @@ static AFORC_Status surf_man_qa_riding_cells(SurfManApp *app,
     }
     if (!surf_man_qa_find_text(app->renderer, "SCORE", NULL) ||
         !surf_man_qa_find_text(app->renderer, "FLOW", NULL) ||
-        !surf_man_qa_find_text(app->renderer, "WAVE", NULL)) {
+        !surf_man_qa_find_text(app->renderer, "WAVE", NULL) ||
+        !surf_man_qa_find_text(app->renderer, "LINE [", NULL) ||
+        !surf_man_qa_find_text(app->renderer, "FACE [", NULL)) {
         return surf_man_qa_render_error(
             error,
             AFORC_ERROR_STATE,
@@ -857,18 +1076,23 @@ static AFORC_Status surf_man_qa_riding_cells(SurfManApp *app,
                              SURF_MAN_QA_INK,
                              AFORC_STYLE_BOLD) ||
         !surf_man_qa_text_at(app->renderer,
-                             (AFORC_Point){2, 19},
-                             "FLOW [",
-                             SURF_MAN_QA_INK,
-                             AFORC_STYLE_NONE) ||
+                              (AFORC_Point){2, 19},
+                              "LINE [",
+                              SURF_MAN_QA_INK,
+                              AFORC_STYLE_NONE) ||
         !surf_man_qa_text_at(app->renderer,
-                             (AFORC_Point){8, 19},
-                             "===",
-                             SURF_MAN_QA_SIGNAL,
-                             AFORC_STYLE_BOLD) ||
+                              (AFORC_Point){2, 20},
+                              "FLOW [",
+                              SURF_MAN_QA_INK,
+                              AFORC_STYLE_NONE) ||
         !surf_man_qa_text_at(app->renderer,
-                             (AFORC_Point){11, 19},
-                             "--",
+                              (AFORC_Point){8, 20},
+                              "===",
+                              SURF_MAN_QA_SIGNAL,
+                              AFORC_STYLE_BOLD) ||
+        !surf_man_qa_text_at(app->renderer,
+                              (AFORC_Point){11, 20},
+                              "--",
                              SURF_MAN_QA_FRAMEWORK,
                              AFORC_STYLE_DIM)) {
         return surf_man_qa_render_error(
@@ -876,11 +1100,19 @@ static AFORC_Status surf_man_qa_riding_cells(SurfManApp *app,
             AFORC_ERROR_STATE,
             "riding HUD cells differed from the fixed 80x24 composition");
     }
+    status = surf_man_qa_wave_contour_is_continuous(app, error);
+    if (status != AFORC_OK) {
+        return status;
+    }
     status = surf_man_qa_all_rider_poses(app, error);
     if (status != AFORC_OK) {
         return status;
     }
     status = surf_man_qa_dynamic_rider_motion(app, error);
+    if (status != AFORC_OK) {
+        return status;
+    }
+    status = surf_man_qa_rider_preserves_background(app, error);
     if (status != AFORC_OK) {
         return status;
     }
@@ -1033,12 +1265,54 @@ static AFORC_Status surf_man_qa_reduced_motion_checks(SurfManApp *app,
     return AFORC_OK;
 }
 
+static AFORC_Status surf_man_qa_phase_control_contrast(
+    SurfManApp *app,
+    AFORC_Error *error) {
+    const SurfManSimulation saved_simulation = app->simulation;
+    AFORC_Status status;
+
+    app->simulation.phase = SURF_MAN_WAVE_RECAP;
+    surf_man_visuals_mark_dirty(&app->visuals);
+    status = surf_man_render_frame(app, 0.0, error);
+    if (status == AFORC_OK &&
+        !surf_man_qa_text_at(app->renderer,
+                             (AFORC_Point){21, 11},
+                             "ENTER NEXT WAVE   ESC SHACK",
+                             SURF_MAN_QA_INK,
+                             AFORC_STYLE_NONE)) {
+        status = AFORC_ERROR_STATE;
+    }
+    if (status == AFORC_OK) {
+        app->simulation.phase = SURF_MAN_DAY_RECAP;
+        surf_man_visuals_mark_dirty(&app->visuals);
+        status = surf_man_render_frame(app, 0.0, error);
+    }
+    if (status == AFORC_OK &&
+        !surf_man_qa_text_at(app->renderer,
+                             (AFORC_Point){21, 11},
+                             "ENTER RETURN TO SHACK",
+                             SURF_MAN_QA_INK,
+                             AFORC_STYLE_NONE)) {
+        status = AFORC_ERROR_STATE;
+    }
+
+    app->simulation = saved_simulation;
+    if (status != AFORC_OK) {
+        return surf_man_qa_render_error(
+            error,
+            status,
+            "recap controls used a decorative low-contrast token");
+    }
+    return AFORC_OK;
+}
+
 static AFORC_Status surf_man_qa_resize_panel_checks(SurfManApp *app,
                                                      AFORC_Error *error) {
     const AFORC_Size saved_size = aforc_renderer_size(app->renderer);
     const AFORC_Size compact = {50, 12};
     const AFORC_Cell corner = surf_man_cell(
         (uint32_t)'+', SURF_MAN_QA_FRAMEWORK, AFORC_STYLE_NONE);
+    AFORC_Point paused_position;
     AFORC_Status status = aforc_renderer_resize(app->renderer, compact);
     AFORC_Status restore_status;
 
@@ -1053,8 +1327,14 @@ static AFORC_Status surf_man_qa_resize_panel_checks(SurfManApp *app,
          !surf_man_qa_cell_at(app->renderer, (AFORC_Point){1, 8}, corner) ||
          !surf_man_qa_cell_at(app->renderer, (AFORC_Point){48, 8}, corner) ||
          !surf_man_qa_find_text(
-             app->renderer, "RESIZE TERMINAL TO AT LEAST 60x20", NULL) ||
-         !surf_man_qa_find_text(app->renderer, "GAMEPLAY TIME PAUSED", NULL))) {
+              app->renderer, "RESIZE TERMINAL TO AT LEAST 60x20", NULL) ||
+          !surf_man_qa_find_text(
+               app->renderer, "GAMEPLAY TIME PAUSED", &paused_position) ||
+          !surf_man_qa_text_at(app->renderer,
+                               paused_position,
+                               "GAMEPLAY TIME PAUSED",
+                               SURF_MAN_QA_INK,
+                               AFORC_STYLE_NONE))) {
         status = AFORC_ERROR_STATE;
     }
 
@@ -1069,6 +1349,59 @@ static AFORC_Status surf_man_qa_resize_panel_checks(SurfManApp *app,
             error,
             status,
             "undersized terminal did not render a centered bordered pause panel");
+    }
+    return AFORC_OK;
+}
+
+static AFORC_Status surf_man_qa_minimum_help_panel(SurfManApp *app,
+                                                    AFORC_Error *error) {
+    const AFORC_Size saved_size = aforc_renderer_size(app->renderer);
+    const AFORC_Size saved_terminal_size = app->terminal_size;
+    const SurfManSimulation saved_simulation = app->simulation;
+    const SurfManOverlay saved_overlay = app->overlay;
+    const AFORC_Size minimum = {SURF_MAN_MIN_COLUMNS, SURF_MAN_MIN_ROWS};
+    const AFORC_Cell frame = surf_man_cell(
+        (uint32_t)'+', SURF_MAN_QA_FRAMEWORK, AFORC_STYLE_NONE);
+    AFORC_Point help_position;
+    AFORC_Status status = aforc_renderer_resize(app->renderer, minimum);
+    AFORC_Status restore_status;
+
+    if (status == AFORC_OK) {
+        app->terminal_size = minimum;
+        app->simulation.phase = SURF_MAN_SHACK;
+        app->overlay = SURF_MAN_OVERLAY_HELP;
+        surf_man_visuals_mark_dirty(&app->visuals);
+        status = surf_man_render_frame(app, 0.0, error);
+    }
+    if (status == AFORC_OK &&
+        (!surf_man_qa_find_text(app->renderer, "HELP", &help_position) ||
+         help_position.y != 1 ||
+         !surf_man_qa_find_text(
+             app->renderer, "ESC/ENTER/?/P BACK", NULL) ||
+         !surf_man_qa_find_text(
+              app->renderer,
+              "NO CHORDS/RELEASE TIMING. P: PAUSE > END.",
+              NULL) ||
+         !surf_man_qa_cell_at(app->renderer, (AFORC_Point){0, 0}, frame) ||
+         !surf_man_qa_cell_at(app->renderer,
+                              (AFORC_Point){minimum.width - 1, 0},
+                              frame))) {
+        status = AFORC_ERROR_STATE;
+    }
+
+    restore_status = aforc_renderer_resize(app->renderer, saved_size);
+    app->terminal_size = saved_terminal_size;
+    app->simulation = saved_simulation;
+    app->overlay = saved_overlay;
+    surf_man_visuals_mark_dirty(&app->visuals);
+    if (status == AFORC_OK) {
+        status = restore_status;
+    }
+    if (status != AFORC_OK) {
+        return surf_man_qa_render_error(
+            error,
+            status,
+            "minimum-size Help panel overwrote the instrument frame");
     }
     return AFORC_OK;
 }
@@ -1164,6 +1497,9 @@ AFORC_Status surf_man_render_checks(SurfManApp *app, AFORC_Error *error) {
         status = surf_man_qa_count_in_copy(app, error);
     }
     if (status == AFORC_OK) {
+        status = surf_man_qa_input_gauges(app, error);
+    }
+    if (status == AFORC_OK) {
         status = surf_man_qa_rider_legend(app, error);
     }
     if (status == AFORC_OK) {
@@ -1173,7 +1509,13 @@ AFORC_Status surf_man_render_checks(SurfManApp *app, AFORC_Error *error) {
         status = surf_man_qa_reduced_motion_checks(app, error);
     }
     if (status == AFORC_OK) {
+        status = surf_man_qa_phase_control_contrast(app, error);
+    }
+    if (status == AFORC_OK) {
         status = surf_man_qa_resize_panel_checks(app, error);
+    }
+    if (status == AFORC_OK) {
+        status = surf_man_qa_minimum_help_panel(app, error);
     }
 
     app->simulation = saved_simulation;
