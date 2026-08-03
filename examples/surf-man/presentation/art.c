@@ -13,8 +13,10 @@
 #include <string.h>
 
 enum {
-    WAVE_FOCAL_CORE_RADIUS = 3,
-    WAVE_FOCAL_FADE_RADIUS = 7
+    WAVE_FOCAL_CORE_RADIUS = 5,
+    WAVE_FOCAL_FADE_RADIUS = 10,
+    WAVE_WAKE_START = 1,
+    WAVE_TEXTURE_DEPTH = 2
 };
 
 static int32_t clamp_i32(int32_t value, int32_t minimum, int32_t maximum) {
@@ -43,21 +45,7 @@ static uint32_t wave_glyph(const SurfManWaveSample *sample,
                            int32_t previous_row,
                            int32_t row,
                            int32_t next_row) {
-    if (sample->hazard) {
-        return (uint32_t)'+';
-    }
-    if (sample->tube) {
-        return (uint32_t)'=';
-    }
-    if (sample->pocket) {
-        return (uint32_t)'#';
-    }
-    if (sample->lip) {
-        return (uint32_t)'^';
-    }
-    if (sample->foam) {
-        return (uint32_t)'*';
-    }
+    (void)sample;
     if (row < previous_row && row < next_row) {
         return (uint32_t)'^';
     }
@@ -70,13 +58,7 @@ static uint32_t wave_glyph(const SurfManWaveSample *sample,
     if (next_row > row || previous_row < row) {
         return (uint32_t)'\\';
     }
-    if (sample->slope_q16 >= SURF_MAN_Q16_ONE / 8) {
-        return (uint32_t)'/';
-    }
-    if (sample->slope_q16 <= -SURF_MAN_Q16_ONE / 8) {
-        return (uint32_t)'\\';
-    }
-    return (uint32_t)'-';
+    return (uint32_t)'~';
 }
 
 static SurfManTone wave_tone(const SurfManWaveSample *sample) {
@@ -153,31 +135,34 @@ static uint32_t wave_depth_glyph(const SurfManWaveSample *sample,
     const uint64_t flow_position = (uint64_t)(uint32_t)column + phase +
                                    depth * 5U;
     const uint64_t flow_period = 13U + depth * 4U;
+    const uint32_t feature_stride = sample->hazard ? 2U : 3U;
+    const bool feature_column =
+        flow_position % feature_stride == 0U;
 
     if (sample->hazard) {
-        static const char hazard[] = "|V^";
-
-        return (uint32_t)(unsigned char)hazard[depth - 1U];
+        return feature_column
+                   ? (depth == 1U ? (uint32_t)'V' : (uint32_t)'|')
+                   : (uint32_t)' ';
     }
     if (sample->tube) {
-        static const char tube[] = "#=:";
-
-        return (uint32_t)(unsigned char)tube[depth - 1U];
+        return feature_column
+                   ? (depth == 1U ? (uint32_t)'=' : (uint32_t)':')
+                   : (uint32_t)' ';
     }
     if (sample->pocket) {
-        static const char pocket[] = "#:.";
-
-        return (uint32_t)(unsigned char)pocket[depth - 1U];
+        return feature_column
+                   ? (depth == 1U ? (uint32_t)'#' : (uint32_t)'.')
+                   : (uint32_t)' ';
     }
     if (sample->lip) {
-        static const char lip[] = "|:.";
-
-        return (uint32_t)(unsigned char)lip[depth - 1U];
+        return feature_column
+                   ? (depth == 1U ? (uint32_t)'^' : (uint32_t)'.')
+                   : (uint32_t)' ';
     }
     if (sample->foam) {
-        static const char foam[] = "o:.";
-
-        return (uint32_t)(unsigned char)foam[depth - 1U];
+        return feature_column
+                   ? (depth == 1U ? (uint32_t)'o' : (uint32_t)'.')
+                   : (uint32_t)' ';
     }
     if (flow_position % flow_period >= 3U) {
         return (uint32_t)' ';
@@ -266,7 +251,9 @@ static AFORC_Status draw_wave_column(SurfManApp *app,
     const int32_t crest_row = row - 1;
     AFORC_Status status = AFORC_OK;
 
-    for (size_t depth = 1U; status == AFORC_OK && depth <= 3U; ++depth) {
+    for (size_t depth = 1U;
+         status == AFORC_OK && depth <= WAVE_TEXTURE_DEPTH;
+         ++depth) {
         const int32_t texture_row = row + (int32_t)depth;
         uint32_t glyph;
         AFORC_CellStyle style = AFORC_STYLE_DIM;
@@ -289,7 +276,7 @@ static AFORC_Status draw_wave_column(SurfManApp *app,
             style);
     }
     if (status == AFORC_OK &&
-        wake_distance > WAVE_FOCAL_CORE_RADIUS &&
+        wake_distance > WAVE_WAKE_START &&
         wake_distance <= wake_length && crest_row > layout->play.y + 2) {
         static const char wake[] = ".o. ";
         const size_t index = ((size_t)wake_distance +
@@ -350,7 +337,7 @@ AFORC_Status surf_man_render_shack_art(SurfManApp *app,
         " +---------------+ "};
     static const char horizon[] = "--  .   --   .  ";
     static const char rear_swell[] = "_____/~~\\____________";
-    static const char shore_break[] = "~=-~~--=~-";
+    static const char shore_break[] = "~~    --    ~~    ";
     const uint64_t motion_phase = decorative_phase(app, 6U);
     const uint64_t horizon_phase = decorative_phase(app, 18U);
     const uint64_t rear_phase = decorative_phase(app, 9U);
@@ -408,11 +395,11 @@ AFORC_Status surf_man_render_shack_art(SurfManApp *app,
     if (status == AFORC_OK) {
         status = draw_pattern_row(app,
                                   layout,
-                                  water_y,
-                                  shore_break,
-                                  shore_phase,
-                                  SURF_MAN_TONE_INK,
-                                  AFORC_STYLE_NONE);
+                                   water_y,
+                                   shore_break,
+                                   shore_phase,
+                                   SURF_MAN_TONE_FRAMEWORK,
+                                   AFORC_STYLE_NONE);
     }
     return status;
 }
@@ -439,9 +426,9 @@ AFORC_Status surf_man_render_wave_art(SurfManApp *app,
     status = surf_man_draw_text(
         app,
         (AFORC_Point){layout->play.x + 1, layout->play.y},
-        "W/S FACE   A/D LINE   SPACE ACTION   ? HELP",
-        SURF_MAN_TONE_FRAMEWORK,
-        AFORC_STYLE_DIM);
+        "W/S FACE  A/D LINE  SPACE ACTION  P PAUSE  ? HELP",
+        SURF_MAN_TONE_INK,
+        AFORC_STYLE_NONE);
     if (status == AFORC_OK) {
         status = draw_pattern_row(app,
                                   layout,

@@ -27,9 +27,9 @@ typedef enum SurfManRiderPose {
 } SurfManRiderPose;
 
 enum {
-    SURF_MAN_RIDER_LEGEND_ROWS = 1,
+    SURF_MAN_RIDER_SKY_ROWS = 3,
     SURF_MAN_RIDER_BODY_ROWS = 3,
-    SURF_MAN_RIDER_HALF_WIDTH = 5,
+    SURF_MAN_RIDER_HALF_WIDTH = 4,
     SURF_MAN_RIDER_BODY_WIDTH = SURF_MAN_RIDER_HALF_WIDTH * 2 + 1,
     SURF_MAN_RIDER_BOARD_GAP = 0
 };
@@ -38,23 +38,23 @@ static const char rider_body[SURF_MAN_RIDER_POSE_COUNT]
                             [SURF_MAN_RIDER_BODY_ROWS]
                             [SURF_MAN_RIDER_BODY_WIDTH + 1] = {
     [SURF_MAN_RIDER_NEUTRAL] = {
-        "     O     ", "    /|\\    ", "    / \\    "},
+        "    O    ", "   /|\\   ", "   / \\   "},
     [SURF_MAN_RIDER_PADDLE] = {
-        "     O     ", "    /|\\    ", "    / \\    "},
+        "    O    ", "   /|\\   ", "   / \\   "},
     [SURF_MAN_RIDER_CARVE_LEFT] = {
-        "    O      ", "   /|\\     ", "   / \\     "},
+        "   O     ", "  /|\\    ", "  / \\    "},
     [SURF_MAN_RIDER_CARVE_RIGHT] = {
-        "      O    ", "     /|\\   ", "     / \\   "},
+        "     O   ", "    /|\\  ", "    / \\  "},
     [SURF_MAN_RIDER_AIR] = {
-        "     O     ", "    \\|/    ", "    / \\    "},
+        "    O    ", "   \\|/   ", "   / \\   "},
     [SURF_MAN_RIDER_GRAB] = {
-        "      O    ", "    _/|/   ", "     / \\   "},
+        "     O   ", "   _/|/  ", "    / \\  "},
     [SURF_MAN_RIDER_LANDING] = {
-        "     O     ", "   \\_|_/   ", "    / \\    "},
+        "    O    ", "  \\_|_/  ", "   / \\   "},
     [SURF_MAN_RIDER_TUBE] = {
-        "    O      ", "   /|_     ", "   / \\     "},
+        "   O     ", "  /|_    ", "  / \\    "},
     [SURF_MAN_RIDER_WIPEOUT] = {
-        "     O     ", "   __|__   ", "   _/ \\_   "}};
+        "    O    ", "  __|__  ", "  _/ \\_  "}};
 
 static SurfManRiderPose rider_pose(const SurfManSimulation *simulation) {
     const int32_t carve_threshold =
@@ -97,22 +97,22 @@ static SurfManRiderPose rider_pose(const SurfManSimulation *simulation) {
 static const char *rider_board(SurfManRiderPose pose, int32_t angle_q16) {
     switch (pose) {
     case SURF_MAN_RIDER_CARVE_LEFT:
-        return "\\=======/";
+        return "\\=====/";
     case SURF_MAN_RIDER_CARVE_RIGHT:
-        return "/=======\\";
+        return "/=====\\";
     case SURF_MAN_RIDER_AIR:
     case SURF_MAN_RIDER_GRAB:
-        return angle_q16 < 0 ? "\\=======/" : "/=======\\";
+        return angle_q16 < 0 ? "\\=====/" : "/=====\\";
     case SURF_MAN_RIDER_WIPEOUT:
-        return angle_q16 < 0 ? "\\=======/" : "/=======\\";
+        return angle_q16 < 0 ? "\\=====/" : "/=====\\";
     case SURF_MAN_RIDER_NEUTRAL:
     case SURF_MAN_RIDER_PADDLE:
     case SURF_MAN_RIDER_LANDING:
     case SURF_MAN_RIDER_TUBE:
     case SURF_MAN_RIDER_POSE_COUNT:
-        return "<=======>";
+        return "<=====>";
     }
-    return "<=======>";
+    return "<=====>";
 }
 
 static bool rider_cell_visible(const SurfManLayout *layout,
@@ -138,11 +138,7 @@ static AFORC_Status draw_rider_glyph(SurfManApp *app,
         return AFORC_OK;
     }
     if (glyph == (unsigned char)' ') {
-        return surf_man_draw_char(app,
-                                  position,
-                                  (uint32_t)' ',
-                                  SURF_MAN_TONE_CANVAS,
-                                  AFORC_STYLE_NONE);
+        return AFORC_OK;
     }
     return surf_man_draw_char(app,
                               position,
@@ -218,7 +214,7 @@ AFORC_Status surf_man_render_rider(SurfManApp *app,
     const int32_t center_x =
         surf_man_rider_center_x(simulation, layout->play);
     const int32_t minimum_board_y = layout->play.y +
-                                     SURF_MAN_RIDER_LEGEND_ROWS +
+                                     SURF_MAN_RIDER_SKY_ROWS +
                                      SURF_MAN_RIDER_BODY_ROWS +
                                      SURF_MAN_RIDER_BOARD_GAP;
     const int32_t maximum_board_y = layout->play.y + layout->play.height - 1;
