@@ -16,55 +16,50 @@
  * escape sequence, and can force progress when bounded storage fills.
  */
 
-static AFORC_ParseResult aforc_input_internal_parse_paste(
-    AFORC_Input *input,
-    const unsigned char *bytes,
-    size_t size,
-    bool force_escape,
-    uint64_t timestamp_ms,
-    size_t *out_consumed
-)
+static AFORC_ParseResult
+aforc_input_internal_parse_paste(AFORC_Input *input,
+                                 const unsigned char *bytes,
+                                 size_t size,
+                                 bool force_escape,
+                                 uint64_t timestamp_ms,
+                                 size_t *out_consumed)
 {
-    static const unsigned char paste_end[] = {
-        0x1bu,
-        (unsigned char)'[',
-        (unsigned char)'2',
-        (unsigned char)'0',
-        (unsigned char)'1',
-        (unsigned char)'~'
-    };
-    size_t prefix_size = size < sizeof(paste_end) ? size :
-                                                       sizeof(paste_end);
+    static const unsigned char paste_end[] = {0x1bu,
+                                              (unsigned char)'[',
+                                              (unsigned char)'2',
+                                              (unsigned char)'0',
+                                              (unsigned char)'1',
+                                              (unsigned char)'~'};
+    size_t prefix_size = size < sizeof(paste_end) ? size : sizeof(paste_end);
     uint32_t codepoint = 0u;
     size_t consumed = 0u;
     AFORC_Utf8Result utf8_result;
 
     /* Hold a partial terminator so its protocol bytes never leak as text. */
-    if (memcmp(bytes, paste_end, prefix_size) == 0) {
-        if (size < sizeof(paste_end) && !force_escape) {
+    if (memcmp(bytes, paste_end, prefix_size) == 0)
+    {
+        if (size < sizeof(paste_end) && !force_escape)
+        {
             return AFORC_PARSE_INCOMPLETE;
         }
-        if (size >= sizeof(paste_end)) {
+        if (size >= sizeof(paste_end))
+        {
             const AFORC_InputEvent event = aforc_input_internal_event(
-                AFORC_INPUT_EVENT_PASTE_END,
-                timestamp_ms
-            );
+                AFORC_INPUT_EVENT_PASTE_END, timestamp_ms);
             input->paste_mode = false;
             (void)aforc_input_internal_queue_event(input, &event);
             *out_consumed = sizeof(paste_end);
             return AFORC_PARSE_COMPLETE;
         }
     }
-    utf8_result = aforc_input_internal_decode_utf8(
-        bytes,
-        size,
-        &codepoint,
-        &consumed
-    );
-    if (utf8_result == AFORC_UTF8_INCOMPLETE && !force_escape) {
+    utf8_result =
+        aforc_input_internal_decode_utf8(bytes, size, &codepoint, &consumed);
+    if (utf8_result == AFORC_UTF8_INCOMPLETE && !force_escape)
+    {
         return AFORC_PARSE_INCOMPLETE;
     }
-    if (utf8_result != AFORC_UTF8_COMPLETE) {
+    if (utf8_result != AFORC_UTF8_COMPLETE)
+    {
         codepoint = 0xfffdu;
         consumed = 1u;
     }
@@ -73,10 +68,8 @@ static AFORC_ParseResult aforc_input_internal_parse_paste(
     return AFORC_PARSE_COMPLETE;
 }
 
-static bool aforc_input_internal_escape_expired(
-    const AFORC_Input *input,
-    uint64_t timestamp_ms
-)
+static bool aforc_input_internal_escape_expired(const AFORC_Input *input,
+                                                uint64_t timestamp_ms)
 {
     return input->escape_pending &&
            (timestamp_ms >= input->escape_started_ms) &&
@@ -84,48 +77,44 @@ static bool aforc_input_internal_escape_expired(
                (uint64_t)input->escape_timeout_ms;
 }
 
-static void aforc_input_internal_mark_escape(
-    AFORC_Input *input,
-    uint64_t timestamp_ms
-)
+static void aforc_input_internal_mark_escape(AFORC_Input *input,
+                                             uint64_t timestamp_ms)
 {
     /* Do not restart the deadline when a partial sequence gains more bytes. */
-    if (!input->escape_pending) {
+    if (!input->escape_pending)
+    {
         input->escape_pending = true;
         input->escape_started_ms = timestamp_ms;
     }
 }
 
-static void aforc_input_internal_emit_escape(
-    AFORC_Input *input,
-    uint64_t timestamp_ms
-)
+static void aforc_input_internal_emit_escape(AFORC_Input *input,
+                                             uint64_t timestamp_ms)
 {
-    aforc_input_internal_emit_key_down(
-        input,
-        AFORC_KEY_ESCAPE,
-        0u,
-        AFORC_MOD_NONE,
-        false,
-        false,
-        false,
-        timestamp_ms
-    );
+    aforc_input_internal_emit_key_down(input,
+                                       AFORC_KEY_ESCAPE,
+                                       0u,
+                                       AFORC_MOD_NONE,
+                                       false,
+                                       false,
+                                       false,
+                                       timestamp_ms);
 }
 
-static AFORC_ParseResult aforc_input_internal_parse_escape(
-    AFORC_Input *input,
-    const unsigned char *bytes,
-    size_t size,
-    bool force_escape,
-    uint64_t timestamp_ms,
-    size_t *out_consumed
-)
+static AFORC_ParseResult
+aforc_input_internal_parse_escape(AFORC_Input *input,
+                                  const unsigned char *bytes,
+                                  size_t size,
+                                  bool force_escape,
+                                  uint64_t timestamp_ms,
+                                  size_t *out_consumed)
 {
     size_t final_index = 0u;
 
-    if (size < 2u) {
-        if (!force_escape) {
+    if (size < 2u)
+    {
+        if (!force_escape)
+        {
             aforc_input_internal_mark_escape(input, timestamp_ms);
             return AFORC_PARSE_INCOMPLETE;
         }
@@ -133,10 +122,14 @@ static AFORC_ParseResult aforc_input_internal_parse_escape(
         *out_consumed = 1u;
         return AFORC_PARSE_COMPLETE;
     }
-    if (bytes[1] == (unsigned char)'[') {
-        if (size >= 3u && bytes[2] == (unsigned char)'M') {
-            if (size < 6u) {
-                if (!force_escape) {
+    if (bytes[1] == (unsigned char)'[')
+    {
+        if (size >= 3u && bytes[2] == (unsigned char)'M')
+        {
+            if (size < 6u)
+            {
+                if (!force_escape)
+                {
                     aforc_input_internal_mark_escape(input, timestamp_ms);
                     return AFORC_PARSE_INCOMPLETE;
                 }
@@ -144,40 +137,40 @@ static AFORC_ParseResult aforc_input_internal_parse_escape(
                 *out_consumed = 1u;
                 return AFORC_PARSE_COMPLETE;
             }
-            if (bytes[3] >= 32u && bytes[4] >= 33u && bytes[5] >= 33u) {
-                aforc_input_internal_handle_mouse(
-                    input,
-                    (uint32_t)(bytes[3] - 32u),
-                    (uint32_t)(bytes[4] - 32u),
-                    (uint32_t)(bytes[5] - 32u),
-                    false,
-                    true,
-                    timestamp_ms
-                );
+            if (bytes[3] >= 32u && bytes[4] >= 33u && bytes[5] >= 33u)
+            {
+                aforc_input_internal_handle_mouse(input,
+                                                  (uint32_t)(bytes[3] - 32u),
+                                                  (uint32_t)(bytes[4] - 32u),
+                                                  (uint32_t)(bytes[5] - 32u),
+                                                  false,
+                                                  true,
+                                                  timestamp_ms);
             }
             *out_consumed = 6u;
             return AFORC_PARSE_COMPLETE;
         }
         for (final_index = 2u; final_index < size && final_index < 64u;
-             ++final_index) {
-            if (bytes[final_index] >= 0x40u &&
-                bytes[final_index] <= 0x7eu) {
-                aforc_input_internal_handle_csi(
-                    input,
-                    bytes + 2u,
-                    final_index - 2u,
-                    bytes[final_index],
-                    timestamp_ms
-                );
+             ++final_index)
+        {
+            if (bytes[final_index] >= 0x40u && bytes[final_index] <= 0x7eu)
+            {
+                aforc_input_internal_handle_csi(input,
+                                                bytes + 2u,
+                                                final_index - 2u,
+                                                bytes[final_index],
+                                                timestamp_ms);
                 *out_consumed = final_index + 1u;
                 return AFORC_PARSE_COMPLETE;
             }
         }
-        if (final_index == size && size < 64u && !force_escape) {
+        if (final_index == size && size < 64u && !force_escape)
+        {
             aforc_input_internal_mark_escape(input, timestamp_ms);
             return AFORC_PARSE_INCOMPLETE;
         }
-        if (force_escape) {
+        if (force_escape)
+        {
             aforc_input_internal_emit_escape(input, timestamp_ms);
             *out_consumed = 1u;
             return AFORC_PARSE_COMPLETE;
@@ -185,9 +178,12 @@ static AFORC_ParseResult aforc_input_internal_parse_escape(
         *out_consumed = final_index < size ? final_index + 1u : 1u;
         return AFORC_PARSE_COMPLETE;
     }
-    if (bytes[1] == (unsigned char)'O') {
-        if (size < 3u) {
-            if (!force_escape) {
+    if (bytes[1] == (unsigned char)'O')
+    {
+        if (size < 3u)
+        {
+            if (!force_escape)
+            {
                 aforc_input_internal_mark_escape(input, timestamp_ms);
                 return AFORC_PARSE_INCOMPLETE;
             }
@@ -199,25 +195,27 @@ static AFORC_ParseResult aforc_input_internal_parse_escape(
         *out_consumed = 3u;
         return AFORC_PARSE_COMPLETE;
     }
-    if (bytes[1] == 0x1bu) {
+    if (bytes[1] == 0x1bu)
+    {
         aforc_input_internal_emit_escape(input, timestamp_ms);
         *out_consumed = 1u;
         return AFORC_PARSE_COMPLETE;
     }
     {
         size_t consumed = 0u;
-        const AFORC_ParseResult result = aforc_input_internal_parse_plain(
-            input,
-            bytes + 1u,
-            size - 1u,
-            AFORC_MOD_ALT,
-            force_escape,
-            timestamp_ms,
-            &consumed
-        );
+        const AFORC_ParseResult result =
+            aforc_input_internal_parse_plain(input,
+                                             bytes + 1u,
+                                             size - 1u,
+                                             AFORC_MOD_ALT,
+                                             force_escape,
+                                             timestamp_ms,
+                                             &consumed);
 
-        if (result == AFORC_PARSE_INCOMPLETE) {
-            if (!force_escape) {
+        if (result == AFORC_PARSE_INCOMPLETE)
+        {
+            if (!force_escape)
+            {
                 aforc_input_internal_mark_escape(input, timestamp_ms);
                 return result;
             }
@@ -230,123 +228,110 @@ static AFORC_ParseResult aforc_input_internal_parse_escape(
     }
 }
 
-static AFORC_ParseResult aforc_input_internal_parse_one(
-    AFORC_Input *input,
-    const unsigned char *bytes,
-    size_t size,
-    bool force_escape,
-    uint64_t timestamp_ms,
-    size_t *out_consumed
-)
+static AFORC_ParseResult
+aforc_input_internal_parse_one(AFORC_Input *input,
+                               const unsigned char *bytes,
+                               size_t size,
+                               bool force_escape,
+                               uint64_t timestamp_ms,
+                               size_t *out_consumed)
 {
-    if (input->paste_mode) {
+    if (input->paste_mode)
+    {
         return aforc_input_internal_parse_paste(
-            input,
-            bytes,
-            size,
-            force_escape,
-            timestamp_ms,
-            out_consumed
-        );
+            input, bytes, size, force_escape, timestamp_ms, out_consumed);
     }
-    if (bytes[0] == 0x1bu) {
+    if (bytes[0] == 0x1bu)
+    {
         return aforc_input_internal_parse_escape(
-            input,
-            bytes,
-            size,
-            force_escape,
-            timestamp_ms,
-            out_consumed
-        );
+            input, bytes, size, force_escape, timestamp_ms, out_consumed);
     }
-    return aforc_input_internal_parse_plain(
-        input,
-        bytes,
-        size,
-        AFORC_MOD_NONE,
-        force_escape,
-        timestamp_ms,
-        out_consumed
-    );
+    return aforc_input_internal_parse_plain(input,
+                                            bytes,
+                                            size,
+                                            AFORC_MOD_NONE,
+                                            force_escape,
+                                            timestamp_ms,
+                                            out_consumed);
 }
 
-void aforc_input_internal_parse_available(
-    AFORC_Input *input,
-    uint64_t timestamp_ms,
-    bool force_all
-)
+void aforc_input_internal_parse_available(AFORC_Input *input,
+                                          uint64_t timestamp_ms,
+                                          bool force_all)
 {
     size_t offset = 0u;
 
-    while (offset < input->byte_count) {
+    while (offset < input->byte_count)
+    {
         size_t consumed = 0u;
         const bool force_escape =
-            force_all || aforc_input_internal_escape_expired(input, timestamp_ms);
-        const AFORC_ParseResult result = aforc_input_internal_parse_one(
-            input,
-            input->bytes + offset,
-            input->byte_count - offset,
-            force_escape,
-            timestamp_ms,
-            &consumed
-        );
+            force_all ||
+            aforc_input_internal_escape_expired(input, timestamp_ms);
+        const AFORC_ParseResult result =
+            aforc_input_internal_parse_one(input,
+                                           input->bytes + offset,
+                                           input->byte_count - offset,
+                                           force_escape,
+                                           timestamp_ms,
+                                           &consumed);
 
-        if (result == AFORC_PARSE_INCOMPLETE) {
+        if (result == AFORC_PARSE_INCOMPLETE)
+        {
             aforc_input_internal_mark_escape(input, timestamp_ms);
             break;
         }
-        if (consumed == 0u || consumed > input->byte_count - offset) {
+        if (consumed == 0u || consumed > input->byte_count - offset)
+        {
             consumed = 1u;
         }
         offset += consumed;
         input->escape_pending = false;
     }
-    if (offset > 0u) {
+    if (offset > 0u)
+    {
         input->byte_count -= offset;
-        if (input->byte_count > 0u) {
+        if (input->byte_count > 0u)
+        {
             (void)memmove(
-                input->bytes,
-                input->bytes + offset,
-                input->byte_count
-            );
+                input->bytes, input->bytes + offset, input->byte_count);
         }
     }
-    if (input->byte_count == 0u) {
+    if (input->byte_count == 0u)
+    {
         input->escape_pending = false;
     }
 }
 
-AFORC_Status aforc_input_internal_feed(
-    AFORC_Input *input,
-    const unsigned char *bytes,
-    size_t size,
-    uint64_t timestamp_ms
-)
+AFORC_Status aforc_input_internal_feed(AFORC_Input *input,
+                                       const unsigned char *bytes,
+                                       size_t size,
+                                       uint64_t timestamp_ms)
 {
     size_t offset = 0u;
 
     aforc_input_internal_release_expired(input, timestamp_ms);
     aforc_input_internal_parse_available(input, timestamp_ms, false);
-    while (offset < size) {
+    while (offset < size)
+    {
         size_t available = input->byte_capacity - input->byte_count;
         size_t chunk = size - offset;
 
-        if (available == 0u) {
-            /* A full prefix must be forced so bounded buffering makes progress. */
+        if (available == 0u)
+        {
+            /* A full prefix must be forced so bounded buffering makes progress.
+             */
             aforc_input_internal_parse_available(input, timestamp_ms, true);
             available = input->byte_capacity - input->byte_count;
-            if (available == 0u) {
+            if (available == 0u)
+            {
                 return AFORC_ERROR_OVERFLOW;
             }
         }
-        if (chunk > available) {
+        if (chunk > available)
+        {
             chunk = available;
         }
-        (void)memcpy(
-            input->bytes + input->byte_count,
-            bytes + offset,
-            chunk
-        );
+        (void)memcpy(input->bytes + input->byte_count, bytes + offset, chunk);
         input->byte_count += chunk;
         offset += chunk;
         aforc_input_internal_parse_available(input, timestamp_ms, false);

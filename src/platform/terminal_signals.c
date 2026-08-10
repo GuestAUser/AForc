@@ -18,15 +18,11 @@
 #include <unistd.h>
 
 /* Owns the single process-wide signal bridge. The handler records only
- * sig_atomic_t state and wakes normal code through the nonblocking self-pipe. */
+ * sig_atomic_t state and wakes normal code through the nonblocking self-pipe.
+ */
 
 static const int aforc_terminal_signals[AFORC_TERMINAL_SIGNAL_COUNT] = {
-    SIGWINCH,
-    SIGHUP,
-    SIGINT,
-    SIGQUIT,
-    SIGTERM
-};
+    SIGWINCH, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 
 static volatile sig_atomic_t aforc_terminal_global_active = 0;
 static volatile sig_atomic_t aforc_terminal_global_pipe = -1;
@@ -53,13 +49,17 @@ static void aforc_terminal_signal_handler(int signal_number)
 
     /* Restoration is not signal-safe; record the cause and wake poll so the
      * regular control path can restore termios and terminal modes. */
-    if (signal_number == SIGWINCH) {
+    if (signal_number == SIGWINCH)
+    {
         aforc_terminal_global_resize = 1;
         marker = (unsigned char)'w';
-    } else if (aforc_terminal_global_signal == 0) {
+    }
+    else if (aforc_terminal_global_signal == 0)
+    {
         aforc_terminal_global_signal = (sig_atomic_t)signal_number;
     }
-    if (aforc_terminal_global_pipe >= 0) {
+    if (aforc_terminal_global_pipe >= 0)
+    {
         const unsigned char byte = marker;
         ssize_t write_result;
         /* The nonblocking write may fail when the pipe is full. That is safe:
@@ -73,10 +73,12 @@ static void aforc_terminal_signal_handler(int signal_number)
 
 static void aforc_terminal_restore_at_exit(void)
 {
-    if (aforc_terminal_global_active == 0) {
+    if (aforc_terminal_global_active == 0)
+    {
         return;
     }
-    if (aforc_terminal_global_input_fd >= 0) {
+    if (aforc_terminal_global_input_fd >= 0)
+    {
         (void)tcsetattr(aforc_terminal_global_input_fd,
                         TCSAFLUSH,
                         &aforc_terminal_global_termios);
@@ -84,7 +86,8 @@ static void aforc_terminal_restore_at_exit(void)
                     F_SETFL,
                     aforc_terminal_global_input_flags);
     }
-    if (aforc_terminal_global_output_fd >= 0) {
+    if (aforc_terminal_global_output_fd >= 0)
+    {
         (void)aforc_terminal_write_best_effort(
             aforc_terminal_global_output_fd,
             aforc_terminal_emergency_reset,
@@ -98,7 +101,8 @@ static void aforc_terminal_signal_set(sigset_t *set)
     size_t index;
 
     (void)sigemptyset(set);
-    for (index = 0u; index < AFORC_TERMINAL_SIGNAL_COUNT; ++index) {
+    for (index = 0u; index < AFORC_TERMINAL_SIGNAL_COUNT; ++index)
+    {
         (void)sigaddset(set, aforc_terminal_signals[index]);
     }
 }
@@ -165,7 +169,8 @@ static AFORC_Status aforc_terminal_set_fd_flag(int fd, int command, int flag)
     const int current = fcntl(fd, command);
     const int set_command = command == F_GETFD ? F_SETFD : F_SETFL;
 
-    if (current < 0 || fcntl(fd, set_command, current | flag) < 0) {
+    if (current < 0 || fcntl(fd, set_command, current | flag) < 0)
+    {
         return AFORC_ERROR_PLATFORM;
     }
     return AFORC_OK;
@@ -175,28 +180,29 @@ AFORC_Status aforc_terminal_open_signal_pipe(AFORC_Terminal *terminal)
 {
     AFORC_Status status = AFORC_OK;
 
-    if (pipe(terminal->signal_pipe) < 0) {
+    if (pipe(terminal->signal_pipe) < 0)
+    {
         return AFORC_ERROR_PLATFORM;
     }
-    status = aforc_terminal_set_fd_flag(terminal->signal_pipe[0],
-                                      F_GETFL,
-                                      O_NONBLOCK);
-    if (status == AFORC_OK) {
-        status = aforc_terminal_set_fd_flag(terminal->signal_pipe[1],
-                                          F_GETFL,
-                                          O_NONBLOCK);
+    status = aforc_terminal_set_fd_flag(
+        terminal->signal_pipe[0], F_GETFL, O_NONBLOCK);
+    if (status == AFORC_OK)
+    {
+        status = aforc_terminal_set_fd_flag(
+            terminal->signal_pipe[1], F_GETFL, O_NONBLOCK);
     }
-    if (status == AFORC_OK) {
-        status = aforc_terminal_set_fd_flag(terminal->signal_pipe[0],
-                                          F_GETFD,
-                                          FD_CLOEXEC);
+    if (status == AFORC_OK)
+    {
+        status = aforc_terminal_set_fd_flag(
+            terminal->signal_pipe[0], F_GETFD, FD_CLOEXEC);
     }
-    if (status == AFORC_OK) {
-        status = aforc_terminal_set_fd_flag(terminal->signal_pipe[1],
-                                          F_GETFD,
-                                          FD_CLOEXEC);
+    if (status == AFORC_OK)
+    {
+        status = aforc_terminal_set_fd_flag(
+            terminal->signal_pipe[1], F_GETFD, FD_CLOEXEC);
     }
-    if (status != AFORC_OK) {
+    if (status != AFORC_OK)
+    {
         const int saved_errno = errno;
         (void)close(terminal->signal_pipe[0]);
         (void)close(terminal->signal_pipe[1]);
@@ -209,11 +215,13 @@ AFORC_Status aforc_terminal_open_signal_pipe(AFORC_Terminal *terminal)
 
 void aforc_terminal_close_signal_pipe(AFORC_Terminal *terminal)
 {
-    if (terminal->signal_pipe[0] >= 0) {
+    if (terminal->signal_pipe[0] >= 0)
+    {
         (void)close(terminal->signal_pipe[0]);
         terminal->signal_pipe[0] = -1;
     }
-    if (terminal->signal_pipe[1] >= 0) {
+    if (terminal->signal_pipe[1] >= 0)
+    {
         (void)close(terminal->signal_pipe[1]);
         terminal->signal_pipe[1] = -1;
     }
@@ -223,14 +231,16 @@ void aforc_terminal_drain_signal_pipe(AFORC_Terminal *terminal)
 {
     unsigned char bytes[64];
 
-    for (;;) {
-        const ssize_t count = read(terminal->signal_pipe[0],
-                                   bytes,
-                                   sizeof(bytes));
-        if (count > 0) {
+    for (;;)
+    {
+        const ssize_t count =
+            read(terminal->signal_pipe[0], bytes, sizeof(bytes));
+        if (count > 0)
+        {
             continue;
         }
-        if (count < 0 && errno == EINTR) {
+        if (count < 0 && errno == EINTR)
+        {
             continue;
         }
         break;
@@ -245,10 +255,12 @@ AFORC_Status aforc_terminal_install_actions(AFORC_Terminal *terminal)
     (void)memset(&action, 0, sizeof(action));
     action.sa_handler = aforc_terminal_signal_handler;
     (void)sigemptyset(&action.sa_mask);
-    for (index = 0u; index < AFORC_TERMINAL_SIGNAL_COUNT; ++index) {
+    for (index = 0u; index < AFORC_TERMINAL_SIGNAL_COUNT; ++index)
+    {
         if (sigaction(aforc_terminal_signals[index],
                       &action,
-                      &terminal->previous_actions[index]) < 0) {
+                      &terminal->previous_actions[index]) < 0)
+        {
             return AFORC_ERROR_PLATFORM;
         }
         terminal->action_installed[index] = true;
@@ -260,9 +272,11 @@ void aforc_terminal_restore_actions(AFORC_Terminal *terminal)
 {
     size_t index = AFORC_TERMINAL_SIGNAL_COUNT;
 
-    while (index > 0u) {
+    while (index > 0u)
+    {
         --index;
-        if (terminal->action_installed[index]) {
+        if (terminal->action_installed[index])
+        {
             (void)sigaction(aforc_terminal_signals[index],
                             &terminal->previous_actions[index],
                             NULL);
@@ -273,8 +287,10 @@ void aforc_terminal_restore_actions(AFORC_Terminal *terminal)
 
 bool aforc_terminal_register_exit_restore(void)
 {
-    if (!aforc_terminal_atexit_registered) {
-        if (atexit(aforc_terminal_restore_at_exit) != 0) {
+    if (!aforc_terminal_atexit_registered)
+    {
+        if (atexit(aforc_terminal_restore_at_exit) != 0)
+        {
             return false;
         }
         aforc_terminal_atexit_registered = true;

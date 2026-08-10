@@ -16,7 +16,8 @@
  * has defined endpoints and portable comparison behavior.
  */
 
-static bool easing_valid(AFORC_Easing easing) {
+static bool easing_valid(AFORC_Easing easing)
+{
     return easing == AFORC_EASING_LINEAR ||
            easing == AFORC_EASING_QUADRATIC_IN ||
            easing == AFORC_EASING_QUADRATIC_OUT ||
@@ -26,83 +27,99 @@ static bool easing_valid(AFORC_Easing easing) {
            easing == AFORC_EASING_CUBIC_IN_OUT;
 }
 
-static bool double_finite(double value) {
+static bool double_finite(double value)
+{
     return value == value && value >= -DBL_MAX && value <= DBL_MAX;
 }
 
-static bool tween_ready(const AFORC_Tween *tween) {
+static bool tween_ready(const AFORC_Tween *tween)
+{
     return tween != NULL && tween->initialized && tween->duration_ms > 0U &&
            tween->elapsed_ms <= tween->duration_ms &&
            easing_valid(tween->easing) && double_finite(tween->start) &&
            double_finite(tween->end);
 }
 
-AFORC_Status aforc_easing_sample(AFORC_Easing easing,
-                             double progress,
-                             double *out_value) {
+AFORC_Status
+aforc_easing_sample(AFORC_Easing easing, double progress, double *out_value)
+{
     double value = progress;
 
-    if (out_value == NULL || !easing_valid(easing) ||
-        !double_finite(progress)) {
+    if (out_value == NULL || !easing_valid(easing) || !double_finite(progress))
+    {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
     /* Curves never extrapolate; clamping also gives every easing mode exact
        and consistent endpoint samples. */
-    if (value < 0.0) {
+    if (value < 0.0)
+    {
         value = 0.0;
-    } else if (value > 1.0) {
+    }
+    else if (value > 1.0)
+    {
         value = 1.0;
     }
 
-    switch (easing) {
-    case AFORC_EASING_LINEAR:
-        *out_value = value;
-        break;
-    case AFORC_EASING_QUADRATIC_IN:
-        *out_value = value * value;
-        break;
-    case AFORC_EASING_QUADRATIC_OUT: {
-        const double inverse = 1.0 - value;
-        *out_value = 1.0 - inverse * inverse;
-        break;
-    }
-    case AFORC_EASING_QUADRATIC_IN_OUT:
-        if (value < 0.5) {
-            *out_value = 2.0 * value * value;
-        } else {
-            const double inverse = -2.0 * value + 2.0;
-            *out_value = 1.0 - inverse * inverse / 2.0;
+    switch (easing)
+    {
+        case AFORC_EASING_LINEAR:
+            *out_value = value;
+            break;
+        case AFORC_EASING_QUADRATIC_IN:
+            *out_value = value * value;
+            break;
+        case AFORC_EASING_QUADRATIC_OUT:
+        {
+            const double inverse = 1.0 - value;
+            *out_value = 1.0 - inverse * inverse;
+            break;
         }
-        break;
-    case AFORC_EASING_CUBIC_IN:
-        *out_value = value * value * value;
-        break;
-    case AFORC_EASING_CUBIC_OUT: {
-        const double inverse = 1.0 - value;
-        *out_value = 1.0 - inverse * inverse * inverse;
-        break;
-    }
-    case AFORC_EASING_CUBIC_IN_OUT:
-        if (value < 0.5) {
-            *out_value = 4.0 * value * value * value;
-        } else {
-            const double inverse = -2.0 * value + 2.0;
-            *out_value = 1.0 - inverse * inverse * inverse / 2.0;
+        case AFORC_EASING_QUADRATIC_IN_OUT:
+            if (value < 0.5)
+            {
+                *out_value = 2.0 * value * value;
+            }
+            else
+            {
+                const double inverse = -2.0 * value + 2.0;
+                *out_value = 1.0 - inverse * inverse / 2.0;
+            }
+            break;
+        case AFORC_EASING_CUBIC_IN:
+            *out_value = value * value * value;
+            break;
+        case AFORC_EASING_CUBIC_OUT:
+        {
+            const double inverse = 1.0 - value;
+            *out_value = 1.0 - inverse * inverse * inverse;
+            break;
         }
-        break;
-    default:
-        return AFORC_ERROR_INVALID_ARGUMENT;
+        case AFORC_EASING_CUBIC_IN_OUT:
+            if (value < 0.5)
+            {
+                *out_value = 4.0 * value * value * value;
+            }
+            else
+            {
+                const double inverse = -2.0 * value + 2.0;
+                *out_value = 1.0 - inverse * inverse * inverse / 2.0;
+            }
+            break;
+        default:
+            return AFORC_ERROR_INVALID_ARGUMENT;
     }
     return AFORC_OK;
 }
 
 AFORC_Status aforc_tween_init(AFORC_Tween *tween,
-                          double start,
-                          double end,
-                          uint64_t duration_ms,
-                          AFORC_Easing easing) {
+                              double start,
+                              double end,
+                              uint64_t duration_ms,
+                              AFORC_Easing easing)
+{
     if (tween == NULL || !double_finite(start) || !double_finite(end) ||
-        duration_ms == 0U || !easing_valid(easing)) {
+        duration_ms == 0U || !easing_valid(easing))
+    {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
     tween->start = start;
@@ -116,8 +133,10 @@ AFORC_Status aforc_tween_init(AFORC_Tween *tween,
     return AFORC_OK;
 }
 
-void aforc_tween_dispose(AFORC_Tween *tween) {
-    if (tween == NULL) {
+void aforc_tween_dispose(AFORC_Tween *tween)
+{
+    if (tween == NULL)
+    {
         return;
     }
     tween->start = 0.0;
@@ -130,11 +149,14 @@ void aforc_tween_dispose(AFORC_Tween *tween) {
     tween->initialized = false;
 }
 
-AFORC_Status aforc_tween_restart(AFORC_Tween *tween) {
-    if (tween == NULL) {
+AFORC_Status aforc_tween_restart(AFORC_Tween *tween)
+{
+    if (tween == NULL)
+    {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
-    if (!tween_ready(tween)) {
+    if (!tween_ready(tween))
+    {
         return AFORC_ERROR_STATE;
     }
     tween->elapsed_ms = 0U;
@@ -143,53 +165,67 @@ AFORC_Status aforc_tween_restart(AFORC_Tween *tween) {
     return AFORC_OK;
 }
 
-AFORC_Status aforc_tween_set_paused(AFORC_Tween *tween, bool paused) {
-    if (tween == NULL) {
+AFORC_Status aforc_tween_set_paused(AFORC_Tween *tween, bool paused)
+{
+    if (tween == NULL)
+    {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
-    if (!tween_ready(tween)) {
+    if (!tween_ready(tween))
+    {
         return AFORC_ERROR_STATE;
     }
     tween->paused = paused;
     return AFORC_OK;
 }
 
-AFORC_Status aforc_tween_update(AFORC_Tween *tween, uint64_t delta_ms) {
+AFORC_Status aforc_tween_update(AFORC_Tween *tween, uint64_t delta_ms)
+{
     uint64_t remaining;
 
-    if (tween == NULL) {
+    if (tween == NULL)
+    {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
-    if (!tween_ready(tween)) {
+    if (!tween_ready(tween))
+    {
         return AFORC_ERROR_STATE;
     }
-    if (tween->paused || tween->finished || delta_ms == 0U) {
+    if (tween->paused || tween->finished || delta_ms == 0U)
+    {
         return AFORC_OK;
     }
     remaining = tween->duration_ms - tween->elapsed_ms;
-    if (delta_ms >= remaining) {
+    if (delta_ms >= remaining)
+    {
         tween->elapsed_ms = tween->duration_ms;
         tween->finished = true;
-    } else {
+    }
+    else
+    {
         tween->elapsed_ms += delta_ms;
     }
     return AFORC_OK;
 }
 
-AFORC_Status aforc_tween_sample(const AFORC_Tween *tween, double *out_value) {
+AFORC_Status aforc_tween_sample(const AFORC_Tween *tween, double *out_value)
+{
     double eased;
     double progress;
     AFORC_Status status;
 
-    if (tween == NULL || out_value == NULL) {
+    if (tween == NULL || out_value == NULL)
+    {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
-    if (!tween_ready(tween)) {
+    if (!tween_ready(tween))
+    {
         return AFORC_ERROR_STATE;
     }
     progress = (double)tween->elapsed_ms / (double)tween->duration_ms;
     status = aforc_easing_sample(tween->easing, progress, &eased);
-    if (status != AFORC_OK) {
+    if (status != AFORC_OK)
+    {
         return status;
     }
     /* Weighted endpoints avoid the cancellation of start + (end - start). */

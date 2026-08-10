@@ -17,16 +17,16 @@
  * reorder or evict events already accepted by consumers.
  */
 
-bool aforc_input_internal_queue_event(
-    AFORC_Input *input,
-    const AFORC_InputEvent *event
-)
+bool aforc_input_internal_queue_event(AFORC_Input *input,
+                                      const AFORC_InputEvent *event)
 {
     size_t tail = 0u;
 
-    if (input->event_count == input->event_capacity) {
+    if (input->event_count == input->event_capacity)
+    {
         /* Drop the newest event so already-observed ordering never changes. */
-        if (input->dropped_events < UINT64_MAX) {
+        if (input->dropped_events < UINT64_MAX)
+        {
             ++input->dropped_events;
         }
         input->queue_overflowed = true;
@@ -38,10 +38,8 @@ bool aforc_input_internal_queue_event(
     return true;
 }
 
-AFORC_InputEvent aforc_input_internal_event(
-    AFORC_InputEventType type,
-    uint64_t timestamp_ms
-)
+AFORC_InputEvent aforc_input_internal_event(AFORC_InputEventType type,
+                                            uint64_t timestamp_ms)
 {
     AFORC_InputEvent event;
 

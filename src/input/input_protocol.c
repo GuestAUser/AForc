@@ -16,54 +16,65 @@
  * ignored as protocol data or recover one byte at a time as replacement text.
  */
 
-AFORC_Utf8Result aforc_input_internal_decode_utf8(
-    const unsigned char *bytes,
-    size_t size,
-    uint32_t *out_codepoint,
-    size_t *out_consumed
-)
+AFORC_Utf8Result aforc_input_internal_decode_utf8(const unsigned char *bytes,
+                                                  size_t size,
+                                                  uint32_t *out_codepoint,
+                                                  size_t *out_consumed)
 {
     uint32_t codepoint = 0u;
     size_t needed = 0u;
     uint32_t minimum = 0u;
     size_t index = 0u;
 
-    if (size == 0u) {
+    if (size == 0u)
+    {
         return AFORC_UTF8_INCOMPLETE;
     }
-    if (bytes[0] <= 0x7fu) {
+    if (bytes[0] <= 0x7fu)
+    {
         *out_codepoint = (uint32_t)bytes[0];
         *out_consumed = 1u;
         return AFORC_UTF8_COMPLETE;
     }
-    if (bytes[0] >= 0xc2u && bytes[0] <= 0xdfu) {
+    if (bytes[0] >= 0xc2u && bytes[0] <= 0xdfu)
+    {
         needed = 2u;
         codepoint = (uint32_t)(bytes[0] & 0x1fu);
         minimum = 0x80u;
-    } else if (bytes[0] >= 0xe0u && bytes[0] <= 0xefu) {
+    }
+    else if (bytes[0] >= 0xe0u && bytes[0] <= 0xefu)
+    {
         needed = 3u;
         codepoint = (uint32_t)(bytes[0] & 0x0fu);
         minimum = 0x800u;
-    } else if (bytes[0] >= 0xf0u && bytes[0] <= 0xf4u) {
+    }
+    else if (bytes[0] >= 0xf0u && bytes[0] <= 0xf4u)
+    {
         needed = 4u;
         codepoint = (uint32_t)(bytes[0] & 0x07u);
         minimum = 0x10000u;
-    } else {
+    }
+    else
+    {
         *out_consumed = 1u;
         return AFORC_UTF8_INVALID;
     }
-    if (size < needed) {
+    if (size < needed)
+    {
         return AFORC_UTF8_INCOMPLETE;
     }
-    for (index = 1u; index < needed; ++index) {
-        if ((bytes[index] & 0xc0u) != 0x80u) {
+    for (index = 1u; index < needed; ++index)
+    {
+        if ((bytes[index] & 0xc0u) != 0x80u)
+        {
             *out_consumed = 1u;
             return AFORC_UTF8_INVALID;
         }
         codepoint = (codepoint << 6u) | (uint32_t)(bytes[index] & 0x3fu);
     }
     if (codepoint < minimum || codepoint > 0x10ffffu ||
-        (codepoint >= 0xd800u && codepoint <= 0xdfffu)) {
+        (codepoint >= 0xd800u && codepoint <= 0xdfffu))
+    {
         *out_consumed = 1u;
         return AFORC_UTF8_INVALID;
     }
@@ -74,10 +85,12 @@ AFORC_Utf8Result aforc_input_internal_decode_utf8(
 
 static AFORC_Key aforc_input_internal_key_from_codepoint(uint32_t codepoint)
 {
-    if (codepoint >= (uint32_t)'a' && codepoint <= (uint32_t)'z') {
+    if (codepoint >= (uint32_t)'a' && codepoint <= (uint32_t)'z')
+    {
         codepoint -= (uint32_t)'a' - (uint32_t)'A';
     }
-    if (codepoint >= 0x20u && codepoint <= 0x7eu) {
+    if (codepoint >= 0x20u && codepoint <= 0x7eu)
+    {
         return (AFORC_Key)codepoint;
     }
     return AFORC_KEY_NONE;
@@ -86,108 +99,109 @@ static AFORC_Key aforc_input_internal_key_from_codepoint(uint32_t codepoint)
 static bool aforc_input_internal_codepoint_valid(uint32_t codepoint)
 {
     return codepoint <= UINT32_C(0x10ffff) &&
-           !(codepoint >= UINT32_C(0xd800) &&
-             codepoint <= UINT32_C(0xdfff));
+           !(codepoint >= UINT32_C(0xd800) && codepoint <= UINT32_C(0xdfff));
 }
 
-static void aforc_input_internal_emit_plain_byte(
-    AFORC_Input *input,
-    unsigned char byte,
-    AFORC_Modifiers modifiers,
-    uint64_t timestamp_ms
-)
+static void aforc_input_internal_emit_plain_byte(AFORC_Input *input,
+                                                 unsigned char byte,
+                                                 AFORC_Modifiers modifiers,
+                                                 uint64_t timestamp_ms)
 {
     AFORC_Key key = AFORC_KEY_NONE;
     uint32_t codepoint = 0u;
     bool emit_text = false;
 
-    if (byte == (unsigned char)'\r' || byte == (unsigned char)'\n') {
+    if (byte == (unsigned char)'\r' || byte == (unsigned char)'\n')
+    {
         key = AFORC_KEY_ENTER;
-    } else if (byte == (unsigned char)'\t') {
+    }
+    else if (byte == (unsigned char)'\t')
+    {
         key = AFORC_KEY_TAB;
-    } else if (byte == 0x7fu || byte == 0x08u) {
+    }
+    else if (byte == 0x7fu || byte == 0x08u)
+    {
         key = AFORC_KEY_BACKSPACE;
-    } else if (byte == 0x00u) {
+    }
+    else if (byte == 0x00u)
+    {
         key = AFORC_KEY_SPACE;
         modifiers |= AFORC_MOD_CTRL;
-    } else if (byte >= 0x01u && byte <= 0x1au) {
-        key = (AFORC_Key)((unsigned int)AFORC_KEY_A +
-                        (unsigned int)byte - 1u);
+    }
+    else if (byte >= 0x01u && byte <= 0x1au)
+    {
+        key = (AFORC_Key)((unsigned int)AFORC_KEY_A + (unsigned int)byte - 1u);
         modifiers |= AFORC_MOD_CTRL;
-    } else if (byte >= 0x1cu && byte <= 0x1fu) {
+    }
+    else if (byte >= 0x1cu && byte <= 0x1fu)
+    {
         static const unsigned char control_keys[4] = {'\\', ']', '^', '_'};
         key = (AFORC_Key)control_keys[byte - 0x1cu];
         modifiers |= AFORC_MOD_CTRL;
-    } else if (byte >= 0x20u && byte <= 0x7eu) {
+    }
+    else if (byte >= 0x20u && byte <= 0x7eu)
+    {
         codepoint = (uint32_t)byte;
         key = aforc_input_internal_key_from_codepoint(codepoint);
         emit_text = true;
     }
-    if (key != AFORC_KEY_NONE) {
-        aforc_input_internal_emit_key_down(
-            input,
-            key,
-            codepoint,
-            modifiers,
-            false,
-            false,
-            emit_text,
-            timestamp_ms
-        );
+    if (key != AFORC_KEY_NONE)
+    {
+        aforc_input_internal_emit_key_down(input,
+                                           key,
+                                           codepoint,
+                                           modifiers,
+                                           false,
+                                           false,
+                                           emit_text,
+                                           timestamp_ms);
     }
 }
 
-AFORC_ParseResult aforc_input_internal_parse_plain(
-    AFORC_Input *input,
-    const unsigned char *bytes,
-    size_t size,
-    AFORC_Modifiers modifiers,
-    bool force_incomplete,
-    uint64_t timestamp_ms,
-    size_t *out_consumed
-)
+AFORC_ParseResult aforc_input_internal_parse_plain(AFORC_Input *input,
+                                                   const unsigned char *bytes,
+                                                   size_t size,
+                                                   AFORC_Modifiers modifiers,
+                                                   bool force_incomplete,
+                                                   uint64_t timestamp_ms,
+                                                   size_t *out_consumed)
 {
     uint32_t codepoint = 0u;
     size_t consumed = 0u;
     AFORC_Utf8Result result;
 
-    if (size == 0u) {
+    if (size == 0u)
+    {
         return AFORC_PARSE_INCOMPLETE;
     }
-    if (bytes[0] <= 0x7fu) {
+    if (bytes[0] <= 0x7fu)
+    {
         aforc_input_internal_emit_plain_byte(
-            input,
-            bytes[0],
-            modifiers,
-            timestamp_ms
-        );
+            input, bytes[0], modifiers, timestamp_ms);
         *out_consumed = 1u;
         return AFORC_PARSE_COMPLETE;
     }
-    result = aforc_input_internal_decode_utf8(
-        bytes,
-        size,
-        &codepoint,
-        &consumed
-    );
-    if (result == AFORC_UTF8_INCOMPLETE && !force_incomplete) {
+    result =
+        aforc_input_internal_decode_utf8(bytes, size, &codepoint, &consumed);
+    if (result == AFORC_UTF8_INCOMPLETE && !force_incomplete)
+    {
         return AFORC_PARSE_INCOMPLETE;
     }
-    if (result != AFORC_UTF8_COMPLETE) {
-        /* Consume one bad byte so recovery cannot hide a later valid starter. */
+    if (result != AFORC_UTF8_COMPLETE)
+    {
+        /* Consume one bad byte so recovery cannot hide a later valid starter.
+         */
         codepoint = 0xfffdu;
         consumed = 1u;
     }
-    aforc_input_internal_emit_key_down(
-        input,
-        AFORC_KEY_NONE,
-        codepoint,
-        modifiers,
-        false,
-        false,
-        true,
-        timestamp_ms
-    );
+    aforc_input_internal_emit_key_down(input,
+                                       AFORC_KEY_NONE,
+                                       codepoint,
+                                       modifiers,
+                                       false,
+                                       false,
+                                       true,
+                                       timestamp_ms);
     *out_consumed = consumed;
     return AFORC_PARSE_COMPLETE;
 }
@@ -197,29 +211,31 @@ static AFORC_Modifiers aforc_input_internal_decode_modifiers(uint32_t parameter)
     uint32_t bits = parameter > 0u ? parameter - 1u : 0u;
     AFORC_Modifiers modifiers = AFORC_MOD_NONE;
 
-    if ((bits & 1u) != 0u) {
+    if ((bits & 1u) != 0u)
+    {
         modifiers |= AFORC_MOD_SHIFT;
     }
-    if ((bits & 2u) != 0u) {
+    if ((bits & 2u) != 0u)
+    {
         modifiers |= AFORC_MOD_ALT;
     }
-    if ((bits & 4u) != 0u) {
+    if ((bits & 4u) != 0u)
+    {
         modifiers |= AFORC_MOD_CTRL;
     }
-    if ((bits & 8u) != 0u) {
+    if ((bits & 8u) != 0u)
+    {
         modifiers |= AFORC_MOD_SUPER;
     }
     return modifiers;
 }
 
-static bool aforc_input_internal_parse_parameters(
-    const unsigned char *bytes,
-    size_t size,
-    bool skip_mouse_prefix,
-    uint32_t *parameters,
-    size_t parameter_capacity,
-    size_t *out_count
-)
+static bool aforc_input_internal_parse_parameters(const unsigned char *bytes,
+                                                  size_t size,
+                                                  bool skip_mouse_prefix,
+                                                  uint32_t *parameters,
+                                                  size_t parameter_capacity,
+                                                  size_t *out_count)
 {
     size_t index = 0u;
     size_t count = 0u;
@@ -227,19 +243,24 @@ static bool aforc_input_internal_parse_parameters(
     bool have_value = false;
     bool saw_field = false;
 
-    if (skip_mouse_prefix) {
-        if (size == 0u || bytes[0] != (unsigned char)'<') {
+    if (skip_mouse_prefix)
+    {
+        if (size == 0u || bytes[0] != (unsigned char)'<')
+        {
             return false;
         }
         index = 1u;
     }
-    for (; index < size; ++index) {
+    for (; index < size; ++index)
+    {
         const unsigned char byte = bytes[index];
 
-        if (byte >= (unsigned char)'0' && byte <= (unsigned char)'9') {
+        if (byte >= (unsigned char)'0' && byte <= (unsigned char)'9')
+        {
             const uint32_t digit = (uint32_t)(byte - (unsigned char)'0');
 
-            if (value > (UINT32_MAX - digit) / 10u) {
+            if (value > (UINT32_MAX - digit) / 10u)
+            {
                 return false;
             }
             value = value * 10u + digit;
@@ -247,8 +268,10 @@ static bool aforc_input_internal_parse_parameters(
             saw_field = true;
             continue;
         }
-        if (byte == (unsigned char)';' || byte == (unsigned char)':') {
-            if (count == parameter_capacity) {
+        if (byte == (unsigned char)';' || byte == (unsigned char)':')
+        {
+            if (count == parameter_capacity)
+            {
                 return false;
             }
             parameters[count++] = have_value ? value : 0u;
@@ -259,8 +282,10 @@ static bool aforc_input_internal_parse_parameters(
         }
         return false;
     }
-    if (have_value || saw_field) {
-        if (count == parameter_capacity) {
+    if (have_value || saw_field)
+    {
+        if (count == parameter_capacity)
+        {
             return false;
         }
         parameters[count++] = have_value ? value : 0u;
@@ -271,147 +296,133 @@ static bool aforc_input_internal_parse_parameters(
 
 static AFORC_Key aforc_input_internal_tilde_key(uint32_t parameter)
 {
-    switch (parameter) {
-    case 1u:
-    case 7u:
-        return AFORC_KEY_HOME;
-    case 2u:
-        return AFORC_KEY_INSERT;
-    case 3u:
-        return AFORC_KEY_DELETE;
-    case 4u:
-    case 8u:
-        return AFORC_KEY_END;
-    case 5u:
-        return AFORC_KEY_PAGE_UP;
-    case 6u:
-        return AFORC_KEY_PAGE_DOWN;
-    case 11u:
-        return AFORC_KEY_F1;
-    case 12u:
-        return AFORC_KEY_F2;
-    case 13u:
-        return AFORC_KEY_F3;
-    case 14u:
-        return AFORC_KEY_F4;
-    case 15u:
-        return AFORC_KEY_F5;
-    case 17u:
-        return AFORC_KEY_F6;
-    case 18u:
-        return AFORC_KEY_F7;
-    case 19u:
-        return AFORC_KEY_F8;
-    case 20u:
-        return AFORC_KEY_F9;
-    case 21u:
-        return AFORC_KEY_F10;
-    case 23u:
-        return AFORC_KEY_F11;
-    case 24u:
-        return AFORC_KEY_F12;
-    default:
-        return AFORC_KEY_NONE;
+    switch (parameter)
+    {
+        case 1u:
+        case 7u:
+            return AFORC_KEY_HOME;
+        case 2u:
+            return AFORC_KEY_INSERT;
+        case 3u:
+            return AFORC_KEY_DELETE;
+        case 4u:
+        case 8u:
+            return AFORC_KEY_END;
+        case 5u:
+            return AFORC_KEY_PAGE_UP;
+        case 6u:
+            return AFORC_KEY_PAGE_DOWN;
+        case 11u:
+            return AFORC_KEY_F1;
+        case 12u:
+            return AFORC_KEY_F2;
+        case 13u:
+            return AFORC_KEY_F3;
+        case 14u:
+            return AFORC_KEY_F4;
+        case 15u:
+            return AFORC_KEY_F5;
+        case 17u:
+            return AFORC_KEY_F6;
+        case 18u:
+            return AFORC_KEY_F7;
+        case 19u:
+            return AFORC_KEY_F8;
+        case 20u:
+            return AFORC_KEY_F9;
+        case 21u:
+            return AFORC_KEY_F10;
+        case 23u:
+            return AFORC_KEY_F11;
+        case 24u:
+            return AFORC_KEY_F12;
+        default:
+            return AFORC_KEY_NONE;
     }
 }
 
 static AFORC_Key aforc_input_internal_final_key(unsigned char final_byte)
 {
-    switch (final_byte) {
-    case (unsigned char)'A':
-        return AFORC_KEY_UP;
-    case (unsigned char)'B':
-        return AFORC_KEY_DOWN;
-    case (unsigned char)'C':
-        return AFORC_KEY_RIGHT;
-    case (unsigned char)'D':
-        return AFORC_KEY_LEFT;
-    case (unsigned char)'H':
-        return AFORC_KEY_HOME;
-    case (unsigned char)'F':
-        return AFORC_KEY_END;
-    case (unsigned char)'P':
-        return AFORC_KEY_F1;
-    case (unsigned char)'Q':
-        return AFORC_KEY_F2;
-    case (unsigned char)'R':
-        return AFORC_KEY_F3;
-    case (unsigned char)'S':
-        return AFORC_KEY_F4;
-    default:
-        return AFORC_KEY_NONE;
+    switch (final_byte)
+    {
+        case (unsigned char)'A':
+            return AFORC_KEY_UP;
+        case (unsigned char)'B':
+            return AFORC_KEY_DOWN;
+        case (unsigned char)'C':
+            return AFORC_KEY_RIGHT;
+        case (unsigned char)'D':
+            return AFORC_KEY_LEFT;
+        case (unsigned char)'H':
+            return AFORC_KEY_HOME;
+        case (unsigned char)'F':
+            return AFORC_KEY_END;
+        case (unsigned char)'P':
+            return AFORC_KEY_F1;
+        case (unsigned char)'Q':
+            return AFORC_KEY_F2;
+        case (unsigned char)'R':
+            return AFORC_KEY_F3;
+        case (unsigned char)'S':
+            return AFORC_KEY_F4;
+        default:
+            return AFORC_KEY_NONE;
     }
 }
 
-void aforc_input_internal_handle_ss3(
-    AFORC_Input *input,
-    unsigned char final_byte,
-    uint64_t timestamp_ms
-)
+void aforc_input_internal_handle_ss3(AFORC_Input *input,
+                                     unsigned char final_byte,
+                                     uint64_t timestamp_ms)
 {
     const AFORC_Key key = aforc_input_internal_final_key(final_byte);
 
-    if (key != AFORC_KEY_NONE) {
+    if (key != AFORC_KEY_NONE)
+    {
         aforc_input_internal_emit_key_down(
-            input,
-            key,
-            0u,
-            AFORC_MOD_NONE,
-            false,
-            false,
-            false,
-            timestamp_ms
-        );
+            input, key, 0u, AFORC_MOD_NONE, false, false, false, timestamp_ms);
     }
 }
 
-static void aforc_input_internal_emit_protocol_key(
-    AFORC_Input *input,
-    AFORC_Key key,
-    uint32_t codepoint,
-    AFORC_Modifiers modifiers,
-    uint32_t event_type,
-    bool explicit_release,
-    uint64_t timestamp_ms
-)
+static void aforc_input_internal_emit_protocol_key(AFORC_Input *input,
+                                                   AFORC_Key key,
+                                                   uint32_t codepoint,
+                                                   AFORC_Modifiers modifiers,
+                                                   uint32_t event_type,
+                                                   bool explicit_release,
+                                                   uint64_t timestamp_ms)
 {
-    if (event_type == 3u) {
+    if (event_type == 3u)
+    {
         aforc_input_internal_emit_key_up(
-            input,
-            key,
-            codepoint,
-            modifiers,
-            timestamp_ms
-        );
+            input, key, codepoint, modifiers, timestamp_ms);
         return;
     }
-    aforc_input_internal_emit_key_down(
-        input,
-        key,
-        codepoint,
-        modifiers,
-        event_type == 2u,
-        explicit_release,
-        false,
-        timestamp_ms
-    );
+    aforc_input_internal_emit_key_down(input,
+                                       key,
+                                       codepoint,
+                                       modifiers,
+                                       event_type == 2u,
+                                       explicit_release,
+                                       false,
+                                       timestamp_ms);
 }
 
 static AFORC_MouseButton aforc_input_internal_mouse_button(uint32_t code)
 {
-    if ((code & 128u) != 0u) {
-        return (code & 1u) == 0u ? AFORC_MOUSE_BUTTON_4 :
-                                  AFORC_MOUSE_BUTTON_5;
+    if ((code & 128u) != 0u)
+    {
+        return (code & 1u) == 0u ? AFORC_MOUSE_BUTTON_4 : AFORC_MOUSE_BUTTON_5;
     }
-    switch (code & 3u) {
-    case 0u:
-        return AFORC_MOUSE_LEFT;
-    case 1u:
-        return AFORC_MOUSE_MIDDLE;
-    case 2u:
-        return AFORC_MOUSE_RIGHT;
-    default:
-        return AFORC_MOUSE_NONE;
+    switch (code & 3u)
+    {
+        case 0u:
+            return AFORC_MOUSE_LEFT;
+        case 1u:
+            return AFORC_MOUSE_MIDDLE;
+        case 2u:
+            return AFORC_MOUSE_RIGHT;
+        default:
+            return AFORC_MOUSE_NONE;
     }
 }
 
@@ -419,29 +430,31 @@ static AFORC_Modifiers aforc_input_internal_mouse_modifiers(uint32_t code)
 {
     AFORC_Modifiers modifiers = AFORC_MOD_NONE;
 
-    if ((code & 4u) != 0u) {
+    if ((code & 4u) != 0u)
+    {
         modifiers |= AFORC_MOD_SHIFT;
     }
-    if ((code & 8u) != 0u) {
+    if ((code & 8u) != 0u)
+    {
         modifiers |= AFORC_MOD_ALT;
     }
-    if ((code & 16u) != 0u) {
+    if ((code & 16u) != 0u)
+    {
         modifiers |= AFORC_MOD_CTRL;
     }
     return modifiers;
 }
 
-void aforc_input_internal_handle_mouse(
-    AFORC_Input *input,
-    uint32_t code,
-    uint32_t column,
-    uint32_t row,
-    bool release,
-    bool legacy,
-    uint64_t timestamp_ms
-)
+void aforc_input_internal_handle_mouse(AFORC_Input *input,
+                                       uint32_t code,
+                                       uint32_t column,
+                                       uint32_t row,
+                                       bool release,
+                                       bool legacy,
+                                       uint64_t timestamp_ms)
 {
-    const AFORC_Modifiers modifiers = aforc_input_internal_mouse_modifiers(code);
+    const AFORC_Modifiers modifiers =
+        aforc_input_internal_mouse_modifiers(code);
     const AFORC_MouseButton button = aforc_input_internal_mouse_button(code);
     const bool motion = (code & 32u) != 0u;
     const bool wheel = (code & 64u) != 0u;
@@ -450,67 +463,55 @@ void aforc_input_internal_handle_mouse(
 
     /* Both SGR and legacy mouse coordinates are one-based terminal cells. */
     if (column == 0u || row == 0u || column - 1u > (uint32_t)INT32_MAX ||
-        row - 1u > (uint32_t)INT32_MAX) {
+        row - 1u > (uint32_t)INT32_MAX)
+    {
         return;
     }
     input->mouse_x = (int32_t)(column - 1u);
     input->mouse_y = (int32_t)(row - 1u);
-    if (wheel) {
+    if (wheel)
+    {
         AFORC_InputEvent event = aforc_input_internal_event(
-            AFORC_INPUT_EVENT_MOUSE_WHEEL,
-            timestamp_ms
-        );
+            AFORC_INPUT_EVENT_MOUSE_WHEEL, timestamp_ms);
         const uint32_t direction = code & 3u;
 
-        event.data.wheel.delta.x = direction == 2u ? -1 :
-                                    direction == 3u ? 1 : 0;
-        event.data.wheel.delta.y = direction == 0u ? 1 :
-                                    direction == 1u ? -1 : 0;
+        event.data.wheel.delta.x = direction == 2u   ? -1
+                                   : direction == 3u ? 1
+                                                     : 0;
+        event.data.wheel.delta.y = direction == 0u   ? 1
+                                   : direction == 1u ? -1
+                                                     : 0;
         (void)aforc_input_internal_queue_event(input, &event);
         return;
     }
-    if (motion || previous_x != input->mouse_x ||
-        previous_y != input->mouse_y) {
+    if (motion || previous_x != input->mouse_x || previous_y != input->mouse_y)
+    {
         aforc_input_internal_emit_mouse_move(
-            input,
-            button,
-            modifiers,
-            timestamp_ms
-        );
+            input, button, modifiers, timestamp_ms);
     }
     if ((legacy && (code & 3u) == 3u) ||
-        (release && button == AFORC_MOUSE_NONE)) {
+        (release && button == AFORC_MOUSE_NONE))
+    {
         aforc_input_internal_release_mouse_buttons(
-            input,
-            modifiers,
-            timestamp_ms
-        );
-    } else if (release) {
+            input, modifiers, timestamp_ms);
+    }
+    else if (release)
+    {
         aforc_input_internal_emit_mouse_button(
-            input,
-            button,
-            false,
-            modifiers,
-            timestamp_ms
-        );
-    } else if (!motion) {
+            input, button, false, modifiers, timestamp_ms);
+    }
+    else if (!motion)
+    {
         aforc_input_internal_emit_mouse_button(
-            input,
-            button,
-            true,
-            modifiers,
-            timestamp_ms
-        );
+            input, button, true, modifiers, timestamp_ms);
     }
 }
 
-void aforc_input_internal_handle_csi(
-    AFORC_Input *input,
-    const unsigned char *payload,
-    size_t payload_size,
-    unsigned char final_byte,
-    uint64_t timestamp_ms
-)
+void aforc_input_internal_handle_csi(AFORC_Input *input,
+                                     const unsigned char *payload,
+                                     size_t payload_size,
+                                     unsigned char final_byte,
+                                     uint64_t timestamp_ms)
 {
     uint32_t parameters[8];
     size_t count = 0u;
@@ -520,87 +521,75 @@ void aforc_input_internal_handle_csi(
 
     if ((final_byte == (unsigned char)'M' ||
          final_byte == (unsigned char)'m') &&
-        payload_size > 0u && payload[0] == (unsigned char)'<') {
+        payload_size > 0u && payload[0] == (unsigned char)'<')
+    {
         if (aforc_input_internal_parse_parameters(
-                payload,
-                payload_size,
-                true,
-                parameters,
-                8u,
-                &count
-            ) && count == 3u) {
-            aforc_input_internal_handle_mouse(
-                input,
-                parameters[0],
-                parameters[1],
-                parameters[2],
-                final_byte == (unsigned char)'m',
-                false,
-                timestamp_ms
-            );
+                payload, payload_size, true, parameters, 8u, &count) &&
+            count == 3u)
+        {
+            aforc_input_internal_handle_mouse(input,
+                                              parameters[0],
+                                              parameters[1],
+                                              parameters[2],
+                                              final_byte == (unsigned char)'m',
+                                              false,
+                                              timestamp_ms);
         }
         return;
     }
     if (!aforc_input_internal_parse_parameters(
-            payload,
-            payload_size,
-            false,
-            parameters,
-            8u,
-            &count
-        )) {
+            payload, payload_size, false, parameters, 8u, &count))
+    {
         return;
     }
-    if (final_byte == (unsigned char)'I' && count == 0u) {
+    if (final_byte == (unsigned char)'I' && count == 0u)
+    {
         const AFORC_InputEvent event = aforc_input_internal_event(
-            AFORC_INPUT_EVENT_FOCUS_IN,
-            timestamp_ms
-        );
+            AFORC_INPUT_EVENT_FOCUS_IN, timestamp_ms);
         (void)aforc_input_internal_queue_event(input, &event);
         return;
     }
-    if (final_byte == (unsigned char)'O' && count == 0u) {
+    if (final_byte == (unsigned char)'O' && count == 0u)
+    {
         AFORC_InputEvent event = aforc_input_internal_event(
-            AFORC_INPUT_EVENT_FOCUS_OUT,
-            timestamp_ms
-        );
+            AFORC_INPUT_EVENT_FOCUS_OUT, timestamp_ms);
         (void)aforc_input_internal_queue_event(input, &event);
         aforc_input_internal_release_all(input, timestamp_ms);
         return;
     }
-    if (final_byte == (unsigned char)'Z') {
+    if (final_byte == (unsigned char)'Z')
+    {
         aforc_input_internal_emit_protocol_key(
-            input,
-            AFORC_KEY_TAB,
-            0u,
-            AFORC_MOD_SHIFT,
-            1u,
-            false,
-            timestamp_ms
-        );
+            input, AFORC_KEY_TAB, 0u, AFORC_MOD_SHIFT, 1u, false, timestamp_ms);
         return;
     }
-    if (final_byte == (unsigned char)'u' && count > 0u) {
+    if (final_byte == (unsigned char)'u' && count > 0u)
+    {
         const uint32_t codepoint = parameters[0];
 
-        if (!aforc_input_internal_codepoint_valid(codepoint)) {
+        if (!aforc_input_internal_codepoint_valid(codepoint))
+        {
             return;
         }
 
-        if (count > 1u) {
+        if (count > 1u)
+        {
             modifiers = aforc_input_internal_decode_modifiers(parameters[1]);
         }
-        if (count > 2u && parameters[2] != 0u) {
+        if (count > 2u && parameters[2] != 0u)
+        {
             event_type = parameters[2];
         }
-        if (event_type > 3u) {
+        if (event_type > 3u)
+        {
             return;
         }
-        key = codepoint == 27u ? AFORC_KEY_ESCAPE :
-              codepoint == 13u ? AFORC_KEY_ENTER :
-              codepoint == 9u ? AFORC_KEY_TAB :
-              codepoint == 127u ? AFORC_KEY_BACKSPACE :
-              aforc_input_internal_key_from_codepoint(codepoint);
+        key = codepoint == 27u   ? AFORC_KEY_ESCAPE
+              : codepoint == 13u ? AFORC_KEY_ENTER
+              : codepoint == 9u  ? AFORC_KEY_TAB
+              : codepoint == 127u
+                  ? AFORC_KEY_BACKSPACE
+                  : aforc_input_internal_key_from_codepoint(codepoint);
         /* Kitty's event type is authoritative for repeat and release state. */
         aforc_input_internal_emit_protocol_key(
             input,
@@ -609,77 +598,71 @@ void aforc_input_internal_handle_csi(
             modifiers,
             event_type,
             count > 2u,
-            timestamp_ms
-        );
+            timestamp_ms);
         return;
     }
-    if (final_byte == (unsigned char)'~' && count > 0u) {
-        if (parameters[0] == 200u) {
+    if (final_byte == (unsigned char)'~' && count > 0u)
+    {
+        if (parameters[0] == 200u)
+        {
             const AFORC_InputEvent event = aforc_input_internal_event(
-                AFORC_INPUT_EVENT_PASTE_BEGIN,
-                timestamp_ms
-            );
+                AFORC_INPUT_EVENT_PASTE_BEGIN, timestamp_ms);
             input->paste_mode = true;
             (void)aforc_input_internal_queue_event(input, &event);
             return;
         }
-        if (parameters[0] == 201u) {
+        if (parameters[0] == 201u)
+        {
             const AFORC_InputEvent event = aforc_input_internal_event(
-                AFORC_INPUT_EVENT_PASTE_END,
-                timestamp_ms
-            );
+                AFORC_INPUT_EVENT_PASTE_END, timestamp_ms);
             input->paste_mode = false;
             (void)aforc_input_internal_queue_event(input, &event);
             return;
         }
-        if (parameters[0] == 27u && count >= 3u) {
+        if (parameters[0] == 27u && count >= 3u)
+        {
             const uint32_t codepoint = parameters[2];
 
-            if (!aforc_input_internal_codepoint_valid(codepoint)) {
+            if (!aforc_input_internal_codepoint_valid(codepoint))
+            {
                 return;
             }
 
             modifiers = aforc_input_internal_decode_modifiers(parameters[1]);
             key = aforc_input_internal_key_from_codepoint(codepoint);
             aforc_input_internal_emit_protocol_key(
-                input,
-                key,
-                codepoint,
-                modifiers,
-                1u,
-                false,
-                timestamp_ms
-            );
+                input, key, codepoint, modifiers, 1u, false, timestamp_ms);
             return;
         }
         key = aforc_input_internal_tilde_key(parameters[0]);
-        if (count > 1u) {
+        if (count > 1u)
+        {
             modifiers = aforc_input_internal_decode_modifiers(parameters[1]);
         }
-        if (count > 2u && parameters[2] != 0u) {
-            event_type = parameters[2];
-        }
-    } else {
-        key = aforc_input_internal_final_key(final_byte);
-        if (count > 1u) {
-            modifiers = aforc_input_internal_decode_modifiers(parameters[1]);
-        }
-        if (count > 2u && parameters[2] != 0u) {
+        if (count > 2u && parameters[2] != 0u)
+        {
             event_type = parameters[2];
         }
     }
-    if (event_type > 3u) {
+    else
+    {
+        key = aforc_input_internal_final_key(final_byte);
+        if (count > 1u)
+        {
+            modifiers = aforc_input_internal_decode_modifiers(parameters[1]);
+        }
+        if (count > 2u && parameters[2] != 0u)
+        {
+            event_type = parameters[2];
+        }
+    }
+    if (event_type > 3u)
+    {
         return;
     }
-    if (key != AFORC_KEY_NONE) {
+    if (key != AFORC_KEY_NONE)
+    {
         aforc_input_internal_emit_protocol_key(
-            input,
-            key,
-            0u,
-            modifiers,
-            event_type,
-            count > 2u,
-            timestamp_ms
-        );
+            input, key, 0u, modifiers, event_type, count > 2u, timestamp_ms);
     }
 }
