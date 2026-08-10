@@ -84,6 +84,8 @@ incremental-parser units against one timestamp and bounded storage contract.
 
 The renderer owns front and back cell buffers. Drawing mutates the back
 buffer; presentation emits only changed cells and then synchronizes buffers.
+Contiguous changed ASCII cells with one style are encoded as a single span,
+avoiding per-cell output-buffer growth checks on animation-heavy frames.
 Resize invalidates buffer pointers and forces a complete redraw.
 
 Allocation/lifecycle, drawing, and ANSI diff encoding are separate units; only
@@ -109,10 +111,11 @@ Entities are `(index, generation)` handles. Destroying and later reusing an
 index changes its generation, so stale handles fail safely. Each registered
 component type uses dense component/entity arrays plus a sparse entity index.
 
-Structural mutation invalidates component pointers and active views. Views
-snapshot the ECS revision and select the smallest required component store as
-their iteration driver. Game systems should finish a view before adding,
-removing, or destroying entities.
+Structural mutation invalidates component pointers and active view iterations.
+Views snapshot the ECS revision and select the smallest required component
+store as their iteration driver. Resetting a view captures the new revision,
+reselects that driver, and reuses its allocation. Game systems should finish a
+view before adding, removing, or destroying entities.
 
 Entity lifecycle, component sparse-set mutation, and revision-bound view
 iteration are separate units over one private registry representation.
@@ -146,7 +149,7 @@ separate units; only result-release helpers remain in the assets facade.
 
 ## Frame Flow
 
-The interactive examples drive one engine frame as follows:
+The interactive example drives one engine frame as follows:
 
 1. `poll_events` starts a new input frame, polls terminal bytes, decodes all
    available events, and dispatches them through the scene stack.
@@ -191,56 +194,12 @@ therefore reconstruct a floor from the run seed and floor number before
 restoring dynamic values. The save schema is versioned independently from the
 engine library version.
 
-## Surf-Man Composition
-
-Surf-Man is a second, nested example under `examples/surf-man`. Its headers in
-`examples/surf-man/include/surf_man` are private cross-translation-unit
-contracts for the example, not installed AForc API. The application keeps
-engine adapters separate from deterministic rules and presentation so the same
-session can run interactively or off-screen.
-
-The nested module boundaries are:
-
-- `app/` owns CLI parsing, reverse-order terminal cleanup, engine hooks, input
-  normalization, scene state, and pause/resize handling. It joins
-  `AFORC_Engine`, terminal, input, and renderer.
-- `game/` owns the Q16.16, 60 Hz surf rules, bounded line position and
-  momentum, bounded wave-face motion, rider-local wave sampling, wave
-  progression, scoring, and state hash. It consumes a seeded `AFORC_Rng`; it
-  has no terminal, renderer, wall-clock, or cosmetic-RNG dependency.
-- `presentation/` converts read-only app and simulation state into ASCII
-  renderer cells, rider-local placement and poses, bounded effects particles,
-  HUDs, menus, and modal panels. It does not change rules or scores.
-- `qa/` drives the actual app, simulation, and renderer through deterministic
-  schedules with an off-screen target. It checks input taps and leases,
-  bounded motion and recovery, state hashes, visible cells, color modes,
-  reduced motion, and resize framing without terminal I/O or filesystem
-  effects.
-
-The app maps terminal input into bounded directional and ride-action leases,
-while confirm and back remain one-shot commands before fixed updates. A tap is
-preserved even if its key-up arrives before the next fixed update; an explicit
-release clears the matching lease immediately. `AFORC_Engine` owns the 60 Hz
-simulation cadence, while active presentation composes at 60 Hz and static or
-reduced-motion states remain dirty-driven. `AFORC_Input` supplies decoded key
-and focus events; `AFORC_Renderer` supplies the diffed cell buffer; effects and
-UI provide bounded particles, layouts, and overlays. The assets subsystem
-provides the explicitly seeded PCG stream used to reproduce wave mechanics.
-
-No engine extension was required for Surf-Man's responsive motion. Input lease
-normalization belongs in the example adapter, and the Q16 line, face, air, and
-recovery rules remain game-local state. The public AForc API and engine
-ownership/error conventions therefore remain unchanged.
-
-Surf-Man targets an 80 by 24 terminal and supports 60 by 20 or larger. Focus
-loss and an undersized terminal pause authoritative time rather than consuming
-wave time, score, or flow. Its smoke path validates the same scene off-screen
-under deterministic timestamps and frame schedules, including renderer output,
-so continuous integration does not need a TTY.
-
-The example intentionally has no save data or other persistence, network
-protocol, audio system, or arbitrary input-remapping layer. Session state and
-accessibility choices remain local to the running process.
+Rendering retains and resets one actor view instead of allocating a view each
+frame. Field of view is recomputed only when the player or generated floor
+changes, while particles and the exit tween may continue to animate. Viewports
+smaller than the map use a camera; larger terminals center the bounded map.
+Particles and tweens carry fractional milliseconds independently so animation
+speed does not depend on per-frame rounding.
 
 ## Ownership And Failure Rules
 

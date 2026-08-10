@@ -6,12 +6,10 @@ AForc is an ASCII C game engine for 2D planes. It provides the low-level
 pieces that responsive terminal games repeatedly need, while leaving game
 rules and data layouts under application control.
 
-The repository includes two complete examples. The procedural roguelike
+The repository includes a complete example. The procedural roguelike
 demonstrates the engine loop, terminal lifecycle, buffered renderer, decoded
 input, tile world, ECS, effects, UI, deterministic random generation, and save
-containers working together. Surf-Man is a deterministic, fixed-step terminal
-surf session with responsive Q16 line and wave-face motion, an accessible
-single-screen presentation, and off-screen QA.
+containers working together.
 
 ## Features
 
@@ -48,9 +46,6 @@ cmake --build build/cmake --parallel
 
 # Roguelike
 ./build/cmake/aforc-roguelike
-
-# Surf-Man
-./build/cmake/aforc-surf-man
 ```
 
 With GNU Make:
@@ -60,26 +55,22 @@ make release
 
 # Roguelike
 ./build/make/bin/aforc-roguelike
-
-# Surf-Man
-./build/make/bin/aforc-surf-man
 ```
 
-Run either game deterministically with `--seed`:
+Run the game deterministically with `--seed`:
 
 ```sh
 ./build/make/bin/aforc-roguelike --seed 2026
-./build/make/bin/aforc-surf-man --seed 2026
 ```
 
-Both games need an interactive terminal. Their `--help` and `--smoke` modes do
-not, which makes them suitable for scripts and continuous integration.
+The game needs an interactive terminal. Its `--help` and `--smoke` modes do not,
+which makes them suitable for scripts and continuous integration.
 
-Run Surf-Man's deterministic non-interactive path directly, or run both
-examples' smoke checks through Make:
+Run the roguelike's deterministic non-interactive path directly, or run its
+smoke check through Make:
 
 ```sh
-./build/cmake/aforc-surf-man --smoke
+./build/cmake/aforc-roguelike --smoke
 make smoke
 ```
 
@@ -101,32 +92,20 @@ reach the exit. Clear five floors to win. Movement is turn-based; enemies use
 the engine's A* pathfinder whenever the player takes a turn. The same seed
 reproduces the same sequence of floors.
 
-## Surf-Man
-
-Surf-Man is a single-screen, three-wave surf session that pairs a bounded,
-fixed-step simulation with an ASCII instrument display. Bounded Q16 line and
-wave-face motion make steering responsive and free without changing the engine
-API. It demonstrates the engine loop, terminal lifecycle, decoded input,
-renderer, effects, UI, and PCG random generation without adding persistence,
-networking, or audio.
-
-See [examples/surf-man/README.md](examples/surf-man/README.md) for build,
-controls, scoring, accessibility, seed, and deterministic smoke-test details.
-
 ## Build Options
 
 Important CMake options:
 
 | Option | Default | Purpose |
 | --- | --- | --- |
-| `AFORC_BUILD_EXAMPLES` | Top-level `ON` | Build `aforc-roguelike` and `aforc-surf-man` |
+| `AFORC_BUILD_EXAMPLES` | Top-level `ON` | Build `aforc-roguelike` |
 | `AFORC_BUILD_TESTS` | Top-level `ON` | Build AForc regression tests |
 | `AFORC_WARNINGS_AS_ERRORS` | `OFF` | Promote project warnings to errors |
 | `AFORC_ENABLE_SANITIZERS` | `OFF` | Enable AddressSanitizer and UBSan |
 | `AFORC_ENABLE_HARDENING` | Top-level `ON` | Harden supported project-owned targets |
 | `BUILD_SHARED_LIBS` | `OFF` | Build AForc as a shared library |
 
-Examples and tests default to `OFF` when AForc is added as a subproject. AForc
+The example and tests default to `OFF` when AForc is added as a subproject. AForc
 does not define or change the parent project's `BUILD_TESTING` option. Embedded
 builds that opt into `AFORC_BUILD_TESTS` must enable testing in the parent.
 
@@ -138,7 +117,6 @@ make sanitize    # strict ASan/UBSan build, then all tests
 make smoke       # deterministic non-TTY integration checks
 make package-test  # stage install and exercise its pkg-config consumer
 make run         # launch the roguelike
-make run-surf-man  # launch Surf-Man
 make help        # list all supported targets
 ```
 
@@ -232,7 +210,6 @@ src/effects/       Sprites, animation, tweens, and particles
 src/ui/            Layout and widgets
 src/assets/        Asset I/O, RNG, config, and save containers
 examples/roguelike/ Structured roguelike integration example
-examples/surf-man/  Surf-Man integration example
 DESIGN.md          Brand and terminal-game surface contract
 SECURITY.md        Security policy and integration constraints
 docs/              Architecture and extension guidance
@@ -244,12 +221,10 @@ every engine translation unit explicitly, while the Make build discovers the
 same one-level `src/<subsystem>/*.c` units. Private headers are neither installed
 nor part of the supported ABI.
 
-Both examples keep cross-translation-unit contracts private. The Roguelike
-separates its `app/`, `game/`, `presentation/`, `persistence/`, and `qa/`
-modules under `examples/roguelike`, with private headers in
-`include/roguelike/`; Surf-Man retains its separate `app/`, `game/`,
-`presentation/`, `qa/`, and `include/surf_man/` boundaries. Both build
-manifests enumerate their module units explicitly.
+The Roguelike keeps its cross-translation-unit contracts private. It separates
+its `app/`, `game/`, `presentation/`, `persistence/`, and `qa/` modules under
+`examples/roguelike`, with private headers in `include/roguelike/`. Its build
+manifest enumerates module units explicitly.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for subsystem boundaries,
 frame flow, and extension guidance. See [SECURITY.md](SECURITY.md) for trust
