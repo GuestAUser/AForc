@@ -8,115 +8,120 @@
 
 #include <string.h>
 
-static AFORC_Status game_point_blocked(Game *game,
-                                       AFORC_Point point,
-                                       bool *out_blocked) {
-    if (!aforc_tilemap_contains(game->map, point)) {
+static AFORC_Status
+game_point_blocked(Game *game, AFORC_Point point, bool *out_blocked)
+{
+    if (!aforc_tilemap_contains(game->map, point))
+    {
         *out_blocked = true;
         return AFORC_OK;
     }
-    return aforc_grid_point_blocked(game->map,
-                                    0U,
-                                    point,
-                                    game_tile_blocks,
-                                    NULL,
-                                    out_blocked);
+    return aforc_grid_point_blocked(
+        game->map, 0U, point, game_tile_blocks, NULL, out_blocked);
 }
 
-static void game_add_score(Game *game, uint32_t amount) {
-    if (game->score > UINT32_MAX - amount) {
+static void game_add_score(Game *game, uint32_t amount)
+{
+    if (game->score > UINT32_MAX - amount)
+    {
         game->score = UINT32_MAX;
         return;
     }
     game->score += amount;
 }
 
-static const char *game_target_name(const GameActor *actor) {
+static const char *game_target_name(const GameActor *actor)
+{
     return actor->glyph == (uint32_t)'S' ? "sentinel" : "goblin";
 }
 
-static AFORC_Status game_take_turn(Game *game) {
+static AFORC_Status game_take_turn(Game *game)
+{
     char action_message[GAME_MESSAGE_CAPACITY];
     char retaliation_message[GAME_MESSAGE_CAPACITY];
     AFORC_Status status;
 
     (void)memcpy(action_message, game->message, sizeof(action_message));
-    if (game->turn != UINT32_MAX) {
+    if (game->turn != UINT32_MAX)
+    {
         ++game->turn;
     }
     status = game_enemy_turns(game);
-    if (status == AFORC_OK && strcmp(action_message, game->message) != 0) {
-        (void)memcpy(retaliation_message,
-                     game->message,
-                     sizeof(retaliation_message));
-        game_set_message(game,
-                         "%s %s",
-                         action_message,
-                         retaliation_message);
+    if (status == AFORC_OK && strcmp(action_message, game->message) != 0)
+    {
+        (void)memcpy(
+            retaliation_message, game->message, sizeof(retaliation_message));
+        game_set_message(game, "%s %s", action_message, retaliation_message);
     }
     return status;
 }
 
-AFORC_Status game_move_player(Game *game, AFORC_Point delta) {
+AFORC_Status game_move_player(Game *game, AFORC_Point delta)
+{
     GamePosition *player_position = NULL;
     GameActor *player_actor = NULL;
     AFORC_Point destination;
     AFORC_Entity target = AFORC_ENTITY_INVALID;
     bool occupied = false;
     bool blocked = false;
-    AFORC_Status status = game_actor_components(game,
-                                                 game->player,
-                                                 &player_position,
-                                                 &player_actor);
+    AFORC_Status status = game_actor_components(
+        game, game->player, &player_position, &player_actor);
 
-    if (status == AFORC_OK) {
-        status = aforc_world_point_add(player_position->point,
-                                       delta,
-                                       &destination);
+    if (status == AFORC_OK)
+    {
+        status =
+            aforc_world_point_add(player_position->point, delta, &destination);
     }
-    if (status == AFORC_OK) {
+    if (status == AFORC_OK)
+    {
         status = game_point_blocked(game, destination, &blocked);
     }
-    if (status != AFORC_OK) {
+    if (status != AFORC_OK)
+    {
         return status;
     }
-    if (blocked) {
+    if (blocked)
+    {
         game_set_message(game, "Stone blocks the way.");
         return AFORC_OK;
     }
     status = game_entity_at(game, destination, &target, &occupied);
-    if (status != AFORC_OK) {
+    if (status != AFORC_OK)
+    {
         return status;
     }
-    if (occupied) {
+    if (occupied)
+    {
         GamePosition *target_position = NULL;
         GameActor *target_actor = NULL;
         const char *target_name;
 
-        if (aforc_entity_equal(target, game->player)) {
+        if (aforc_entity_equal(target, game->player))
+        {
             return AFORC_OK;
         }
-        status = game_actor_components(game,
-                                       target,
-                                       &target_position,
-                                       &target_actor);
-        if (status != AFORC_OK || !target_actor->hostile) {
+        status = game_actor_components(
+            game, target, &target_position, &target_actor);
+        if (status != AFORC_OK || !target_actor->hostile)
+        {
             return status;
         }
         target_name = game_target_name(target_actor);
         target_actor->health -= player_actor->attack;
         (void)game_emit_burst(game, target_position->point, true);
-        if (target_actor->health <= 0) {
+        if (target_actor->health <= 0)
+        {
             status = aforc_ecs_destroy_entity(game->ecs, target);
-            if (status != AFORC_OK) {
+            if (status != AFORC_OK)
+            {
                 return status;
             }
             game_add_score(game, 100U);
-            game_set_message(game,
-                             "The %s falls. Score: %u.",
-                             target_name,
-                             game->score);
-        } else {
+            game_set_message(
+                game, "The %s falls. Score: %u.", target_name, game->score);
+        }
+        else
+        {
             game_set_message(game,
                              "You strike the %s for %d. Health: %d/%d.",
                              target_name,
@@ -124,38 +129,46 @@ AFORC_Status game_move_player(Game *game, AFORC_Point delta) {
                              target_actor->health,
                              target_actor->maximum_health);
         }
-    } else {
+    }
+    else
+    {
         player_position->point = destination;
-        if (aforc_world_point_equal(destination, game->exit_position)) {
+        if (aforc_world_point_equal(destination, game->exit_position))
+        {
             game_set_message(game, "The exit hums here. Press > to descend.");
-        } else {
+        }
+        else
+        {
             game_set_message(game, "You advance through the ruins.");
         }
     }
     return game_take_turn(game);
 }
 
-AFORC_Status game_wait_turn(Game *game) {
+AFORC_Status game_wait_turn(Game *game)
+{
     game_set_message(game, "You wait and listen.");
     return game_take_turn(game);
 }
 
-AFORC_Status game_descend(Game *game) {
+AFORC_Status game_descend(Game *game)
+{
     GamePosition *position = NULL;
     GameActor *actor = NULL;
-    AFORC_Status status = game_actor_components(game,
-                                                 game->player,
-                                                 &position,
-                                                 &actor);
+    AFORC_Status status =
+        game_actor_components(game, game->player, &position, &actor);
 
-    if (status != AFORC_OK) {
+    if (status != AFORC_OK)
+    {
         return status;
     }
-    if (!aforc_world_point_equal(position->point, game->exit_position)) {
+    if (!aforc_world_point_equal(position->point, game->exit_position))
+    {
         game_set_message(game, "Stand on the green > before descending.");
         return AFORC_OK;
     }
-    if (game->floor == game->rules.final_floor) {
+    if (game->floor == game->rules.final_floor)
+    {
         game_add_score(game, 1000U);
         game->run_state = GAME_VICTORIOUS;
         game_set_message(game,
@@ -165,7 +178,8 @@ AFORC_Status game_descend(Game *game) {
     }
     game_add_score(game, 250U);
     actor->health += 3;
-    if (actor->health > actor->maximum_health) {
+    if (actor->health > actor->maximum_health)
+    {
         actor->health = actor->maximum_health;
     }
     return game_generate_floor(game, game->floor + 1U, actor->health);

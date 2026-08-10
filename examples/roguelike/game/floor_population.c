@@ -9,15 +9,18 @@
 static AFORC_Status game_spawn_enemies(Game *game,
                                        AFORC_Rng *rng,
                                        const GameRoom *rooms,
-                                       size_t room_count) {
+                                       size_t room_count)
+{
     uint32_t desired = game->rules.enemy_count + (game->floor - 1U) * 2U;
     uint32_t spawned = 0U;
     uint32_t attempts = 0U;
 
-    if (desired > GAME_MAX_ENEMIES) {
+    if (desired > GAME_MAX_ENEMIES)
+    {
         desired = GAME_MAX_ENEMIES;
     }
-    while (spawned < desired && attempts < desired * 20U) {
+    while (spawned < desired && attempts < desired * 20U)
+    {
         uint32_t room_offset = 0U;
         uint32_t x_offset = 0U;
         uint32_t y_offset = 0U;
@@ -30,50 +33,53 @@ static AFORC_Status game_spawn_enemies(Game *game,
         AFORC_Status status;
 
         ++attempts;
-        status = aforc_rng_bounded_u32(rng,
-                                       (uint32_t)room_count - 1U,
-                                       &room_offset);
-        if (status == AFORC_OK) {
+        status =
+            aforc_rng_bounded_u32(rng, (uint32_t)room_count - 1U, &room_offset);
+        if (status == AFORC_OK)
+        {
             const GameRoom *room = &rooms[room_offset + 1U];
 
             status = aforc_rng_bounded_u32(
-                rng,
-                (uint32_t)room->bounds.width - 2U,
-                &x_offset);
-            if (status == AFORC_OK) {
+                rng, (uint32_t)room->bounds.width - 2U, &x_offset);
+            if (status == AFORC_OK)
+            {
                 status = aforc_rng_bounded_u32(
-                    rng,
-                    (uint32_t)room->bounds.height - 2U,
-                    &y_offset);
+                    rng, (uint32_t)room->bounds.height - 2U, &y_offset);
             }
             point = (AFORC_Point){room->bounds.x + 1 + (int32_t)x_offset,
                                   room->bounds.y + 1 + (int32_t)y_offset};
         }
-        if (status != AFORC_OK) {
+        if (status != AFORC_OK)
+        {
             return status;
         }
         status = game_entity_at(game, point, &occupant, &occupied);
-        if (status != AFORC_OK) {
+        if (status != AFORC_OK)
+        {
             return status;
         }
-        if (occupied || aforc_world_point_equal(point, game->exit_position)) {
+        if (occupied || aforc_world_point_equal(point, game->exit_position))
+        {
             continue;
         }
         enemy.health = game->rules.enemy_health + floor_bonus;
-        if (sentinel) {
+        if (sentinel)
+        {
             enemy.health += 5 + floor_bonus;
         }
         enemy.maximum_health = enemy.health;
         enemy.attack = game->rules.enemy_attack + floor_bonus / 2;
-        if (sentinel) {
+        if (sentinel)
+        {
             ++enemy.attack;
         }
         enemy.glyph = sentinel ? (uint32_t)'S' : (uint32_t)'g';
-        enemy.color = sentinel ? aforc_color_indexed(141U)
-                               : aforc_color_indexed(203U);
+        enemy.color =
+            sentinel ? aforc_color_indexed(141U) : aforc_color_indexed(203U);
         enemy.hostile = true;
         status = game_create_actor(game, point, enemy, NULL);
-        if (status != AFORC_OK) {
+        if (status != AFORC_OK)
+        {
             return status;
         }
         ++spawned;
@@ -85,7 +91,8 @@ AFORC_Status game_populate_floor(Game *game,
                                  AFORC_Rng *rng,
                                  const GameRoom *rooms,
                                  size_t room_count,
-                                 int32_t player_health) {
+                                 int32_t player_health)
+{
     GameActor player;
     AFORC_Status status;
 
@@ -93,18 +100,17 @@ AFORC_Status game_populate_floor(Game *game,
     player.health = player_health > player.maximum_health
                         ? player.maximum_health
                         : player_health;
-    if (player.health < 1) {
+    if (player.health < 1)
+    {
         player.health = 1;
     }
     player.attack = game->rules.player_attack;
     player.glyph = (uint32_t)'@';
     player.color = aforc_color_indexed(220U);
     player.hostile = false;
-    status = game_create_actor(game,
-                               rooms[0].center,
-                               player,
-                               &game->player);
-    if (status == AFORC_OK) {
+    status = game_create_actor(game, rooms[0].center, player, &game->player);
+    if (status == AFORC_OK)
+    {
         status = game_spawn_enemies(game, rng, rooms, room_count);
     }
     return status;
