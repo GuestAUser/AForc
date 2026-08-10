@@ -7,30 +7,30 @@
 #include "roguelike/internal.h"
 
 const AFORC_SceneVTable game_scene_vtable = {
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    game_scene_fixed_update,
-    game_scene_update,
-    game_scene_render,
-    game_scene_event
+    .fixed_update = game_scene_fixed_update,
+    .update = game_scene_update,
+    .render = game_scene_render,
+    .event = game_scene_event,
 };
 
 static bool game_queued_event_can_take_turn(const Game *game,
-                                            const AFORC_InputEvent *event) {
+                                            const AFORC_InputEvent *event)
+{
     AFORC_Key key;
     uint32_t codepoint;
 
     if (event->type != AFORC_INPUT_EVENT_KEY_DOWN || game->help_visible ||
-        game->run_state != GAME_PLAYING) {
+        game->run_state != GAME_PLAYING)
+    {
         return false;
     }
     key = event->data.key.key;
     codepoint = event->data.key.codepoint;
-    if (codepoint == 0U && key >= AFORC_KEY_A && key <= AFORC_KEY_Z) {
+    if (codepoint == 0U && key >= AFORC_KEY_A && key <= AFORC_KEY_Z)
+    {
         codepoint = (uint32_t)key;
-        if ((event->data.key.modifiers & AFORC_MOD_SHIFT) == 0U) {
+        if ((event->data.key.modifiers & AFORC_MOD_SHIFT) == 0U)
+        {
             codepoint += (uint32_t)('a' - 'A');
         }
     }
@@ -43,13 +43,14 @@ static bool game_queued_event_can_take_turn(const Game *game,
            codepoint == (uint32_t)'k' || codepoint == (uint32_t)'l';
 }
 
-AFORC_Status game_dispatch_input_queue(Game *game,
-                                       AFORC_Engine *engine,
-                                       AFORC_Error *error) {
+AFORC_Status
+game_dispatch_input_queue(Game *game, AFORC_Engine *engine, AFORC_Error *error)
+{
     AFORC_InputEvent event;
     AFORC_Status status = AFORC_OK;
 
-    while (aforc_input_next_event(game->input, &event)) {
+    while (aforc_input_next_event(game->input, &event))
+    {
         const uint32_t turn_before = game->turn;
         const uint32_t floor_before = game->floor;
         const GameRunState run_state_before = game->run_state;
@@ -58,77 +59,83 @@ AFORC_Status game_dispatch_input_queue(Game *game,
             game_queued_event_can_take_turn(game, &event);
         bool consumed = false;
 
-        status = aforc_engine_dispatch_event(engine,
-                                             &event,
-                                             &consumed,
-                                             error);
-        if (status != AFORC_OK) {
+        status = aforc_engine_dispatch_event(engine, &event, &consumed, error);
+        if (status != AFORC_OK)
+        {
             break;
         }
         if (game->turn != turn_before || game->floor != floor_before ||
-            game->run_state != run_state_before || saturated_turn_action) {
+            game->run_state != run_state_before || saturated_turn_action)
+        {
             break;
         }
     }
     return status;
 }
 
-AFORC_Status game_poll_events(void *context,
-                              AFORC_Engine *engine,
-                              AFORC_Error *error) {
+AFORC_Status
+game_poll_events(void *context, AFORC_Engine *engine, AFORC_Error *error)
+{
     Game *game = context;
     AFORC_Status status = aforc_input_begin_frame(game->input);
 
-    if (status == AFORC_OK) {
+    if (status == AFORC_OK)
+    {
         status = aforc_input_poll(game->input, game->terminal, 0);
     }
     if (status == AFORC_ERROR_INTERRUPTED ||
-        status == AFORC_ERROR_END_OF_STREAM) {
+        status == AFORC_ERROR_END_OF_STREAM)
+    {
         aforc_engine_request_quit(engine);
         return AFORC_OK;
     }
-    if (status != AFORC_OK) {
+    if (status != AFORC_OK)
+    {
         return game_error(error, status, "input", "terminal input poll failed");
     }
     status = game_begin_frame(context, engine, error);
-    if (status != AFORC_OK) {
+    if (status != AFORC_OK)
+    {
         return status;
     }
     return game_dispatch_input_queue(game, engine, error);
 }
 
-AFORC_Status game_begin_frame(void *context,
-                              AFORC_Engine *engine,
-                              AFORC_Error *error) {
+AFORC_Status
+game_begin_frame(void *context, AFORC_Engine *engine, AFORC_Error *error)
+{
     Game *game = context;
     bool changed = false;
     AFORC_Status status;
 
     (void)engine;
     /* A NULL terminal keeps the same frame hook path for off-screen smoke. */
-    if (game->terminal == NULL) {
+    if (game->terminal == NULL)
+    {
         return AFORC_OK;
     }
-    status = aforc_renderer_resize_to_terminal(game->renderer,
-                                               game->terminal,
-                                               &changed);
-    if (status != AFORC_OK) {
+    status = aforc_renderer_resize_to_terminal(
+        game->renderer, game->terminal, &changed);
+    if (status != AFORC_OK)
+    {
         return game_error(error, status, "renderer", "terminal resize failed");
     }
-    if (changed) {
+    if (changed)
+    {
         aforc_renderer_invalidate(game->renderer);
     }
     return AFORC_OK;
 }
 
-AFORC_Status game_present(void *context,
-                          AFORC_Engine *engine,
-                          AFORC_Error *error) {
+AFORC_Status
+game_present(void *context, AFORC_Engine *engine, AFORC_Error *error)
+{
     Game *game = context;
     AFORC_Status status;
 
     (void)engine;
-    if (game->terminal == NULL) {
+    if (game->terminal == NULL)
+    {
         return AFORC_OK;
     }
     status = aforc_renderer_present(game->renderer, game->terminal);
