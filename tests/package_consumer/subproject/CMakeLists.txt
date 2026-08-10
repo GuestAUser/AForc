@@ -18,14 +18,13 @@ if(DEFINED BUILD_TESTING)
     message(FATAL_ERROR "AForc changed the host BUILD_TESTING variable")
 endif()
 if(AFORC_BUILD_EXAMPLES)
-    message(FATAL_ERROR "AForc examples defaulted on as a subproject")
+    message(FATAL_ERROR "AForc example build defaulted on as a subproject")
 endif()
 if(AFORC_BUILD_TESTS)
     message(FATAL_ERROR "AForc tests defaulted on as a subproject")
 endif()
 foreach(unexpected_target IN ITEMS
         aforc_roguelike
-        aforc_surf_man
         aforc_core_lifecycle_test
 )
     if(TARGET "${unexpected_target}")

@@ -26,7 +26,7 @@ endif()
 
 option(
     AFORC_BUILD_EXAMPLES
-    "Build AForc example programs"
+    "Build the AForc roguelike example"
     "${AFORC_IS_TOP_LEVEL}"
 )
 option(
@@ -352,61 +352,6 @@ if(AFORC_BUILD_EXAMPLES)
         )
     endif()
 
-    set(AFORC_SURF_MAN_SOURCES
-        examples/surf-man/app/main.c
-        examples/surf-man/app/lifecycle.c
-        examples/surf-man/app/input.c
-        examples/surf-man/app/menu.c
-        examples/surf-man/app/engine_hooks.c
-        examples/surf-man/app/runtime.c
-        examples/surf-man/game/rules.c
-        examples/surf-man/game/wave.c
-        examples/surf-man/game/scoring.c
-        examples/surf-man/game/simulation.c
-        examples/surf-man/game/ride.c
-        examples/surf-man/presentation/common.c
-        examples/surf-man/presentation/effects.c
-        examples/surf-man/presentation/art.c
-        examples/surf-man/presentation/rider.c
-        examples/surf-man/presentation/hud.c
-        examples/surf-man/presentation/panels.c
-        examples/surf-man/presentation/render.c
-        examples/surf-man/qa/simulation_checks.c
-        examples/surf-man/qa/render_checks.c
-        examples/surf-man/qa/smoke.c
-    )
-    add_executable(aforc_surf_man ${AFORC_SURF_MAN_SOURCES})
-    set_target_properties(aforc_surf_man PROPERTIES
-        OUTPUT_NAME "aforc-surf-man"
-    )
-    target_include_directories(aforc_surf_man PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/examples/surf-man/include"
-    )
-    aforc_configure_owned_target(aforc_surf_man)
-    target_link_libraries(aforc_surf_man PRIVATE aforc::aforc)
-
-    if(AFORC_TESTS_ACTIVE)
-        add_test(NAME surf_man_help COMMAND aforc_surf_man --help)
-        set_tests_properties(surf_man_help PROPERTIES TIMEOUT 15)
-        add_test(NAME surf_man_smoke COMMAND aforc_surf_man --smoke)
-        set_tests_properties(surf_man_smoke PROPERTIES TIMEOUT 15)
-        add_test(
-            NAME surf_man_invalid_seed
-            COMMAND aforc_surf_man --seed nope
-        )
-        set_tests_properties(surf_man_invalid_seed PROPERTIES
-            TIMEOUT 15
-            WILL_FAIL TRUE
-        )
-        add_test(
-            NAME surf_man_negative_seed
-            COMMAND aforc_surf_man --seed -1 --smoke
-        )
-        set_tests_properties(surf_man_negative_seed PROPERTIES
-            TIMEOUT 15
-            WILL_FAIL TRUE
-        )
-    endif()
 endif()
 
 if(AFORC_TESTS_ACTIVE)
