@@ -9,14 +9,16 @@
 
 #include "../src/ecs/ecs_internal.h"
 
-enum {
+enum
+{
     ECS_TEST_TYPE_LIMIT = 8,
     ECS_TEST_HIGH_ENTITY_INDEX = 65535,
     ECS_BENCHMARK_ENTITY_COUNT = 32768,
     ECS_BENCHMARK_ROUNDS = 64
 };
 
-typedef struct EcsTestComponent {
+typedef struct EcsTestComponent
+{
     uint32_t entity_index;
     uint32_t type_id;
 } EcsTestComponent;
@@ -29,14 +31,12 @@ bool ecs_test_register_types(AFORC_Ecs *ecs,
                              size_t type_count,
                              size_t initial_capacity,
                              AFORC_ComponentType *types);
-static inline bool ecs_test_create_entity(AFORC_Ecs *ecs,
-                                          AFORC_Entity *entity)
+static inline bool ecs_test_create_entity(AFORC_Ecs *ecs, AFORC_Entity *entity)
 {
     return aforc_ecs_create_entity(ecs, entity) == AFORC_OK;
 }
-static inline bool ecs_test_add(AFORC_Ecs *ecs,
-                                AFORC_Entity entity,
-                                AFORC_ComponentType type)
+static inline bool
+ecs_test_add(AFORC_Ecs *ecs, AFORC_Entity entity, AFORC_ComponentType type)
 {
     const EcsTestComponent value = {entity.index, type.id};
 

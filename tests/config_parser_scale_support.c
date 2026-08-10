@@ -20,11 +20,13 @@ void *aforc_config_test_malloc(size_t size)
     void *memory;
 
     ++test_allocation_attempts;
-    if (test_fail_at != 0u && test_allocation_attempts == test_fail_at) {
+    if (test_fail_at != 0u && test_allocation_attempts == test_fail_at)
+    {
         return NULL;
     }
     memory = malloc(size);
-    if (memory != NULL) {
+    if (memory != NULL)
+    {
         ++test_live_allocations;
     }
     return memory;
@@ -35,11 +37,13 @@ void *aforc_config_test_realloc(void *memory, size_t size)
     void *replacement;
 
     ++test_allocation_attempts;
-    if (test_fail_at != 0u && test_allocation_attempts == test_fail_at) {
+    if (test_fail_at != 0u && test_allocation_attempts == test_fail_at)
+    {
         return NULL;
     }
     replacement = realloc(memory, size);
-    if (replacement != NULL && memory == NULL) {
+    if (replacement != NULL && memory == NULL)
+    {
         ++test_live_allocations;
     }
     return replacement;
@@ -47,7 +51,8 @@ void *aforc_config_test_realloc(void *memory, size_t size)
 
 void aforc_config_test_free(void *memory)
 {
-    if (memory != NULL) {
+    if (memory != NULL)
+    {
         --test_live_allocations;
     }
     free(memory);
@@ -70,10 +75,9 @@ size_t aforc_config_scale_live_allocations(void)
     return test_live_allocations;
 }
 
-char *aforc_config_scale_make_config(
-    size_t entry_count,
-    bool append_duplicate,
-    size_t *output_size)
+char *aforc_config_scale_make_config(size_t entry_count,
+                                     bool append_duplicate,
+                                     size_t *output_size)
 {
     const size_t bytes_per_entry = 32u;
     const size_t fixed_bytes = 64u;
@@ -84,35 +88,39 @@ char *aforc_config_scale_make_config(
     int written;
 
     if (output_size == NULL ||
-        entry_count > (SIZE_MAX - fixed_bytes) / bytes_per_entry) {
+        entry_count > (SIZE_MAX - fixed_bytes) / bytes_per_entry)
+    {
         return NULL;
     }
     capacity = fixed_bytes + (entry_count * bytes_per_entry);
     text = malloc(capacity);
-    if (text == NULL) {
+    if (text == NULL)
+    {
         return NULL;
     }
     written = snprintf(text, capacity, "[dense]\n");
-    if (written < 0 || (size_t)written >= capacity) {
+    if (written < 0 || (size_t)written >= capacity)
+    {
         free(text);
         return NULL;
     }
     used = (size_t)written;
-    for (index = 0u; index < entry_count; ++index) {
-        written = snprintf(text + used,
-                           capacity - used,
-                           "key%zu=value%zu\n",
-                           index,
-                           index);
-        if (written < 0 || (size_t)written >= capacity - used) {
+    for (index = 0u; index < entry_count; ++index)
+    {
+        written = snprintf(
+            text + used, capacity - used, "key%zu=value%zu\n", index, index);
+        if (written < 0 || (size_t)written >= capacity - used)
+        {
             free(text);
             return NULL;
         }
         used += (size_t)written;
     }
-    if (append_duplicate) {
+    if (append_duplicate)
+    {
         written = snprintf(text + used, capacity - used, "key0=duplicate\n");
-        if (written < 0 || (size_t)written >= capacity - used) {
+        if (written < 0 || (size_t)written >= capacity - used)
+        {
             free(text);
             return NULL;
         }
@@ -122,25 +130,23 @@ char *aforc_config_scale_make_config(
     return text;
 }
 
-bool aforc_config_scale_parse_status(
-    const char *text,
-    size_t text_size,
-    AFORC_Status expected)
+bool aforc_config_scale_parse_status(const char *text,
+                                     size_t text_size,
+                                     AFORC_Status expected)
 {
     AFORC_ConfigLimits limits = aforc_config_limits_default();
     AFORC_Config config = {0};
     const AFORC_Status status =
         aforc_config_parse(text, text_size, &limits, &config);
-    const bool passed = status == expected && config.entries == NULL &&
-                        config.count == 0u;
+    const bool passed =
+        status == expected && config.entries == NULL && config.count == 0u;
 
     aforc_config_release(&config);
     return passed;
 }
 
-double aforc_config_scale_elapsed_milliseconds(
-    const struct timespec *start,
-    const struct timespec *end)
+double aforc_config_scale_elapsed_milliseconds(const struct timespec *start,
+                                               const struct timespec *end)
 {
     const double seconds = (double)(end->tv_sec - start->tv_sec);
     const double nanoseconds = (double)(end->tv_nsec - start->tv_nsec);

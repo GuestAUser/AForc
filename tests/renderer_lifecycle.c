@@ -9,7 +9,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-typedef struct AllocationTracker {
+typedef struct AllocationTracker
+{
     size_t calls;
     size_t fail_at;
     size_t live;
@@ -21,11 +22,13 @@ static void *tracked_allocate(void *context, size_t size)
     void *memory;
 
     ++tracker->calls;
-    if (tracker->calls == tracker->fail_at) {
+    if (tracker->calls == tracker->fail_at)
+    {
         return NULL;
     }
     memory = malloc(size);
-    if (memory != NULL) {
+    if (memory != NULL)
+    {
         ++tracker->live;
     }
     return memory;
@@ -36,7 +39,8 @@ static void *tracked_reallocate(void *context, void *memory, size_t size)
     AllocationTracker *tracker = context;
 
     ++tracker->calls;
-    if (tracker->calls == tracker->fail_at) {
+    if (tracker->calls == tracker->fail_at)
+    {
         return NULL;
     }
     return realloc(memory, size);
@@ -46,7 +50,8 @@ static void tracked_deallocate(void *context, void *memory)
 {
     AllocationTracker *tracker = context;
 
-    if (memory != NULL) {
+    if (memory != NULL)
+    {
         --tracker->live;
         free(memory);
     }
@@ -54,13 +59,16 @@ static void tracked_deallocate(void *context, void *memory)
 
 static bool colors_equal(AFORC_Color left, AFORC_Color right)
 {
-    if (left.mode != right.mode) {
+    if (left.mode != right.mode)
+    {
         return false;
     }
-    if (left.mode == AFORC_COLOR_DEFAULT) {
+    if (left.mode == AFORC_COLOR_DEFAULT)
+    {
         return true;
     }
-    if (left.mode == AFORC_COLOR_INDEXED) {
+    if (left.mode == AFORC_COLOR_INDEXED)
+    {
         return left.red == right.red;
     }
     return left.red == right.red && left.green == right.green &&
@@ -98,11 +106,13 @@ static bool resize_is_transactional(void)
     config.allocator = (AFORC_Allocator){
         &tracker, tracked_allocate, tracked_reallocate, tracked_deallocate};
     if (aforc_renderer_create(&renderer, &config) != AFORC_OK ||
-        tracker.live != 3U) {
+        tracker.live != 3U)
+    {
         goto cleanup;
     }
     marked.codepoint = (uint32_t)'X';
-    if (aforc_renderer_put(renderer, (AFORC_Point){1, 1}, marked) != AFORC_OK) {
+    if (aforc_renderer_put(renderer, (AFORC_Point){1, 1}, marked) != AFORC_OK)
+    {
         goto cleanup;
     }
     back = aforc_renderer_back_buffer(renderer, NULL);
@@ -112,7 +122,8 @@ static bool resize_is_transactional(void)
             AFORC_ERROR_OUT_OF_MEMORY ||
         aforc_renderer_back_buffer(renderer, NULL) != back ||
         tracker.live != 3U ||
-        !cell_at_is(renderer, (AFORC_Point){1, 1}, marked)) {
+        !cell_at_is(renderer, (AFORC_Point){1, 1}, marked))
+    {
         goto cleanup;
     }
 
@@ -121,7 +132,8 @@ static bool resize_is_transactional(void)
             AFORC_ERROR_OUT_OF_MEMORY ||
         aforc_renderer_back_buffer(renderer, NULL) != back ||
         tracker.live != 3U ||
-        !cell_at_is(renderer, (AFORC_Point){1, 1}, marked)) {
+        !cell_at_is(renderer, (AFORC_Point){1, 1}, marked))
+    {
         goto cleanup;
     }
 
@@ -129,20 +141,23 @@ static bool resize_is_transactional(void)
     calls = tracker.calls;
     if (aforc_renderer_resize(renderer, (AFORC_Size){2, 2}) != AFORC_OK ||
         tracker.calls != calls ||
-        aforc_renderer_back_buffer(renderer, NULL) != back) {
+        aforc_renderer_back_buffer(renderer, NULL) != back)
+    {
         goto cleanup;
     }
     if (aforc_renderer_resize(renderer, (AFORC_Size){0, 2}) !=
             AFORC_ERROR_INVALID_ARGUMENT ||
         aforc_renderer_back_buffer(renderer, NULL) != back ||
-        !cell_at_is(renderer, (AFORC_Point){1, 1}, marked)) {
+        !cell_at_is(renderer, (AFORC_Point){1, 1}, marked))
+    {
         goto cleanup;
     }
     if (aforc_renderer_resize(renderer, (AFORC_Size){3, 3}) != AFORC_OK ||
         aforc_renderer_back_buffer(renderer, NULL) == back ||
         tracker.live != 3U ||
         !cell_at_is(renderer, (AFORC_Point){1, 1}, marked) ||
-        !cell_at_is(renderer, (AFORC_Point){2, 2}, aforc_cell_default())) {
+        !cell_at_is(renderer, (AFORC_Point){2, 2}, aforc_cell_default()))
+    {
         goto cleanup;
     }
     passed = true;
@@ -154,7 +169,8 @@ cleanup:
 
 int main(void)
 {
-    if (!resize_is_transactional()) {
+    if (!resize_is_transactional())
+    {
         (void)fputs("renderer lifecycle regression failed\n", stderr);
         return 1;
     }

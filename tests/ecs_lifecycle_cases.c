@@ -6,7 +6,8 @@
 
 #include "ecs_optimization_support.h"
 
-typedef struct EcsLifecycleCleanupProbe {
+typedef struct EcsLifecycleCleanupProbe
+{
     AFORC_ComponentType type;
     AFORC_EcsView *view;
     void *expected_component;
@@ -21,8 +22,7 @@ static void lifecycle_cleanup(AFORC_Ecs *ecs,
                               void *component,
                               void *user_data)
 {
-    EcsLifecycleCleanupProbe *probe =
-        (EcsLifecycleCleanupProbe *)user_data;
+    EcsLifecycleCleanupProbe *probe = (EcsLifecycleCleanupProbe *)user_data;
     const AFORC_EcsComponentDesc desc = {
         sizeof(EcsTestComponent),
         _Alignof(EcsTestComponent),
@@ -54,10 +54,9 @@ static void lifecycle_cleanup(AFORC_Ecs *ecs,
             AFORC_ERROR_STATE &&
         aforc_ecs_remove(ecs, entity, probe->type) == AFORC_ERROR_STATE;
     probe->view_blocked =
-        aforc_ecs_view_next(probe->view,
-                            &view_entity,
-                            &view_component,
-                            &view_has_value) == AFORC_ERROR_STATE &&
+        aforc_ecs_view_next(
+            probe->view, &view_entity, &view_component, &view_has_value) ==
+            AFORC_ERROR_STATE &&
         !view_has_value &&
         aforc_entity_equal(view_entity, AFORC_ENTITY_INVALID) &&
         view_component == NULL;
@@ -81,7 +80,8 @@ static bool test_generation_reuse_and_retirement(void)
              ecs_test_create_entity(ecs, &replacement) &&
              replacement.index == first.index &&
              replacement.generation == first.generation + UINT32_C(1);
-    if (passed) {
+    if (passed)
+    {
         ecs->slots[replacement.index].generation = UINT32_MAX - UINT32_C(1);
         replacement.generation = UINT32_MAX - UINT32_C(1);
         passed = aforc_ecs_destroy_entity(ecs, replacement) == AFORC_OK &&
@@ -111,25 +111,22 @@ static bool test_cleanup_lifecycle(void)
     desc.alignment = _Alignof(EcsTestComponent);
     desc.cleanup = lifecycle_cleanup;
     desc.cleanup_user_data = &probe;
-    passed = passed &&
-             aforc_ecs_register_component(ecs, &desc, &probe.type) ==
-                 AFORC_OK &&
-             ecs_test_create_entity(ecs, &entity);
+    passed =
+        passed &&
+        aforc_ecs_register_component(ecs, &desc, &probe.type) == AFORC_OK &&
+        ecs_test_create_entity(ecs, &entity);
     value = (EcsTestComponent){entity.index, probe.type.id};
-    passed = passed &&
-             aforc_ecs_add(ecs,
-                           entity,
-                           probe.type,
-                           &value,
-                           &probe.expected_component) == AFORC_OK &&
-             aforc_ecs_view_create(ecs, &probe.type, 1U, &probe.view) ==
-                 AFORC_OK &&
-             aforc_ecs_remove(ecs, entity, probe.type) == AFORC_OK &&
-             probe.invocation_count == 1U && probe.component_visible &&
-             probe.mutation_blocked && probe.view_blocked &&
-             aforc_ecs_has(ecs, entity, probe.type, &has_component) ==
-                 AFORC_OK &&
-             !has_component;
+    passed =
+        passed &&
+        aforc_ecs_add(
+            ecs, entity, probe.type, &value, &probe.expected_component) ==
+            AFORC_OK &&
+        aforc_ecs_view_create(ecs, &probe.type, 1U, &probe.view) == AFORC_OK &&
+        aforc_ecs_remove(ecs, entity, probe.type) == AFORC_OK &&
+        probe.invocation_count == 1U && probe.component_visible &&
+        probe.mutation_blocked && probe.view_blocked &&
+        aforc_ecs_has(ecs, entity, probe.type, &has_component) == AFORC_OK &&
+        !has_component;
     aforc_ecs_view_destroy(probe.view);
     aforc_ecs_destroy(ecs);
     return passed;
@@ -163,21 +160,22 @@ static bool test_cleanup_paths(void)
     desc.alignment = _Alignof(EcsTestComponent);
     desc.cleanup = count_cleanup;
     desc.cleanup_user_data = &cleanup_count;
-    passed = passed &&
-             aforc_ecs_register_component(ecs, &desc, &type) == AFORC_OK;
-    for (index = 0U; passed && index < 4U; ++index) {
+    passed =
+        passed && aforc_ecs_register_component(ecs, &desc, &type) == AFORC_OK;
+    for (index = 0U; passed && index < 4U; ++index)
+    {
         passed = ecs_test_create_entity(ecs, &entities[index]) &&
                  ecs_test_add(ecs, entities[index], type);
     }
-    passed = passed &&
-             aforc_ecs_destroy_entity(ecs, entities[0]) == AFORC_OK &&
+    passed = passed && aforc_ecs_destroy_entity(ecs, entities[0]) == AFORC_OK &&
              cleanup_count == 1U &&
              aforc_ecs_remove(ecs, entities[1], type) == AFORC_OK &&
              cleanup_count == 2U && aforc_ecs_clear(ecs) == AFORC_OK &&
              cleanup_count == 4U && aforc_ecs_entity_count(ecs) == 0U &&
              ecs_test_create_entity(ecs, &entities[0]) &&
              ecs_test_add(ecs, entities[0], type);
-    if (passed) {
+    if (passed)
+    {
         aforc_ecs_destroy(ecs);
         ecs = NULL;
         passed = cleanup_count == 5U;

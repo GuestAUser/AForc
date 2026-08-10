@@ -9,18 +9,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-typedef struct ReentryContext {
+typedef struct ReentryContext
+{
     bool attempted;
     AFORC_Status nested_frame_status;
     AFORC_Status nested_run_status;
 } ReentryContext;
 
-typedef struct SleepContext {
+typedef struct SleepContext
+{
     uint64_t now_ns;
     size_t sleep_count;
 } SleepContext;
 
-typedef struct AllocationContext {
+typedef struct AllocationContext
+{
     size_t live_allocations;
     size_t allocation_calls;
     bool destroy_attempted;
@@ -32,7 +35,8 @@ static void *tracked_allocate(void *context, size_t size)
     void *memory = malloc(size);
 
     ++allocations->allocation_calls;
-    if (memory != NULL) {
+    if (memory != NULL)
+    {
         ++allocations->live_allocations;
     }
     return memory;
@@ -48,14 +52,15 @@ static void tracked_deallocate(void *context, void *memory)
 {
     AllocationContext *allocations = context;
 
-    if (memory != NULL) {
+    if (memory != NULL)
+    {
         --allocations->live_allocations;
         free(memory);
     }
 }
 
-static AFORC_Status quit_in_poll(void *context, AFORC_Engine *engine,
-                                 AFORC_Error *error)
+static AFORC_Status
+quit_in_poll(void *context, AFORC_Engine *engine, AFORC_Error *error)
 {
     (void)context;
     (void)error;
@@ -69,7 +74,8 @@ static AFORC_Status attempt_nested_ownership(void *context,
 {
     ReentryContext *reentry = context;
 
-    if (!reentry->attempted) {
+    if (!reentry->attempted)
+    {
         reentry->attempted = true;
         reentry->nested_frame_status = aforc_engine_frame(engine, 1U, error);
         reentry->nested_run_status = aforc_engine_run(engine, error);
@@ -90,8 +96,8 @@ static void count_sleep(void *context, uint64_t nanoseconds)
     ++sleep->sleep_count;
 }
 
-static AFORC_Status destroy_from_hook(void *context, AFORC_Engine *engine,
-                                      AFORC_Error *error)
+static AFORC_Status
+destroy_from_hook(void *context, AFORC_Engine *engine, AFORC_Error *error)
 {
     AllocationContext *allocations = context;
 
@@ -130,7 +136,8 @@ static bool test_nested_loop_ownership_is_rejected(void)
     config.hooks.poll_events = quit_in_poll;
     config.hooks.begin_frame = attempt_nested_ownership;
     status = aforc_engine_create(&config, &engine, &error);
-    if (status == AFORC_OK) {
+    if (status == AFORC_OK)
+    {
         status = aforc_engine_frame(engine, 0U, &error);
     }
     passed = status == AFORC_OK && context.attempted &&
@@ -155,7 +162,8 @@ static bool test_quit_skips_frame_sleep(void)
     config.hooks.sleep = count_sleep;
     config.hooks.poll_events = quit_in_poll;
     status = aforc_engine_create(&config, &engine, &error);
-    if (status == AFORC_OK) {
+    if (status == AFORC_OK)
+    {
         status = aforc_engine_run(engine, &error);
     }
     aforc_engine_destroy(engine);
@@ -181,12 +189,14 @@ static bool test_destroy_is_deferred_during_frame(void)
     config.hooks.context = &context;
     config.hooks.begin_frame = destroy_from_hook;
     status = aforc_engine_create(&config, &engine, &error);
-    if (status == AFORC_OK) {
+    if (status == AFORC_OK)
+    {
         status = aforc_engine_frame(engine, 0U, &error);
     }
     passed = status == AFORC_ERROR_STATE && context.destroy_attempted &&
              context.live_allocations != 0U;
-    if (context.live_allocations != 0U) {
+    if (context.live_allocations != 0U)
+    {
         aforc_engine_destroy(engine);
     }
     return passed && context.live_allocations == 0U;
@@ -228,7 +238,8 @@ static bool test_invalid_target_frequency_is_rejected_before_allocation(void)
         tracked_deallocate,
     };
     status = aforc_engine_create(&config, &engine, &error);
-    if (status == AFORC_OK) {
+    if (status == AFORC_OK)
+    {
         aforc_engine_destroy(engine);
         return false;
     }
@@ -252,13 +263,16 @@ static bool test_successful_fixed_update_advances_tick_before_quit(void)
     config.fixed_updates_per_second = 10U;
     config.quit_when_scene_stack_empty = false;
     status = aforc_engine_create(&config, &engine, &error);
-    if (status == AFORC_OK) {
+    if (status == AFORC_OK)
+    {
         status = aforc_engine_request_push(engine, &scene, &error);
     }
-    if (status == AFORC_OK) {
+    if (status == AFORC_OK)
+    {
         status = aforc_engine_frame(engine, 0U, &error);
     }
-    if (status == AFORC_OK) {
+    if (status == AFORC_OK)
+    {
         status = aforc_engine_frame(engine, UINT64_C(100000000), &error);
     }
     passed = status == AFORC_OK && updates == 1U &&
@@ -269,27 +283,33 @@ static bool test_successful_fixed_update_advances_tick_before_quit(void)
 
 int main(void)
 {
-    if (!test_nested_loop_ownership_is_rejected()) {
+    if (!test_nested_loop_ownership_is_rejected())
+    {
         (void)fprintf(stderr, "nested engine ownership guard failed\n");
         return 1;
     }
-    if (!test_quit_skips_frame_sleep()) {
+    if (!test_quit_skips_frame_sleep())
+    {
         (void)fprintf(stderr, "quit frame pacing guard failed\n");
         return 2;
     }
-    if (!test_destroy_is_deferred_during_frame()) {
+    if (!test_destroy_is_deferred_during_frame())
+    {
         (void)fprintf(stderr, "active destroy guard failed\n");
         return 3;
     }
-    if (!test_successful_fixed_update_advances_tick_before_quit()) {
+    if (!test_successful_fixed_update_advances_tick_before_quit())
+    {
         (void)fprintf(stderr, "fixed tick accounting failed\n");
         return 4;
     }
-    if (!test_invalid_frequency_is_rejected_before_allocation()) {
+    if (!test_invalid_frequency_is_rejected_before_allocation())
+    {
         (void)fprintf(stderr, "invalid engine frequency validation failed\n");
         return 5;
     }
-    if (!test_invalid_target_frequency_is_rejected_before_allocation()) {
+    if (!test_invalid_target_frequency_is_rejected_before_allocation())
+    {
         (void)fprintf(stderr, "invalid target frequency validation failed\n");
         return 6;
     }

@@ -22,7 +22,8 @@
 #include <time.h>
 #include <unistd.h>
 
-typedef struct PtyPair {
+typedef struct PtyPair
+{
     int master;
     int slave;
 } PtyPair;
@@ -34,11 +35,13 @@ static bool pty_open(PtyPair *pair)
     pair->master = posix_openpt(O_RDWR | O_NOCTTY);
     pair->slave = -1;
     if (pair->master < 0 || grantpt(pair->master) < 0 ||
-        unlockpt(pair->master) < 0) {
+        unlockpt(pair->master) < 0)
+    {
         return false;
     }
     slave_name = ptsname(pair->master);
-    if (slave_name == NULL) {
+    if (slave_name == NULL)
+    {
         return false;
     }
     pair->slave = open(slave_name, O_RDWR | O_NOCTTY);
@@ -47,11 +50,13 @@ static bool pty_open(PtyPair *pair)
 
 static void pty_close(PtyPair *pair)
 {
-    if (pair->master >= 0) {
+    if (pair->master >= 0)
+    {
         (void)close(pair->master);
         pair->master = -1;
     }
-    if (pair->slave >= 0) {
+    if (pair->slave >= 0)
+    {
         (void)close(pair->slave);
         pair->slave = -1;
     }
@@ -75,7 +80,8 @@ static AFORC_TerminalConfig terminal_config(int fd)
 
 static bool contract_check(bool condition, const char *label)
 {
-    if (!condition) {
+    if (!condition)
+    {
         (void)fprintf(stderr, "terminal contract check failed: %s\n", label);
     }
     return condition;
@@ -84,10 +90,8 @@ static bool contract_check(bool condition, const char *label)
 static bool termios_equal(const struct termios *left,
                           const struct termios *right)
 {
-    return left->c_iflag == right->c_iflag &&
-           left->c_oflag == right->c_oflag &&
-           left->c_cflag == right->c_cflag &&
-           left->c_lflag == right->c_lflag &&
+    return left->c_iflag == right->c_iflag && left->c_oflag == right->c_oflag &&
+           left->c_cflag == right->c_cflag && left->c_lflag == right->c_lflag &&
            memcmp(left->c_cc, right->c_cc, sizeof(left->c_cc)) == 0;
 }
 
@@ -106,7 +110,8 @@ static bool monotonic_time_ms(uint64_t *out_time_ms)
     struct timespec now;
 
     if (out_time_ms == NULL || clock_gettime(CLOCK_MONOTONIC, &now) < 0 ||
-        now.tv_sec < 0) {
+        now.tv_sec < 0)
+    {
         return false;
     }
     *out_time_ms = (uint64_t)now.tv_sec * UINT64_C(1000) +
@@ -127,25 +132,29 @@ static bool test_open_close_restores_and_borrows_fds(void)
     int flags_before;
     bool passed;
 
-    if (!pty_open(&pair)) {
+    if (!pty_open(&pair))
+    {
         (void)fprintf(stderr, "terminal contract setup failed: open PTY\n");
         pty_close(&pair);
         return false;
     }
     config = terminal_config(pair.slave);
     flags_before = fcntl(pair.slave, F_GETFL);
-    if (flags_before < 0) {
+    if (flags_before < 0)
+    {
         (void)fprintf(stderr, "terminal contract setup failed: read flags\n");
         pty_close(&pair);
         return false;
     }
-    if (tcgetattr(pair.slave, &before) < 0) {
+    if (tcgetattr(pair.slave, &before) < 0)
+    {
         (void)fprintf(stderr, "terminal contract setup failed: read termios\n");
         pty_close(&pair);
         return false;
     }
     open_status = aforc_terminal_open(&terminal, &config);
-    if (open_status != AFORC_OK || tcgetattr(pair.slave, &raw) < 0) {
+    if (open_status != AFORC_OK || tcgetattr(pair.slave, &raw) < 0)
+    {
         (void)fprintf(stderr,
                       "terminal contract setup failed: engine open status %d\n",
                       (int)open_status);
@@ -154,45 +163,47 @@ static bool test_open_close_restores_and_borrows_fds(void)
         return false;
     }
     passed = contract_check(aforc_terminal_is_active(terminal), "active") &&
-              contract_check(aforc_terminal_input_fd(terminal) == pair.slave,
-                             "input descriptor") &&
-              contract_check(aforc_terminal_output_fd(terminal) == pair.slave,
-                             "output descriptor") &&
-              contract_check((raw.c_lflag & (ECHO | ICANON | ISIG)) == 0U,
-                             "raw local flags") &&
-              contract_check((fcntl(pair.slave, F_GETFL) & O_NONBLOCK) != 0,
-                             "nonblocking input") &&
-              contract_check(
-                  aforc_terminal_open(&duplicate, &config) ==
-                      AFORC_ERROR_EXISTS,
-                  "duplicate open") &&
-              contract_check(duplicate == NULL, "duplicate output");
+             contract_check(aforc_terminal_input_fd(terminal) == pair.slave,
+                            "input descriptor") &&
+             contract_check(aforc_terminal_output_fd(terminal) == pair.slave,
+                            "output descriptor") &&
+             contract_check((raw.c_lflag & (ECHO | ICANON | ISIG)) == 0U,
+                            "raw local flags") &&
+             contract_check((fcntl(pair.slave, F_GETFL) & O_NONBLOCK) != 0,
+                            "nonblocking input") &&
+             contract_check(aforc_terminal_open(&duplicate, &config) ==
+                                AFORC_ERROR_EXISTS,
+                            "duplicate open") &&
+             contract_check(duplicate == NULL, "duplicate output");
     aforc_terminal_close(terminal);
-    if (passed) {
+    if (passed)
+    {
         passed = contract_check(tcgetattr(pair.slave, &after) == 0,
                                 "read restored termios");
     }
-    if (passed) {
-        passed = contract_check(termios_equal(&before, &after),
-                                "restored termios");
+    if (passed)
+    {
+        passed =
+            contract_check(termios_equal(&before, &after), "restored termios");
     }
-    if (passed) {
+    if (passed)
+    {
         const int flags_after = fcntl(pair.slave, F_GETFL);
         const int portable_flags = O_ACCMODE | O_APPEND | O_NONBLOCK;
 
-        if ((flags_after & portable_flags) !=
-            (flags_before & portable_flags)) {
+        if ((flags_after & portable_flags) != (flags_before & portable_flags))
+        {
             (void)fprintf(stderr,
                           "terminal descriptor flags: before=%#x after=%#x\n",
                           (unsigned int)flags_before,
                           (unsigned int)flags_after);
         }
-        passed = contract_check(
-            (flags_after & portable_flags) ==
-                (flags_before & portable_flags),
+        passed = contract_check((flags_after & portable_flags) ==
+                                    (flags_before & portable_flags),
                                 "restored descriptor flags");
     }
-    if (passed) {
+    if (passed)
+    {
         passed = contract_check(fcntl(pair.master, F_GETFL) >= 0,
                                 "borrowed descriptors");
     }
@@ -210,7 +221,8 @@ static bool test_resize_signal_is_coalesced(void)
     bool resized = false;
     bool passed;
 
-    if (!pty_open(&pair) || !set_size(pair.slave, 80U, 24U)) {
+    if (!pty_open(&pair) || !set_size(pair.slave, 80U, 24U))
+    {
         pty_close(&pair);
         return false;
     }
@@ -218,16 +230,17 @@ static bool test_resize_signal_is_coalesced(void)
     if (aforc_terminal_open(&terminal, &config) != AFORC_OK ||
         aforc_terminal_dimensions(terminal, &size) != AFORC_OK ||
         size.width != 80 || size.height != 24 ||
-        !set_size(pair.slave, 100U, 40U) || raise(SIGWINCH) != 0) {
+        !set_size(pair.slave, 100U, 40U) || raise(SIGWINCH) != 0)
+    {
         aforc_terminal_close(terminal);
         pty_close(&pair);
         return false;
     }
-    passed = aforc_terminal_poll(terminal, 100, &readable, &resized) ==
-                 AFORC_OK &&
-             !readable && resized &&
-             aforc_terminal_dimensions(terminal, &size) == AFORC_OK &&
-             size.width == 100 && size.height == 40;
+    passed =
+        aforc_terminal_poll(terminal, 100, &readable, &resized) == AFORC_OK &&
+        !readable && resized &&
+        aforc_terminal_dimensions(terminal, &size) == AFORC_OK &&
+        size.width == 100 && size.height == 40;
     aforc_terminal_close(terminal);
     pty_close(&pair);
     return passed;
@@ -242,13 +255,15 @@ static bool test_terminating_signal_restores_runtime(void)
     AFORC_TerminalConfig config;
     bool passed;
 
-    if (!pty_open(&pair) || sigaction(SIGTERM, NULL, &before) < 0) {
+    if (!pty_open(&pair) || sigaction(SIGTERM, NULL, &before) < 0)
+    {
         pty_close(&pair);
         return false;
     }
     config = terminal_config(pair.slave);
     if (aforc_terminal_open(&terminal, &config) != AFORC_OK ||
-        raise(SIGTERM) != 0) {
+        raise(SIGTERM) != 0)
+    {
         aforc_terminal_close(terminal);
         pty_close(&pair);
         return false;
@@ -274,12 +289,14 @@ static bool test_master_hangup_reports_end_of_stream(void)
     bool readable = false;
     bool passed;
 
-    if (!pty_open(&pair)) {
+    if (!pty_open(&pair))
+    {
         pty_close(&pair);
         return false;
     }
     config = terminal_config(pair.slave);
-    if (aforc_terminal_open(&terminal, &config) != AFORC_OK) {
+    if (aforc_terminal_open(&terminal, &config) != AFORC_OK)
+    {
         pty_close(&pair);
         return false;
     }
@@ -306,7 +323,8 @@ static bool test_explicit_release_preserves_poll_timeout(void)
     uint64_t after_ms = 0U;
     bool passed = false;
 
-    if (!pty_open(&pair)) {
+    if (!pty_open(&pair))
+    {
         pty_close(&pair);
         return false;
     }
@@ -315,7 +333,8 @@ static bool test_explicit_release_preserves_poll_timeout(void)
         aforc_input_create(&input, NULL) != AFORC_OK ||
         aforc_input_feed(input, press, sizeof(press) - 1U, 1U) != AFORC_OK ||
         !aforc_input_key_held(input, AFORC_KEY_A) ||
-        !monotonic_time_ms(&before_ms)) {
+        !monotonic_time_ms(&before_ms))
+    {
         aforc_input_destroy(input);
         aforc_terminal_close(terminal);
         pty_close(&pair);
@@ -332,23 +351,28 @@ static bool test_explicit_release_preserves_poll_timeout(void)
 
 int main(void)
 {
-    if (!test_open_close_restores_and_borrows_fds()) {
+    if (!test_open_close_restores_and_borrows_fds())
+    {
         (void)fprintf(stderr, "terminal open/close contract failed\n");
         return 1;
     }
-    if (!test_resize_signal_is_coalesced()) {
+    if (!test_resize_signal_is_coalesced())
+    {
         (void)fprintf(stderr, "terminal resize signal failed\n");
         return 2;
     }
-    if (!test_terminating_signal_restores_runtime()) {
+    if (!test_terminating_signal_restores_runtime())
+    {
         (void)fprintf(stderr, "terminal terminating signal failed\n");
         return 3;
     }
-    if (!test_master_hangup_reports_end_of_stream()) {
+    if (!test_master_hangup_reports_end_of_stream())
+    {
         (void)fprintf(stderr, "terminal hangup handling failed\n");
         return 4;
     }
-    if (!test_explicit_release_preserves_poll_timeout()) {
+    if (!test_explicit_release_preserves_poll_timeout())
+    {
         (void)fprintf(stderr, "explicit-release poll timeout failed\n");
         return 5;
     }

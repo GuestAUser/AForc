@@ -16,12 +16,14 @@ int main(void)
     config.quit_when_scene_stack_empty = false;
     config.target_frames_per_second = 0U;
     status = aforc_engine_create(&config, &engine, &error);
-    if (status != AFORC_OK) {
+    if (status != AFORC_OK)
+    {
         return 1;
     }
 
     status = aforc_engine_frame(engine, UINT64_C(0), &error);
-    if (status == AFORC_OK && aforc_engine_frame_index(engine) != UINT64_C(1)) {
+    if (status == AFORC_OK && aforc_engine_frame_index(engine) != UINT64_C(1))
+    {
         status = AFORC_ERROR_STATE;
     }
     aforc_engine_destroy(engine);
