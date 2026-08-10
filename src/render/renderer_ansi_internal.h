@@ -9,7 +9,8 @@
 
 #include "renderer_internal.h"
 
-typedef struct AnsiStyleCode {
+typedef struct AnsiStyleCode
+{
     AFORC_CellStyle flag;
     uint32_t code;
 } AnsiStyleCode;

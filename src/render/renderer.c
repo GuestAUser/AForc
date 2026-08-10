@@ -48,7 +48,7 @@ AFORC_RendererConfig aforc_renderer_config_default(void)
 }
 
 AFORC_Status aforc_renderer_create(AFORC_Renderer **out_renderer,
-                               const AFORC_RendererConfig *config)
+                                   const AFORC_RendererConfig *config)
 {
     AFORC_RendererConfig effective = aforc_renderer_config_default();
     AFORC_Renderer *renderer = NULL;
@@ -56,40 +56,45 @@ AFORC_Status aforc_renderer_create(AFORC_Renderer **out_renderer,
     size_t count = 0u;
     AFORC_Status status;
 
-    if (out_renderer == NULL) {
+    if (out_renderer == NULL)
+    {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
     *out_renderer = NULL;
-    if (config != NULL) {
+    if (config != NULL)
+    {
         effective = *config;
     }
-    if (!aforc_allocator_is_valid(&effective.allocator)) {
+    if (!aforc_allocator_is_valid(&effective.allocator))
+    {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
     status = aforc_renderer_cell_count(effective.size, &count);
-    if (status != AFORC_OK) {
+    if (status != AFORC_OK)
+    {
         return status;
     }
-    status = aforc_alloc_array(&effective.allocator,
-                             1u,
-                             sizeof(*renderer),
-                             (void **)&renderer);
-    if (status != AFORC_OK) {
+    status = aforc_alloc_array(
+        &effective.allocator, 1u, sizeof(*renderer), (void **)&renderer);
+    if (status != AFORC_OK)
+    {
         return status;
     }
     (void)memset(renderer, 0, sizeof(*renderer));
     renderer->allocator = effective.allocator;
     status = aforc_alloc_array(&renderer->allocator,
-                             count,
-                             sizeof(*renderer->front),
-                             (void **)&renderer->front);
-    if (status == AFORC_OK) {
+                               count,
+                               sizeof(*renderer->front),
+                               (void **)&renderer->front);
+    if (status == AFORC_OK)
+    {
         status = aforc_alloc_array(&renderer->allocator,
-                                 count,
-                                 sizeof(*renderer->back),
-                                 (void **)&renderer->back);
+                                   count,
+                                   sizeof(*renderer->back),
+                                   (void **)&renderer->back);
     }
-    if (status != AFORC_OK) {
+    if (status != AFORC_OK)
+    {
         aforc_renderer_destroy(renderer);
         return status;
     }
@@ -101,23 +106,26 @@ AFORC_Status aforc_renderer_create(AFORC_Renderer **out_renderer,
     return AFORC_OK;
 }
 
-AFORC_Status aforc_renderer_create_for_terminal(
-    AFORC_Renderer **out_renderer,
-    AFORC_Terminal *terminal,
-    const AFORC_Allocator *allocator)
+AFORC_Status
+aforc_renderer_create_for_terminal(AFORC_Renderer **out_renderer,
+                                   AFORC_Terminal *terminal,
+                                   const AFORC_Allocator *allocator)
 {
     AFORC_RendererConfig config = aforc_renderer_config_default();
     AFORC_Status status;
 
-    if (out_renderer == NULL || terminal == NULL) {
+    if (out_renderer == NULL || terminal == NULL)
+    {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
     *out_renderer = NULL;
     status = aforc_terminal_dimensions(terminal, &config.size);
-    if (status != AFORC_OK) {
+    if (status != AFORC_OK)
+    {
         return status;
     }
-    if (allocator != NULL) {
+    if (allocator != NULL)
+    {
         config.allocator = *allocator;
     }
     return aforc_renderer_create(out_renderer, &config);
@@ -127,7 +135,8 @@ void aforc_renderer_destroy(AFORC_Renderer *renderer)
 {
     AFORC_Allocator allocator;
 
-    if (renderer == NULL) {
+    if (renderer == NULL)
+    {
         return;
     }
     allocator = renderer->allocator;
@@ -145,9 +154,10 @@ AFORC_Size aforc_renderer_size(const AFORC_Renderer *renderer)
 }
 
 AFORC_Cell *aforc_renderer_back_buffer(AFORC_Renderer *renderer,
-                                   size_t *out_stride)
+                                       size_t *out_stride)
 {
-    if (out_stride != NULL) {
+    if (out_stride != NULL)
+    {
         *out_stride = renderer == NULL ? 0u : (size_t)renderer->size.width;
     }
     return renderer == NULL ? NULL : renderer->back;
@@ -155,44 +165,49 @@ AFORC_Cell *aforc_renderer_back_buffer(AFORC_Renderer *renderer,
 
 void aforc_renderer_invalidate(AFORC_Renderer *renderer)
 {
-    if (renderer != NULL) {
+    if (renderer != NULL)
+    {
         renderer->invalidated = true;
     }
 }
 
 AFORC_Status aforc_renderer_present(AFORC_Renderer *renderer,
-                                AFORC_Terminal *terminal)
+                                    AFORC_Terminal *terminal)
 {
     AFORC_Status status;
     size_t count = 0u;
 
-    if (renderer == NULL || terminal == NULL) {
+    if (renderer == NULL || terminal == NULL)
+    {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
     status = aforc_renderer_resize_to_terminal(renderer, terminal, NULL);
-    if (status == AFORC_OK) {
+    if (status == AFORC_OK)
+    {
         status = aforc_renderer_build_ansi(renderer);
     }
-    if (status == AFORC_OK && renderer->batch_size > 0u) {
-        status = aforc_terminal_write(terminal,
-                                    renderer->batch,
-                                    renderer->batch_size);
+    if (status == AFORC_OK && renderer->batch_size > 0u)
+    {
+        status = aforc_terminal_write(
+            terminal, renderer->batch, renderer->batch_size);
     }
-    if (status != AFORC_OK) {
+    if (status != AFORC_OK)
+    {
         return status;
     }
-    if (renderer->batch_size == 0u && !renderer->invalidated) {
+    if (renderer->batch_size == 0u && !renderer->invalidated)
+    {
         return AFORC_OK;
     }
     /* Front advances only after the whole batch is written; any failure keeps
      * the previous frame intact so the same diff remains retryable. */
     status = aforc_renderer_cell_count(renderer->size, &count);
-    if (status != AFORC_OK) {
+    if (status != AFORC_OK)
+    {
         return status;
     }
-    (void)memcpy(renderer->front,
-                 renderer->back,
-                 count * sizeof(*renderer->front));
+    (void)memcpy(
+        renderer->front, renderer->back, count * sizeof(*renderer->front));
     renderer->invalidated = false;
     return AFORC_OK;
 }
