@@ -9,27 +9,51 @@
 #include <stddef.h>
 #include <string.h>
 
-static AFORC_Status validate_required_types(
-    const AFORC_Ecs *ecs,
-    const AFORC_ComponentType *required_types,
-    size_t required_type_count)
+static AFORC_Status
+validate_required_types(const AFORC_Ecs *ecs,
+                        const AFORC_ComponentType *required_types,
+                        size_t required_type_count)
 {
     size_t type_index;
 
-    for (type_index = 0U; type_index < required_type_count; ++type_index) {
+    for (type_index = 0U; type_index < required_type_count; ++type_index)
+    {
         size_t prior_index;
 
-        if ((size_t)required_types[type_index].id >= ecs->store_count) {
+        if ((size_t)required_types[type_index].id >= ecs->store_count)
+        {
             return AFORC_ERROR_NOT_FOUND;
         }
-        for (prior_index = 0U; prior_index < type_index; ++prior_index) {
-            if (required_types[prior_index].id ==
-                required_types[type_index].id) {
+        for (prior_index = 0U; prior_index < type_index; ++prior_index)
+        {
+            if (required_types[prior_index].id == required_types[type_index].id)
+            {
                 return AFORC_ERROR_INVALID_ARGUMENT;
             }
         }
     }
     return AFORC_OK;
+}
+
+static void reset_view_iteration(AFORC_EcsView *view)
+{
+    size_t smallest_count = SIZE_MAX;
+
+    view->cursor = 0U;
+    view->driver_type_id = AFORC_COMPONENT_TYPE_INVALID_ID;
+    view->revision = view->ecs->revision;
+    for (size_t type_index = 0U; type_index < view->required_type_count;
+         ++type_index)
+    {
+        const uint32_t type_id = view->required_types[type_index].id;
+        const AFORC_EcsComponentStore *store = &view->ecs->stores[type_id];
+
+        if (store->count < smallest_count)
+        {
+            smallest_count = store->count;
+            view->driver_type_id = type_id;
+        }
+    }
 }
 
 AFORC_Status aforc_ecs_view_create(AFORC_Ecs *ecs,
@@ -38,43 +62,39 @@ AFORC_Status aforc_ecs_view_create(AFORC_Ecs *ecs,
                                    AFORC_EcsView **out_view)
 {
     AFORC_EcsView *view = NULL;
-    size_t type_index;
-    size_t smallest_count = SIZE_MAX;
     AFORC_Status status;
 
-    if (out_view == NULL) {
+    if (out_view == NULL)
+    {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
     *out_view = NULL;
-    if (ecs == NULL ||
-        (required_type_count != 0U && required_types == NULL)) {
+    if (ecs == NULL || (required_type_count != 0U && required_types == NULL))
+    {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
-    status = validate_required_types(ecs,
-                                     required_types,
-                                     required_type_count);
-    if (status != AFORC_OK) {
+    status = validate_required_types(ecs, required_types, required_type_count);
+    if (status != AFORC_OK)
+    {
         return status;
     }
-    status = aforc_ecs_allocate_array(&ecs->allocator,
-                                      1U,
-                                      sizeof(*view),
-                                      true,
-                                      (void **)&view);
-    if (status != AFORC_OK) {
+    status = aforc_ecs_allocate_array(
+        &ecs->allocator, 1U, sizeof(*view), true, (void **)&view);
+    if (status != AFORC_OK)
+    {
         return status;
     }
     view->allocator = ecs->allocator;
     view->ecs = ecs;
-    view->driver_type_id = AFORC_COMPONENT_TYPE_INVALID_ID;
-    view->revision = ecs->revision;
-    if (required_type_count != 0U) {
+    if (required_type_count != 0U)
+    {
         status = aforc_ecs_allocate_array(&ecs->allocator,
                                           required_type_count,
                                           sizeof(*view->required_types),
                                           false,
                                           (void **)&view->required_types);
-        if (status != AFORC_OK) {
+        if (status != AFORC_OK)
+        {
             aforc_free(&view->allocator, view);
             return status;
         }
@@ -82,16 +102,8 @@ AFORC_Status aforc_ecs_view_create(AFORC_Ecs *ecs,
                      required_types,
                      required_type_count * sizeof(*required_types));
         view->required_type_count = required_type_count;
-        for (type_index = 0U; type_index < required_type_count; ++type_index) {
-            const AFORC_EcsComponentStore *store =
-                &ecs->stores[required_types[type_index].id];
-
-            if (store->count < smallest_count) {
-                smallest_count = store->count;
-                view->driver_type_id = required_types[type_index].id;
-            }
-        }
     }
+    reset_view_iteration(view);
     *out_view = view;
     return AFORC_OK;
 }
@@ -100,7 +112,8 @@ void aforc_ecs_view_destroy(AFORC_EcsView *view)
 {
     AFORC_Allocator allocator;
 
-    if (view == NULL) {
+    if (view == NULL)
+    {
         return;
     }
     allocator = view->allocator;
@@ -113,6 +126,20 @@ size_t aforc_ecs_view_component_count(const AFORC_EcsView *view)
     return view == NULL ? 0U : view->required_type_count;
 }
 
+AFORC_Status aforc_ecs_view_reset(AFORC_EcsView *view)
+{
+    if (view == NULL)
+    {
+        return AFORC_ERROR_INVALID_ARGUMENT;
+    }
+    if (view->ecs->cleanup_active)
+    {
+        return AFORC_ERROR_STATE;
+    }
+    reset_view_iteration(view);
+    return AFORC_OK;
+}
+
 AFORC_Status aforc_ecs_view_next(AFORC_EcsView *view,
                                  AFORC_Entity *out_entity,
                                  void **out_components,
@@ -121,30 +148,37 @@ AFORC_Status aforc_ecs_view_next(AFORC_EcsView *view,
     AFORC_Ecs *ecs;
     size_t type_index;
 
-    if (out_entity == NULL || out_has_value == NULL) {
+    if (out_entity == NULL || out_has_value == NULL)
+    {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
     *out_entity = AFORC_ENTITY_INVALID;
     *out_has_value = false;
-    if (view == NULL) {
+    if (view == NULL)
+    {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
-    for (type_index = 0U; out_components != NULL &&
-                          type_index < view->required_type_count;
-         ++type_index) {
+    for (type_index = 0U;
+         out_components != NULL && type_index < view->required_type_count;
+         ++type_index)
+    {
         out_components[type_index] = NULL;
     }
     ecs = view->ecs;
-    if (ecs->cleanup_active || view->revision != ecs->revision) {
+    if (ecs->cleanup_active || view->revision != ecs->revision)
+    {
         return AFORC_ERROR_STATE;
     }
-    if (view->driver_type_id == AFORC_COMPONENT_TYPE_INVALID_ID) {
-        while (view->cursor < ecs->slot_count) {
+    if (view->driver_type_id == AFORC_COMPONENT_TYPE_INVALID_ID)
+    {
+        while (view->cursor < ecs->slot_count)
+        {
             const size_t slot_index = view->cursor;
             const AFORC_EcsEntitySlot *slot = &ecs->slots[slot_index];
 
             ++view->cursor;
-            if (slot->alive) {
+            if (slot->alive)
+            {
                 out_entity->index = (uint32_t)slot_index;
                 out_entity->generation = slot->generation;
                 *out_has_value = true;
@@ -154,10 +188,10 @@ AFORC_Status aforc_ecs_view_next(AFORC_EcsView *view,
         return AFORC_OK;
     }
     {
-        AFORC_EcsComponentStore *driver =
-            &ecs->stores[view->driver_type_id];
+        AFORC_EcsComponentStore *driver = &ecs->stores[view->driver_type_id];
 
-        while (view->cursor < driver->count) {
+        while (view->cursor < driver->count)
+        {
             const size_t driver_dense_index = view->cursor;
             const AFORC_Entity candidate =
                 driver->dense_entities[driver_dense_index];
@@ -165,32 +199,36 @@ AFORC_Status aforc_ecs_view_next(AFORC_EcsView *view,
 
             ++view->cursor;
             for (type_index = 0U; type_index < view->required_type_count;
-                 ++type_index) {
+                 ++type_index)
+            {
                 AFORC_EcsComponentStore *store =
                     &ecs->stores[view->required_types[type_index].id];
                 const size_t dense_index =
-                    view->required_types[type_index].id ==
-                            view->driver_type_id
+                    view->required_types[type_index].id == view->driver_type_id
                         ? driver_dense_index
                         : aforc_ecs_find_component(store, candidate);
 
-                if (dense_index == SIZE_MAX) {
+                if (dense_index == SIZE_MAX)
+                {
                     size_t clear_index;
 
                     matches = false;
                     for (clear_index = 0U;
                          out_components != NULL && clear_index < type_index;
-                         ++clear_index) {
+                         ++clear_index)
+                    {
                         out_components[clear_index] = NULL;
                     }
                     break;
                 }
-                if (out_components != NULL) {
+                if (out_components != NULL)
+                {
                     out_components[type_index] =
                         aforc_ecs_component_at(store, dense_index);
                 }
             }
-            if (!matches) {
+            if (!matches)
+            {
                 continue;
             }
             *out_entity = candidate;
