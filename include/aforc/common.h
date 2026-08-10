@@ -12,7 +12,8 @@
 #include <stdint.h>
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 #define AFORC_VERSION_MAJOR 0
@@ -20,18 +21,19 @@ extern "C" {
 #define AFORC_VERSION_PATCH 0
 
 #if defined(_WIN32) && defined(AFORC_SHARED)
-#  if defined(AFORC_BUILDING_LIBRARY)
-#    define AFORC_API __declspec(dllexport)
-#  else
-#    define AFORC_API __declspec(dllimport)
-#  endif
-#elif defined(__GNUC__) && defined(AFORC_SHARED)
-#  define AFORC_API __attribute__((visibility("default")))
+#if defined(AFORC_BUILDING_LIBRARY)
+#define AFORC_API __declspec(dllexport)
 #else
-#  define AFORC_API
+#define AFORC_API __declspec(dllimport)
+#endif
+#elif defined(__GNUC__) && defined(AFORC_SHARED)
+#define AFORC_API __attribute__((visibility("default")))
+#else
+#define AFORC_API
 #endif
 
-typedef enum AFORC_Status {
+typedef enum AFORC_Status
+{
     AFORC_OK = 0,
     AFORC_ERROR_INVALID_ARGUMENT,
     AFORC_ERROR_OUT_OF_MEMORY,
@@ -50,7 +52,8 @@ typedef enum AFORC_Status {
     AFORC_ERROR_INTERRUPTED
 } AFORC_Status;
 
-typedef struct AFORC_Error {
+typedef struct AFORC_Error
+{
     AFORC_Status status;
     /* Borrowed; the pointed-to subsystem name must outlive this value. */
     const char *subsystem;
@@ -62,7 +65,8 @@ typedef void *(*AFORC_AllocFn)(void *context, size_t size);
 typedef void *(*AFORC_ReallocFn)(void *context, void *memory, size_t size);
 typedef void (*AFORC_FreeFn)(void *context, void *memory);
 
-typedef struct AFORC_Allocator {
+typedef struct AFORC_Allocator
+{
     void *context;
     AFORC_AllocFn allocate;
     AFORC_ReallocFn reallocate;
@@ -73,7 +77,8 @@ typedef struct AFORC_Allocator {
  * is copied into an owning object. They must remain valid until that object is
  * destroyed. Allocation helpers accept only complete callback tables. */
 
-typedef enum AFORC_LogLevel {
+typedef enum AFORC_LogLevel
+{
     AFORC_LOG_TRACE = 0,
     AFORC_LOG_DEBUG,
     AFORC_LOG_INFO,
@@ -81,26 +86,32 @@ typedef enum AFORC_LogLevel {
     AFORC_LOG_ERROR
 } AFORC_LogLevel;
 
-typedef void (*AFORC_LogFn)(void *context, AFORC_LogLevel level,
-                          const char *subsystem, const char *message);
+typedef void (*AFORC_LogFn)(void *context,
+                            AFORC_LogLevel level,
+                            const char *subsystem,
+                            const char *message);
 
-typedef struct AFORC_Logger {
+typedef struct AFORC_Logger
+{
     void *context;
     AFORC_LogFn write;
     AFORC_LogLevel minimum_level;
 } AFORC_Logger;
 
-typedef struct AFORC_Point {
+typedef struct AFORC_Point
+{
     int32_t x;
     int32_t y;
 } AFORC_Point;
 
-typedef struct AFORC_Size {
+typedef struct AFORC_Size
+{
     int32_t width;
     int32_t height;
 } AFORC_Size;
 
-typedef struct AFORC_Rect {
+typedef struct AFORC_Rect
+{
     int32_t x;
     int32_t y;
     int32_t width;
@@ -113,18 +124,26 @@ AFORC_API bool aforc_size_add(size_t left, size_t right, size_t *out);
 /* Successful zero-sized allocation stores NULL. Reallocation failure leaves
  * the original allocation owned by the caller and does not overwrite output. */
 AFORC_API AFORC_Status aforc_alloc_array(const AFORC_Allocator *allocator,
-                                   size_t count, size_t element_size,
-                                   void **out_memory);
+                                         size_t count,
+                                         size_t element_size,
+                                         void **out_memory);
 AFORC_API AFORC_Status aforc_realloc_array(const AFORC_Allocator *allocator,
-                                     void *memory, size_t count,
-                                     size_t element_size, void **out_memory);
+                                           void *memory,
+                                           size_t count,
+                                           size_t element_size,
+                                           void **out_memory);
 AFORC_API void aforc_free(const AFORC_Allocator *allocator, void *memory);
 AFORC_API void aforc_error_clear(AFORC_Error *error);
-AFORC_API void aforc_error_set(AFORC_Error *error, AFORC_Status status,
-                           const char *subsystem, const char *format, ...);
+AFORC_API void aforc_error_set(AFORC_Error *error,
+                               AFORC_Status status,
+                               const char *subsystem,
+                               const char *format,
+                               ...);
 AFORC_API const char *aforc_status_string(AFORC_Status status);
-AFORC_API void aforc_log(const AFORC_Logger *logger, AFORC_LogLevel level,
-                     const char *subsystem, const char *message);
+AFORC_API void aforc_log(const AFORC_Logger *logger,
+                         AFORC_LogLevel level,
+                         const char *subsystem,
+                         const char *message);
 AFORC_API bool aforc_rect_contains(AFORC_Rect rect, AFORC_Point point);
 AFORC_API AFORC_Rect aforc_rect_intersection(AFORC_Rect left, AFORC_Rect right);
 

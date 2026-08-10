@@ -15,7 +15,8 @@
 
 void aforc_asset_blob_release(AFORC_AssetBlob *blob)
 {
-    if (blob == NULL) {
+    if (blob == NULL)
+    {
         return;
     }
     free(blob->data);
@@ -25,7 +26,8 @@ void aforc_asset_blob_release(AFORC_AssetBlob *blob)
 
 void aforc_asset_text_release(AFORC_AssetText *text)
 {
-    if (text == NULL) {
+    if (text == NULL)
+    {
         return;
     }
     free(text->data);

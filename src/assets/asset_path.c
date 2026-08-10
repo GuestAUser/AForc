@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-/* Owns lexical path policy and joining without claiming filesystem confinement. */
+/* Owns lexical path policy and joining without claiming filesystem confinement.
+ */
 
 #include "../../include/aforc/assets.h"
 
@@ -13,29 +14,32 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct AFORC_PathParts {
+typedef struct AFORC_PathParts
+{
     size_t root_size;
     size_t relative_size;
     size_t total_size;
     bool add_separator;
 } AFORC_PathParts;
 
-static AFORC_Status aforc_bounded_string_size(
-    const char *text,
-    size_t limit,
-    size_t *output)
+static AFORC_Status
+aforc_bounded_string_size(const char *text, size_t limit, size_t *output)
 {
     size_t index;
 
-    if (text == NULL || output == NULL) {
+    if (text == NULL || output == NULL)
+    {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
-    for (index = 0u;; ++index) {
-        if (text[index] == '\0') {
+    for (index = 0u;; ++index)
+    {
+        if (text[index] == '\0')
+        {
             *output = index;
             return AFORC_OK;
         }
-        if (index == limit) {
+        if (index == limit)
+        {
             return AFORC_ERROR_LIMIT;
         }
     }
@@ -44,8 +48,7 @@ static AFORC_Status aforc_bounded_string_size(
 static bool aforc_path_character_rejected(unsigned char character)
 {
     return character < UINT8_C(32) || character == UINT8_C(127) ||
-           character == (unsigned char)'\\' ||
-           character == (unsigned char)':';
+           character == (unsigned char)'\\' || character == (unsigned char)':';
 }
 
 AFORC_AssetPathPolicy aforc_asset_path_policy_default(void)
@@ -59,9 +62,8 @@ AFORC_AssetPathPolicy aforc_asset_path_policy_default(void)
     return policy;
 }
 
-AFORC_Status aforc_asset_path_validate(
-    const char *relative_path,
-    const AFORC_AssetPathPolicy *policy)
+AFORC_Status aforc_asset_path_validate(const char *relative_path,
+                                       const AFORC_AssetPathPolicy *policy)
 {
     size_t path_size;
     size_t component_start;
@@ -70,30 +72,35 @@ AFORC_Status aforc_asset_path_validate(
     AFORC_Status status;
 
     if (relative_path == NULL || policy == NULL ||
-        policy->max_path_bytes == SIZE_MAX) {
+        policy->max_path_bytes == SIZE_MAX)
+    {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
     status = aforc_bounded_string_size(
-        relative_path,
-        policy->max_path_bytes,
-        &path_size);
-    if (status != AFORC_OK) {
+        relative_path, policy->max_path_bytes, &path_size);
+    if (status != AFORC_OK)
+    {
         return status;
     }
-    if (path_size == 0u || relative_path[0] == '/') {
+    if (path_size == 0u || relative_path[0] == '/')
+    {
         return AFORC_ERROR_FORMAT;
     }
 
     component_start = 0u;
     depth = 0u;
-    for (index = 0u; index <= path_size; ++index) {
-        if (index < path_size) {
+    for (index = 0u; index <= path_size; ++index)
+    {
+        if (index < path_size)
+        {
             unsigned char character = (unsigned char)relative_path[index];
 
-            if (aforc_path_character_rejected(character)) {
+            if (aforc_path_character_rejected(character))
+            {
                 return AFORC_ERROR_FORMAT;
             }
-            if (character != (unsigned char)'/') {
+            if (character != (unsigned char)'/')
+            {
                 continue;
             }
         }
@@ -101,24 +108,29 @@ AFORC_Status aforc_asset_path_validate(
         {
             size_t component_size = index - component_start;
 
-            if (component_size == 0u) {
+            if (component_size == 0u)
+            {
                 return AFORC_ERROR_FORMAT;
             }
-            if (component_size > policy->max_component_bytes) {
+            if (component_size > policy->max_component_bytes)
+            {
                 return AFORC_ERROR_LIMIT;
             }
             if ((component_size == 1u &&
                  relative_path[component_start] == '.') ||
                 (component_size == 2u &&
                  relative_path[component_start] == '.' &&
-                 relative_path[component_start + 1u] == '.')) {
+                 relative_path[component_start + 1u] == '.'))
+            {
                 return AFORC_ERROR_FORMAT;
             }
             if (!policy->allow_hidden_components &&
-                relative_path[component_start] == '.') {
+                relative_path[component_start] == '.')
+            {
                 return AFORC_ERROR_FORMAT;
             }
-            if (depth == policy->max_depth) {
+            if (depth == policy->max_depth)
+            {
                 return AFORC_ERROR_LIMIT;
             }
             ++depth;
@@ -128,43 +140,44 @@ AFORC_Status aforc_asset_path_validate(
     return AFORC_OK;
 }
 
-static AFORC_Status aforc_path_measure(
-    const char *root,
-    const char *relative_path,
-    const AFORC_AssetPathPolicy *policy,
-    AFORC_PathParts *parts)
+static AFORC_Status aforc_path_measure(const char *root,
+                                       const char *relative_path,
+                                       const AFORC_AssetPathPolicy *policy,
+                                       AFORC_PathParts *parts)
 {
     AFORC_Status status;
     size_t index;
     size_t total_size;
     bool add_separator;
 
-    if (root == NULL || parts == NULL) {
+    if (root == NULL || parts == NULL)
+    {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
     status = aforc_asset_path_validate(relative_path, policy);
-    if (status != AFORC_OK) {
+    if (status != AFORC_OK)
+    {
         return status;
     }
     status = aforc_bounded_string_size(
-        root,
-        policy->max_path_bytes,
-        &parts->root_size);
-    if (status != AFORC_OK) {
+        root, policy->max_path_bytes, &parts->root_size);
+    if (status != AFORC_OK)
+    {
         return status;
     }
     status = aforc_bounded_string_size(
-        relative_path,
-        policy->max_path_bytes,
-        &parts->relative_size);
-    if (status != AFORC_OK) {
+        relative_path, policy->max_path_bytes, &parts->relative_size);
+    if (status != AFORC_OK)
+    {
         return status;
     }
 
-    for (index = 0u; index < parts->root_size; ++index) {
+    for (index = 0u; index < parts->root_size; ++index)
+    {
         unsigned char character = (unsigned char)root[index];
 
-        if (character < UINT8_C(32) || character == UINT8_C(127)) {
+        if (character < UINT8_C(32) || character == UINT8_C(127))
+        {
             return AFORC_ERROR_FORMAT;
         }
     }
@@ -173,13 +186,16 @@ static AFORC_Status aforc_path_measure(
                     root[parts->root_size - 1u] != '/' &&
                     root[parts->root_size - 1u] != '\\';
     total_size = parts->root_size;
-    if (add_separator) {
-        if (total_size == policy->max_path_bytes) {
+    if (add_separator)
+    {
+        if (total_size == policy->max_path_bytes)
+        {
             return AFORC_ERROR_LIMIT;
         }
         ++total_size;
     }
-    if (parts->relative_size > policy->max_path_bytes - total_size) {
+    if (parts->relative_size > policy->max_path_bytes - total_size)
+    {
         return AFORC_ERROR_LIMIT;
     }
     total_size += parts->relative_size;
@@ -189,19 +205,20 @@ static AFORC_Status aforc_path_measure(
     return AFORC_OK;
 }
 
-static void aforc_path_copy(
-    const char *root,
-    const char *relative_path,
-    const AFORC_PathParts *parts,
-    char *destination)
+static void aforc_path_copy(const char *root,
+                            const char *relative_path,
+                            const AFORC_PathParts *parts,
+                            char *destination)
 {
     size_t offset = 0u;
 
-    if (parts->root_size > 0u) {
+    if (parts->root_size > 0u)
+    {
         memcpy(destination, root, parts->root_size);
         offset = parts->root_size;
     }
-    if (parts->add_separator) {
+    if (parts->add_separator)
+    {
         destination[offset] = '/';
         ++offset;
     }
@@ -209,37 +226,41 @@ static void aforc_path_copy(
     destination[parts->total_size] = '\0';
 }
 
-AFORC_Status aforc_asset_path_join(
-    const char *root,
-    const char *relative_path,
-    const AFORC_AssetPathPolicy *policy,
-    char *destination,
-    size_t destination_capacity)
+AFORC_Status aforc_asset_path_join(const char *root,
+                                   const char *relative_path,
+                                   const AFORC_AssetPathPolicy *policy,
+                                   char *destination,
+                                   size_t destination_capacity)
 {
     AFORC_PathParts parts;
     AFORC_Status status;
     char *joined;
     size_t allocation_size;
 
-    if (destination == NULL || destination_capacity == 0u) {
+    if (destination == NULL || destination_capacity == 0u)
+    {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
     status = aforc_path_measure(root, relative_path, policy, &parts);
-    if (status != AFORC_OK) {
+    if (status != AFORC_OK)
+    {
         destination[0] = '\0';
         return status;
     }
-    if (parts.total_size >= destination_capacity) {
+    if (parts.total_size >= destination_capacity)
+    {
         destination[0] = '\0';
         return AFORC_ERROR_LIMIT;
     }
-    if (!aforc_size_add(parts.total_size, 1u, &allocation_size)) {
+    if (!aforc_size_add(parts.total_size, 1u, &allocation_size))
+    {
         destination[0] = '\0';
         return AFORC_ERROR_LIMIT;
     }
 
     joined = malloc(allocation_size);
-    if (joined == NULL) {
+    if (joined == NULL)
+    {
         destination[0] = '\0';
         return AFORC_ERROR_OUT_OF_MEMORY;
     }
@@ -249,30 +270,33 @@ AFORC_Status aforc_asset_path_join(
     return AFORC_OK;
 }
 
-AFORC_Status aforc_asset_path_allocate(
-    const char *root,
-    const char *relative_path,
-    const AFORC_AssetPathPolicy *policy,
-    char **output)
+AFORC_Status aforc_asset_path_allocate(const char *root,
+                                       const char *relative_path,
+                                       const AFORC_AssetPathPolicy *policy,
+                                       char **output)
 {
     AFORC_PathParts parts;
     AFORC_Status status;
     char *path;
     size_t allocation_size;
 
-    if (output == NULL) {
+    if (output == NULL)
+    {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
     *output = NULL;
     status = aforc_path_measure(root, relative_path, policy, &parts);
-    if (status != AFORC_OK) {
+    if (status != AFORC_OK)
+    {
         return status;
     }
-    if (!aforc_size_add(parts.total_size, 1u, &allocation_size)) {
+    if (!aforc_size_add(parts.total_size, 1u, &allocation_size))
+    {
         return AFORC_ERROR_LIMIT;
     }
     path = malloc(allocation_size);
-    if (path == NULL) {
+    if (path == NULL)
+    {
         return AFORC_ERROR_OUT_OF_MEMORY;
     }
     aforc_path_copy(root, relative_path, &parts, path);

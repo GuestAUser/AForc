@@ -11,23 +11,22 @@
 #include <limits.h>
 #include <string.h>
 
-void aforc_save_bounded_reader_init(
-    AFORC_SaveBoundedReader *reader,
-    const void *data,
-    size_t size)
+void aforc_save_bounded_reader_init(AFORC_SaveBoundedReader *reader,
+                                    const void *data,
+                                    size_t size)
 {
     reader->data = (const uint8_t *)data;
     reader->size = size;
     reader->cursor = 0u;
 }
 
-bool aforc_save_bounded_reader_take(
-    AFORC_SaveBoundedReader *reader,
-    size_t size,
-    const uint8_t **output)
+bool aforc_save_bounded_reader_take(AFORC_SaveBoundedReader *reader,
+                                    size_t size,
+                                    const uint8_t **output)
 {
     if (reader == NULL || output == NULL || reader->cursor > reader->size ||
-        size > reader->size - reader->cursor) {
+        size > reader->size - reader->cursor)
+    {
         return false;
     }
     *output = reader->data + reader->cursor;
@@ -35,24 +34,23 @@ bool aforc_save_bounded_reader_take(
     return true;
 }
 
-void aforc_save_bounded_writer_init(
-    AFORC_SaveBoundedWriter *writer,
-    void *data,
-    size_t size,
-    size_t cursor)
+void aforc_save_bounded_writer_init(AFORC_SaveBoundedWriter *writer,
+                                    void *data,
+                                    size_t size,
+                                    size_t cursor)
 {
     writer->data = (uint8_t *)data;
     writer->size = size;
     writer->cursor = cursor;
 }
 
-bool aforc_save_bounded_writer_take(
-    AFORC_SaveBoundedWriter *writer,
-    size_t size,
-    uint8_t **output)
+bool aforc_save_bounded_writer_take(AFORC_SaveBoundedWriter *writer,
+                                    size_t size,
+                                    uint8_t **output)
 {
     if (writer == NULL || output == NULL || writer->cursor > writer->size ||
-        size > writer->size - writer->cursor) {
+        size > writer->size - writer->cursor)
+    {
         return false;
     }
     *output = writer->data + writer->cursor;
@@ -79,7 +77,8 @@ void aforc_save_store_u64(uint8_t *destination, uint64_t value)
 {
     size_t index;
 
-    for (index = 0u; index < 8u; ++index) {
+    for (index = 0u; index < 8u; ++index)
+    {
         destination[index] = (uint8_t)(value & UINT64_C(0xff));
         value >>= 8u;
     }
@@ -93,10 +92,8 @@ uint16_t aforc_save_load_u16(const uint8_t *source)
 
 uint32_t aforc_save_load_u32(const uint8_t *source)
 {
-    return (uint32_t)source[0]          |
-           ((uint32_t)source[1] << 8u)  |
-           ((uint32_t)source[2] << 16u) |
-           ((uint32_t)source[3] << 24u);
+    return (uint32_t)source[0] | ((uint32_t)source[1] << 8u) |
+           ((uint32_t)source[2] << 16u) | ((uint32_t)source[3] << 24u);
 }
 
 uint64_t aforc_save_load_u64(const uint8_t *source)
@@ -104,61 +101,63 @@ uint64_t aforc_save_load_u64(const uint8_t *source)
     uint64_t value = UINT64_C(0);
     size_t index;
 
-    for (index = 0u; index < 8u; ++index) {
+    for (index = 0u; index < 8u; ++index)
+    {
         value |= (uint64_t)source[index] << (index * 8u);
     }
     return value;
 }
 
-bool aforc_save_bounded_writer_write_bytes(
-    AFORC_SaveBoundedWriter *writer,
-    const void *source,
-    size_t size)
+bool aforc_save_bounded_writer_write_bytes(AFORC_SaveBoundedWriter *writer,
+                                           const void *source,
+                                           size_t size)
 {
     uint8_t *destination;
 
-    if (!aforc_save_bounded_writer_take(writer, size, &destination)) {
+    if (!aforc_save_bounded_writer_take(writer, size, &destination))
+    {
         return false;
     }
-    if (size > 0u) {
+    if (size > 0u)
+    {
         memcpy(destination, source, size);
     }
     return true;
 }
 
-bool aforc_save_bounded_writer_write_u16(
-    AFORC_SaveBoundedWriter *writer,
-    uint16_t value)
+bool aforc_save_bounded_writer_write_u16(AFORC_SaveBoundedWriter *writer,
+                                         uint16_t value)
 {
     uint8_t *destination;
 
-    if (!aforc_save_bounded_writer_take(writer, 2u, &destination)) {
+    if (!aforc_save_bounded_writer_take(writer, 2u, &destination))
+    {
         return false;
     }
     aforc_save_store_u16(destination, value);
     return true;
 }
 
-bool aforc_save_bounded_writer_write_u32(
-    AFORC_SaveBoundedWriter *writer,
-    uint32_t value)
+bool aforc_save_bounded_writer_write_u32(AFORC_SaveBoundedWriter *writer,
+                                         uint32_t value)
 {
     uint8_t *destination;
 
-    if (!aforc_save_bounded_writer_take(writer, 4u, &destination)) {
+    if (!aforc_save_bounded_writer_take(writer, 4u, &destination))
+    {
         return false;
     }
     aforc_save_store_u32(destination, value);
     return true;
 }
 
-bool aforc_save_bounded_writer_write_u64(
-    AFORC_SaveBoundedWriter *writer,
-    uint64_t value)
+bool aforc_save_bounded_writer_write_u64(AFORC_SaveBoundedWriter *writer,
+                                         uint64_t value)
 {
     uint8_t *destination;
 
-    if (!aforc_save_bounded_writer_take(writer, 8u, &destination)) {
+    if (!aforc_save_bounded_writer_take(writer, 8u, &destination))
+    {
         return false;
     }
     aforc_save_store_u64(destination, value);
@@ -167,7 +166,8 @@ bool aforc_save_bounded_writer_write_u64(
 
 uint32_t aforc_save_signed_i32_bits(int32_t value)
 {
-    if (value >= 0) {
+    if (value >= 0)
+    {
         return (uint32_t)value;
     }
     {
@@ -180,7 +180,8 @@ uint64_t aforc_save_signed_i64_bits(int64_t value)
 {
     uint64_t magnitude;
 
-    if (value >= 0) {
+    if (value >= 0)
+    {
         return (uint64_t)value;
     }
     magnitude = (uint64_t)(-(value + INT64_C(1)));
@@ -190,13 +191,15 @@ uint64_t aforc_save_signed_i64_bits(int64_t value)
 
 int32_t aforc_save_signed_i32_value(uint32_t bits)
 {
-    if (bits <= (uint32_t)INT32_MAX) {
+    if (bits <= (uint32_t)INT32_MAX)
+    {
         return (int32_t)bits;
     }
     {
         uint32_t magnitude = UINT32_MAX - bits + UINT32_C(1);
 
-        if (magnitude == (uint32_t)INT32_MAX + UINT32_C(1)) {
+        if (magnitude == (uint32_t)INT32_MAX + UINT32_C(1))
+        {
             return INT32_MIN;
         }
         return -(int32_t)magnitude;
@@ -205,13 +208,15 @@ int32_t aforc_save_signed_i32_value(uint32_t bits)
 
 int64_t aforc_save_signed_i64_value(uint64_t bits)
 {
-    if (bits <= (uint64_t)INT64_MAX) {
+    if (bits <= (uint64_t)INT64_MAX)
+    {
         return (int64_t)bits;
     }
     {
         uint64_t magnitude = UINT64_MAX - bits + UINT64_C(1);
 
-        if (magnitude == (uint64_t)INT64_MAX + UINT64_C(1)) {
+        if (magnitude == (uint64_t)INT64_MAX + UINT64_C(1))
+        {
             return INT64_MIN;
         }
         return -(int64_t)magnitude;

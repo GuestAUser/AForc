@@ -51,11 +51,13 @@ static uint32_t aforc_rng_step(AFORC_Rng *rng)
 
 AFORC_Status aforc_rng_seed(AFORC_Rng *rng, uint64_t seed, uint64_t stream)
 {
-    if (rng == NULL) {
+    if (rng == NULL)
+    {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
 
-    /* PCG requires two warm-up steps; changing this order changes every sequence. */
+    /* PCG requires two warm-up steps; changing this order changes every
+     * sequence. */
     rng->state = UINT64_C(0);
     rng->increment = (stream << 1u) | UINT64_C(1);
     (void)aforc_rng_step(rng);
@@ -66,31 +68,35 @@ AFORC_Status aforc_rng_seed(AFORC_Rng *rng, uint64_t seed, uint64_t stream)
 
 AFORC_Status aforc_rng_next_u32(AFORC_Rng *rng, uint32_t *output)
 {
-    if (rng == NULL || output == NULL || (rng->increment & UINT64_C(1)) == 0u) {
+    if (rng == NULL || output == NULL || (rng->increment & UINT64_C(1)) == 0u)
+    {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
     *output = aforc_rng_step(rng);
     return AFORC_OK;
 }
 
-AFORC_Status aforc_rng_bounded_u32(
-    AFORC_Rng *rng,
-    uint32_t exclusive_bound,
-    uint32_t *output)
+AFORC_Status aforc_rng_bounded_u32(AFORC_Rng *rng,
+                                   uint32_t exclusive_bound,
+                                   uint32_t *output)
 {
     uint32_t threshold;
 
     if (rng == NULL || output == NULL || exclusive_bound == 0u ||
-        (rng->increment & UINT64_C(1)) == 0u) {
+        (rng->increment & UINT64_C(1)) == 0u)
+    {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
 
-    /* Rejection avoids modulo bias while consuming the canonical PCG sequence. */
+    /* Rejection avoids modulo bias while consuming the canonical PCG sequence.
+     */
     threshold = (UINT32_C(0) - exclusive_bound) % exclusive_bound;
-    for (;;) {
+    for (;;)
+    {
         uint32_t value = aforc_rng_step(rng);
 
-        if (value >= threshold) {
+        if (value >= threshold)
+        {
             *output = value % exclusive_bound;
             return AFORC_OK;
         }

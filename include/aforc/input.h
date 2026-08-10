@@ -10,12 +10,14 @@
 #include "terminal.h"
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 typedef struct AFORC_Input AFORC_Input;
 
-typedef enum AFORC_Key {
+typedef enum AFORC_Key
+{
     AFORC_KEY_NONE = 0,
     AFORC_KEY_BACKSPACE = 8,
     AFORC_KEY_TAB = 9,
@@ -89,7 +91,8 @@ typedef enum AFORC_Key {
 
 typedef uint16_t AFORC_Modifiers;
 
-enum {
+enum
+{
     AFORC_MOD_NONE = 0,
     AFORC_MOD_SHIFT = 1u << 0,
     AFORC_MOD_ALT = 1u << 1,
@@ -97,7 +100,8 @@ enum {
     AFORC_MOD_SUPER = 1u << 3
 };
 
-typedef enum AFORC_MouseButton {
+typedef enum AFORC_MouseButton
+{
     AFORC_MOUSE_NONE = 0,
     AFORC_MOUSE_LEFT,
     AFORC_MOUSE_MIDDLE,
@@ -107,7 +111,8 @@ typedef enum AFORC_MouseButton {
     AFORC_MOUSE_BUTTON_COUNT
 } AFORC_MouseButton;
 
-typedef enum AFORC_InputEventType {
+typedef enum AFORC_InputEventType
+{
     AFORC_INPUT_EVENT_NONE = 0,
     AFORC_INPUT_EVENT_KEY_DOWN,
     AFORC_INPUT_EVENT_KEY_UP,
@@ -123,34 +128,42 @@ typedef enum AFORC_InputEventType {
     AFORC_INPUT_EVENT_PASTE_END
 } AFORC_InputEventType;
 
-typedef struct AFORC_InputEvent {
+typedef struct AFORC_InputEvent
+{
     AFORC_InputEventType type;
     uint64_t timestamp_ms;
-    union {
-        struct {
+    union
+    {
+        struct
+        {
             AFORC_Key key;
             uint32_t codepoint;
             AFORC_Modifiers modifiers;
             bool repeat;
         } key;
-        struct {
+        struct
+        {
             uint32_t codepoint;
         } text;
-        struct {
+        struct
+        {
             AFORC_Point position;
             AFORC_MouseButton button;
             AFORC_Modifiers modifiers;
         } mouse;
-        struct {
+        struct
+        {
             AFORC_Point delta;
         } wheel;
-        struct {
+        struct
+        {
             AFORC_Size size;
         } resize;
     } data;
 } AFORC_InputEvent;
 
-typedef struct AFORC_InputConfig {
+typedef struct AFORC_InputConfig
+{
     size_t event_capacity;
     size_t byte_capacity;
     uint32_t key_release_timeout_ms;
@@ -165,62 +178,46 @@ typedef struct AFORC_InputConfig {
  * returns AFORC_ERROR_LIMIT. No allocations occur while parsing. */
 
 AFORC_API AFORC_InputConfig aforc_input_config_default(void);
-AFORC_API AFORC_Status aforc_input_create(
-    AFORC_Input **out_input,
-    const AFORC_InputConfig *config
-);
+AFORC_API AFORC_Status aforc_input_create(AFORC_Input **out_input,
+                                          const AFORC_InputConfig *config);
 AFORC_API void aforc_input_destroy(AFORC_Input *input);
 /* Clears pressed/released edges, resolves elapsed parser/key deadlines against
  * CLOCK_MONOTONIC, and preserves unread events plus held state. */
 AFORC_API AFORC_Status aforc_input_begin_frame(AFORC_Input *input);
 /* Poll borrows an active terminal for this call and bounds its wait by pending
  * escape and synthetic key-release deadlines. */
-AFORC_API AFORC_Status aforc_input_poll(
-    AFORC_Input *input,
-    AFORC_Terminal *terminal,
-    int timeout_ms
-);
+AFORC_API AFORC_Status aforc_input_poll(AFORC_Input *input,
+                                        AFORC_Terminal *terminal,
+                                        int timeout_ms);
 /* Feed is the deterministic decoder entry point. Timestamps across feed,
  * flush, and release_all calls on one input must be nondecreasing milliseconds
  * from one clock domain. Partial UTF-8/control sequences remain buffered. */
-AFORC_API AFORC_Status aforc_input_feed(
-    AFORC_Input *input,
-    const unsigned char *bytes,
-    size_t size,
-    uint64_t timestamp_ms
-);
+AFORC_API AFORC_Status aforc_input_feed(AFORC_Input *input,
+                                        const unsigned char *bytes,
+                                        size_t size,
+                                        uint64_t timestamp_ms);
 /* Resolves only deadlines elapsed at timestamp_ms; it does not force an
- * unexpired partial sequence. Explicit protocol releases are never synthesized. */
-AFORC_API AFORC_Status aforc_input_flush(
-    AFORC_Input *input,
-    uint64_t timestamp_ms
-);
-AFORC_API bool aforc_input_next_event(
-    AFORC_Input *input,
-    AFORC_InputEvent *out_event
-);
+ * unexpired partial sequence. Explicit protocol releases are never synthesized.
+ */
+AFORC_API AFORC_Status aforc_input_flush(AFORC_Input *input,
+                                         uint64_t timestamp_ms);
+AFORC_API bool aforc_input_next_event(AFORC_Input *input,
+                                      AFORC_InputEvent *out_event);
 AFORC_API size_t aforc_input_event_count(const AFORC_Input *input);
 AFORC_API uint64_t aforc_input_dropped_events(const AFORC_Input *input);
 AFORC_API bool aforc_input_key_held(const AFORC_Input *input, AFORC_Key key);
 AFORC_API bool aforc_input_key_pressed(const AFORC_Input *input, AFORC_Key key);
-AFORC_API bool aforc_input_key_released(const AFORC_Input *input, AFORC_Key key);
-AFORC_API bool aforc_input_mouse_held(
-    const AFORC_Input *input,
-    AFORC_MouseButton button
-);
-AFORC_API bool aforc_input_mouse_pressed(
-    const AFORC_Input *input,
-    AFORC_MouseButton button
-);
-AFORC_API bool aforc_input_mouse_released(
-    const AFORC_Input *input,
-    AFORC_MouseButton button
-);
+AFORC_API bool aforc_input_key_released(const AFORC_Input *input,
+                                        AFORC_Key key);
+AFORC_API bool aforc_input_mouse_held(const AFORC_Input *input,
+                                      AFORC_MouseButton button);
+AFORC_API bool aforc_input_mouse_pressed(const AFORC_Input *input,
+                                         AFORC_MouseButton button);
+AFORC_API bool aforc_input_mouse_released(const AFORC_Input *input,
+                                          AFORC_MouseButton button);
 AFORC_API AFORC_Point aforc_input_mouse_position(const AFORC_Input *input);
-AFORC_API void aforc_input_release_all(
-    AFORC_Input *input,
-    uint64_t timestamp_ms
-);
+AFORC_API void aforc_input_release_all(AFORC_Input *input,
+                                       uint64_t timestamp_ms);
 
 #ifdef __cplusplus
 }

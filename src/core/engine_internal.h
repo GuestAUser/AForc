@@ -10,18 +10,21 @@
 #include "common_internal.h"
 #include "aforc/engine.h"
 
-typedef enum AFORC_EngineSceneCommandType {
+typedef enum AFORC_EngineSceneCommandType
+{
     AFORC_ENGINE_SCENE_COMMAND_PUSH,
     AFORC_ENGINE_SCENE_COMMAND_POP,
     AFORC_ENGINE_SCENE_COMMAND_REPLACE
 } AFORC_EngineSceneCommandType;
 
-typedef struct AFORC_EngineSceneCommand {
+typedef struct AFORC_EngineSceneCommand
+{
     AFORC_EngineSceneCommandType type;
     AFORC_Scene *scene;
 } AFORC_EngineSceneCommand;
 
-struct AFORC_Engine {
+struct AFORC_Engine
+{
     AFORC_EngineConfig config;
     AFORC_SceneStack scenes;
     AFORC_EngineSceneCommand *commands;
@@ -39,16 +42,14 @@ struct AFORC_Engine {
 };
 
 static inline AFORC_Status aforc_engine_set_error(AFORC_Error *error,
-                                               AFORC_Status status,
-                                               const char *message)
+                                                  AFORC_Status status,
+                                                  const char *message)
 {
     aforc_error_set(error, status, "engine", "%s", message);
     return status;
 }
 
-AFORC_INTERNAL AFORC_Status aforc_engine_apply_scene_commands(
-    AFORC_Engine *engine,
-    AFORC_Error *error
-);
+AFORC_INTERNAL AFORC_Status
+aforc_engine_apply_scene_commands(AFORC_Engine *engine, AFORC_Error *error);
 
 #endif
