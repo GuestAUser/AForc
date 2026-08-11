@@ -12,8 +12,9 @@
  * Incremental byte-buffer parser.
  *
  * Escape, UTF-8, and bracketed-paste sequences may span terminal reads. The
- * parser retains only an incomplete suffix, uses one deadline for the whole
- * escape sequence, and can force progress when bounded storage fills.
+ * parser retains only an incomplete suffix, times out ambiguous bare escapes,
+ * and keeps recognized control-sequence prefixes until they complete or hit
+ * the bounded storage limit.
  */
 
 static AFORC_ParseResult
@@ -88,6 +89,14 @@ static void aforc_input_internal_mark_escape(AFORC_Input *input,
     }
 }
 
+static AFORC_ParseResult
+aforc_input_internal_defer_protocol(AFORC_Input *input, uint64_t timestamp_ms)
+{
+    input->escape_pending = true;
+    input->escape_started_ms = timestamp_ms;
+    return AFORC_PARSE_INCOMPLETE;
+}
+
 static void aforc_input_internal_emit_escape(AFORC_Input *input,
                                              uint64_t timestamp_ms)
 {
@@ -128,14 +137,13 @@ aforc_input_internal_parse_escape(AFORC_Input *input,
         {
             if (size < 6u)
             {
-                if (!force_escape)
+                if (force_escape)
                 {
-                    aforc_input_internal_mark_escape(input, timestamp_ms);
-                    return AFORC_PARSE_INCOMPLETE;
+                    return aforc_input_internal_defer_protocol(input,
+                                                               timestamp_ms);
                 }
-                aforc_input_internal_emit_escape(input, timestamp_ms);
-                *out_consumed = 1u;
-                return AFORC_PARSE_COMPLETE;
+                aforc_input_internal_mark_escape(input, timestamp_ms);
+                return AFORC_PARSE_INCOMPLETE;
             }
             if (bytes[3] >= 32u && bytes[4] >= 33u && bytes[5] >= 33u)
             {
@@ -164,8 +172,12 @@ aforc_input_internal_parse_escape(AFORC_Input *input,
                 return AFORC_PARSE_COMPLETE;
             }
         }
-        if (final_index == size && size < 64u && !force_escape)
+        if (final_index == size && size < 64u)
         {
+            if (force_escape)
+            {
+                return aforc_input_internal_defer_protocol(input, timestamp_ms);
+            }
             aforc_input_internal_mark_escape(input, timestamp_ms);
             return AFORC_PARSE_INCOMPLETE;
         }
@@ -182,14 +194,12 @@ aforc_input_internal_parse_escape(AFORC_Input *input,
     {
         if (size < 3u)
         {
-            if (!force_escape)
+            if (force_escape)
             {
-                aforc_input_internal_mark_escape(input, timestamp_ms);
-                return AFORC_PARSE_INCOMPLETE;
+                return aforc_input_internal_defer_protocol(input, timestamp_ms);
             }
-            aforc_input_internal_emit_escape(input, timestamp_ms);
-            *out_consumed = 1u;
-            return AFORC_PARSE_COMPLETE;
+            aforc_input_internal_mark_escape(input, timestamp_ms);
+            return AFORC_PARSE_INCOMPLETE;
         }
         aforc_input_internal_handle_ss3(input, bytes[2], timestamp_ms);
         *out_consumed = 3u;

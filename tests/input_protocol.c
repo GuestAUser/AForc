@@ -307,6 +307,43 @@ static bool test_bounded_escape_forces_progress(void)
     return passed;
 }
 
+static bool test_fragmented_kitty_survives_escape_timeout(void)
+{
+    static const unsigned char first[] = "\x1b[107;1";
+    static const unsigned char second[] = ":1u";
+    static const unsigned char bare_escape[] = "\x1b";
+    AFORC_InputConfig config = aforc_input_config_default();
+    AFORC_Input *input = NULL;
+    AFORC_InputEvent event;
+    bool passed;
+
+    config.escape_timeout_ms = 10U;
+    if (aforc_input_create(&input, &config) != AFORC_OK)
+    {
+        return false;
+    }
+    passed =
+        aforc_input_feed(input, first, sizeof(first) - 1U, 1U) == AFORC_OK &&
+        no_events(input) && aforc_input_flush(input, 100U) == AFORC_OK &&
+        no_events(input) &&
+        aforc_input_feed(input, second, sizeof(second) - 1U, 101U) ==
+            AFORC_OK &&
+        aforc_input_next_event(input, &event) &&
+        event.type == AFORC_INPUT_EVENT_KEY_DOWN &&
+        event.data.key.key == AFORC_KEY_K &&
+        event.data.key.codepoint == (uint32_t)'k' && !event.data.key.repeat &&
+        no_events(input) &&
+        aforc_input_feed(input, bare_escape, sizeof(bare_escape) - 1U, 200U) ==
+            AFORC_OK &&
+        no_events(input) && aforc_input_flush(input, 300U) == AFORC_OK &&
+        aforc_input_next_event(input, &event) &&
+        event.type == AFORC_INPUT_EVENT_KEY_DOWN &&
+        event.data.key.key == AFORC_KEY_ESCAPE && !event.data.key.repeat &&
+        no_events(input);
+    aforc_input_destroy(input);
+    return passed;
+}
+
 static bool test_queue_overflow_preserves_state_and_order(void)
 {
     static const unsigned char bytes[] = "ab";
@@ -377,6 +414,11 @@ int main(void)
     {
         (void)fprintf(stderr, "input queue overflow contract failed\n");
         return 9;
+    }
+    if (!test_fragmented_kitty_survives_escape_timeout())
+    {
+        (void)fprintf(stderr, "fragmented Kitty timeout handling failed\n");
+        return 10;
     }
     (void)puts("input protocol: ok");
     return 0;
