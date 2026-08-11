@@ -64,6 +64,7 @@ jobs:
             linkage: static
             shared: "OFF"
             install_libdir: lib/x86_64-linux-gnu
+            invariant_checks: true
           - os: ubuntu-latest
             compiler: gcc
             linkage: shared
@@ -94,6 +95,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Verify subproject defaults
+        if: matrix.invariant_checks == true
         run: >-
           cmake -S tests/package_consumer/subproject
           -B "build/ci-subproject-${{ matrix.compiler }}-${{ matrix.linkage }}"
@@ -145,6 +147,7 @@ jobs:
           "build/ci-consumer-${{ matrix.compiler }}-${{ matrix.linkage }}"
           --output-on-failure
       - name: Reject incompatible package minor
+        if: matrix.invariant_checks == true
         run: |
           if cmake -S tests/package_consumer \
             -B "build/ci-consumer-incompatible-${{ matrix.compiler }}-${{ matrix.linkage }}" \

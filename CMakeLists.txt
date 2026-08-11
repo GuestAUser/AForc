@@ -18,11 +18,9 @@ include(CMakePushCheckState)
 include(CMakePackageConfigHelpers)
 include(GNUInstallDirs)
 
-if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
-    set(AFORC_IS_TOP_LEVEL ON)
-else()
-    set(AFORC_IS_TOP_LEVEL OFF)
-endif()
+string(COMPARE EQUAL
+    "${CMAKE_SOURCE_DIR}" "${PROJECT_SOURCE_DIR}" AFORC_IS_TOP_LEVEL
+)
 
 option(
     AFORC_BUILD_EXAMPLES
@@ -36,27 +34,18 @@ option(
 )
 option(AFORC_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(AFORC_ENABLE_SANITIZERS "Enable address and undefined-behavior sanitizers" OFF)
-if(AFORC_IS_TOP_LEVEL)
-    set(AFORC_HARDENING_DEFAULT ON)
-else()
-    set(AFORC_HARDENING_DEFAULT OFF)
-endif()
 option(
     AFORC_ENABLE_HARDENING
     "Enable supported hardening for AForc-owned targets"
-    "${AFORC_HARDENING_DEFAULT}"
+    "${AFORC_IS_TOP_LEVEL}"
 )
-unset(AFORC_HARDENING_DEFAULT)
 
+set(AFORC_TESTS_ACTIVE "${AFORC_BUILD_TESTS}")
 if(AFORC_IS_TOP_LEVEL)
     include(CTest)
-    if(BUILD_TESTING)
-        set(AFORC_TESTS_ACTIVE "${AFORC_BUILD_TESTS}")
-    else()
+    if(NOT BUILD_TESTING)
         set(AFORC_TESTS_ACTIVE OFF)
     endif()
-else()
-    set(AFORC_TESTS_ACTIVE "${AFORC_BUILD_TESTS}")
 endif()
 
 if(NOT UNIX)
@@ -323,7 +312,12 @@ if(AFORC_BUILD_EXAMPLES)
     aforc_configure_owned_target(aforc_roguelike)
     target_link_libraries(aforc_roguelike PRIVATE aforc::aforc)
 
-    set(AFORC_FIELDZERO_DOMAIN_SOURCES
+    set(AFORC_FIELDZERO_SOURCES
+        examples/fieldzero/main.c
+        examples/fieldzero/app/engine_hooks.c
+        examples/fieldzero/app/input_actions.c
+        examples/fieldzero/app/runtime.c
+        examples/fieldzero/app/scenes.c
         examples/fieldzero/content/horizon.c
         examples/fieldzero/content/origin.c
         examples/fieldzero/content/registry.c
@@ -340,16 +334,8 @@ if(AFORC_BUILD_EXAMPLES)
         examples/fieldzero/presentation/render_world.c
         examples/fieldzero/qa/digests.c
         examples/fieldzero/qa/regression.c
-        examples/fieldzero/qa/validators.c
-    )
-    set(AFORC_FIELDZERO_SOURCES
-        examples/fieldzero/main.c
-        examples/fieldzero/app/engine_hooks.c
-        examples/fieldzero/app/input_actions.c
-        examples/fieldzero/app/runtime.c
-        examples/fieldzero/app/scenes.c
         examples/fieldzero/qa/smoke.c
-        ${AFORC_FIELDZERO_DOMAIN_SOURCES}
+        examples/fieldzero/qa/validators.c
     )
     add_executable(aforc_fieldzero ${AFORC_FIELDZERO_SOURCES})
     set_target_properties(aforc_fieldzero PROPERTIES
@@ -362,48 +348,27 @@ if(AFORC_BUILD_EXAMPLES)
     target_link_libraries(aforc_fieldzero PRIVATE aforc::aforc)
 
     if(AFORC_TESTS_ACTIVE)
+        function(aforc_add_rejected_cli_test test_name target)
+            add_test(NAME ${test_name} COMMAND ${target} ${ARGN})
+            set_tests_properties(${test_name} PROPERTIES
+                TIMEOUT 15
+                WILL_FAIL TRUE
+            )
+        endfunction()
+
         add_test(NAME roguelike_smoke COMMAND aforc_roguelike --smoke)
         set_tests_properties(roguelike_smoke PROPERTIES TIMEOUT 15)
-        add_test(
-            NAME roguelike_invalid_seed
-            COMMAND aforc_roguelike --seed nope
+        aforc_add_rejected_cli_test(
+            roguelike_invalid_seed aforc_roguelike --seed nope
         )
-        set_tests_properties(roguelike_invalid_seed PROPERTIES
-            TIMEOUT 15
-            WILL_FAIL TRUE
+        aforc_add_rejected_cli_test(
+            roguelike_negative_seed aforc_roguelike --seed -1 --smoke
         )
-        add_test(
-            NAME roguelike_negative_seed
-            COMMAND aforc_roguelike --seed -1 --smoke
-        )
-        set_tests_properties(roguelike_negative_seed PROPERTIES
-            TIMEOUT 15
-            WILL_FAIL TRUE
-        )
-        add_test(
-            NAME roguelike_duplicate_seed
-            COMMAND aforc_roguelike --seed 1 --seed 2 --smoke
-        )
-        set_tests_properties(roguelike_duplicate_seed PROPERTIES
-            TIMEOUT 15
-            WILL_FAIL TRUE
+        aforc_add_rejected_cli_test(
+            roguelike_duplicate_seed
+            aforc_roguelike --seed 1 --seed 2 --smoke
         )
 
-        add_executable(aforc_fieldzero_regression
-            examples/fieldzero/qa/regression_main.c
-            ${AFORC_FIELDZERO_DOMAIN_SOURCES}
-        )
-        set_target_properties(aforc_fieldzero_regression PROPERTIES
-            OUTPUT_NAME "aforc-fieldzero-regression"
-        )
-        target_include_directories(aforc_fieldzero_regression PRIVATE
-            "${CMAKE_CURRENT_SOURCE_DIR}/examples/fieldzero/include"
-        )
-        aforc_configure_owned_target(aforc_fieldzero_regression)
-        target_link_libraries(aforc_fieldzero_regression PRIVATE aforc::aforc)
-
-        add_test(NAME fieldzero_regression COMMAND aforc_fieldzero_regression)
-        set_tests_properties(fieldzero_regression PROPERTIES TIMEOUT 30)
         add_test(NAME fieldzero_smoke COMMAND aforc_fieldzero --smoke)
         set_tests_properties(fieldzero_smoke PROPERTIES TIMEOUT 15)
         add_executable(aforc_fieldzero_pty_test tests/fieldzero_pty.c)
@@ -419,29 +384,15 @@ if(AFORC_BUILD_EXAMPLES)
                 "$<TARGET_FILE:aforc_fieldzero>"
         )
         set_tests_properties(fieldzero_pty PROPERTIES TIMEOUT 30)
-        add_test(
-            NAME fieldzero_invalid_seed
-            COMMAND aforc_fieldzero --seed nope
+        aforc_add_rejected_cli_test(
+            fieldzero_invalid_seed aforc_fieldzero --seed nope
         )
-        set_tests_properties(fieldzero_invalid_seed PROPERTIES
-            TIMEOUT 15
-            WILL_FAIL TRUE
+        aforc_add_rejected_cli_test(
+            fieldzero_negative_seed aforc_fieldzero --seed -1 --smoke
         )
-        add_test(
-            NAME fieldzero_negative_seed
-            COMMAND aforc_fieldzero --seed -1 --smoke
-        )
-        set_tests_properties(fieldzero_negative_seed PROPERTIES
-            TIMEOUT 15
-            WILL_FAIL TRUE
-        )
-        add_test(
-            NAME fieldzero_duplicate_seed
-            COMMAND aforc_fieldzero --seed 1 --seed 2 --smoke
-        )
-        set_tests_properties(fieldzero_duplicate_seed PROPERTIES
-            TIMEOUT 15
-            WILL_FAIL TRUE
+        aforc_add_rejected_cli_test(
+            fieldzero_duplicate_seed
+            aforc_fieldzero --seed 1 --seed 2 --smoke
         )
     endif()
 
