@@ -127,6 +127,10 @@ aforc_input_internal_parse_escape(AFORC_Input *input,
             aforc_input_internal_mark_escape(input, timestamp_ms);
             return AFORC_PARSE_INCOMPLETE;
         }
+        if (input->key_release_mode == AFORC_INPUT_KEY_RELEASE_EXPLICIT)
+        {
+            return aforc_input_internal_defer_protocol(input, timestamp_ms);
+        }
         aforc_input_internal_emit_escape(input, timestamp_ms);
         *out_consumed = 1u;
         return AFORC_PARSE_COMPLETE;
