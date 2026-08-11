@@ -46,6 +46,7 @@ static const char fieldzero_supported_capabilities[] = "\x1b[?27u";
 static const char fieldzero_unsupported_capabilities[] = "\x1b[?1u";
 static const char fieldzero_title_marker[] = "ENTER BEGIN   ? HELP   Q QUIT";
 static const char fieldzero_play_marker[] = "A/D MOVE   SPACE/Z JUMP   X DASH";
+static const char fieldzero_quit_marker[] = "Q CONFIRM   ESC CONTINUE";
 static const char fieldzero_resize_marker[] =
     "FIELD ZERO REQUIRES 80x24 - RESIZE TERMINAL";
 static const char fieldzero_runtime_failure[] = "aforc-fieldzero runtime:";
@@ -551,16 +552,23 @@ static bool fieldzero_run_supported(const char *executable)
                              fieldzero_collect(
                                  &process, 1000u, fieldzero_play_marker, start),
                          &process,
-                         "play screen was not restored after resize") ||
-        !fieldzero_check(fieldzero_write_all(
+                         "play screen was not restored after resize"))
+    {
+        goto done;
+    }
+    start = process.output_size;
+    if (!fieldzero_check(fieldzero_write_all(
                              process.master, quit_key, sizeof(quit_key) - 1u) &&
-                             fieldzero_collect(&process, 100u, NULL, 0u) &&
-                             fieldzero_write_all(process.master,
-                                                 quit_confirm,
-                                                 sizeof(quit_confirm) - 1u),
+                             fieldzero_collect(
+                                 &process, 1000u, fieldzero_quit_marker, start),
                          &process,
-                         "quit input failed") ||
-        !fieldzero_check(fieldzero_wait_for_exit(&process, 2000u),
+                         "quit confirmation was not rendered"))
+    {
+        goto done;
+    }
+    (void)fieldzero_write_all(
+        process.master, quit_confirm, sizeof(quit_confirm) - 1u);
+    if (!fieldzero_check(fieldzero_wait_for_exit(&process, 2000u),
                          &process,
                          "supported run did not exit before timeout") ||
         !fieldzero_check(fieldzero_exit_code(&process) == 0,
