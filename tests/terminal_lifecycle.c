@@ -13,6 +13,7 @@
 #include "aforc/terminal.h"
 
 #include <fcntl.h>
+#include <poll.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -103,6 +104,35 @@ static bool set_size(int fd, unsigned short columns, unsigned short rows)
     size.ws_col = columns;
     size.ws_row = rows;
     return ioctl(fd, TIOCSWINSZ, &size) == 0;
+}
+
+static bool read_pty_output(int fd,
+                            unsigned char *buffer,
+                            size_t capacity,
+                            size_t *out_size)
+{
+    struct pollfd descriptor;
+
+    descriptor.fd = fd;
+    descriptor.events = POLLIN;
+    *out_size = 0u;
+    while (*out_size < capacity)
+    {
+        ssize_t count;
+
+        descriptor.revents = 0;
+        if (poll(&descriptor, 1u, 100) <= 0)
+        {
+            return false;
+        }
+        count = read(fd, buffer + *out_size, capacity - *out_size);
+        if (count <= 0)
+        {
+            return false;
+        }
+        *out_size += (size_t)count;
+    }
+    return true;
 }
 
 static bool monotonic_time_ms(uint64_t *out_time_ms)
@@ -207,6 +237,42 @@ static bool test_open_close_restores_and_borrows_fds(void)
         passed = contract_check(fcntl(pair.master, F_GETFL) >= 0,
                                 "borrowed descriptors");
     }
+    pty_close(&pair);
+    return passed;
+}
+
+static bool test_enhanced_keyboard_negotiation_sequences(void)
+{
+    static const unsigned char enable[] = "\x1b[>27u\x1b[?u\x1b[c";
+    static const unsigned char disable[] = "\x1b[<u\x1b[0m";
+    unsigned char output[64];
+    PtyPair pair;
+    AFORC_Terminal *terminal = NULL;
+    AFORC_TerminalConfig config;
+    size_t output_size = 0u;
+    bool passed = false;
+
+    if (!pty_open(&pair))
+    {
+        pty_close(&pair);
+        return false;
+    }
+    config = terminal_config(pair.slave);
+    config.enhanced_keyboard = true;
+    if (aforc_terminal_open(&terminal, &config) == AFORC_OK &&
+        read_pty_output(
+            pair.master, output, sizeof(enable) - 1u, &output_size) &&
+        output_size == sizeof(enable) - 1u &&
+        memcmp(output, enable, sizeof(enable) - 1u) == 0)
+    {
+        aforc_terminal_close(terminal);
+        terminal = NULL;
+        passed = read_pty_output(
+                     pair.master, output, sizeof(disable) - 1u, &output_size) &&
+                 output_size == sizeof(disable) - 1u &&
+                 memcmp(output, disable, sizeof(disable) - 1u) == 0;
+    }
+    aforc_terminal_close(terminal);
     pty_close(&pair);
     return passed;
 }
@@ -349,6 +415,94 @@ static bool test_explicit_release_preserves_poll_timeout(void)
     return passed;
 }
 
+static bool test_redirected_descriptors_are_rejected(void)
+{
+    PtyPair pair;
+    int descriptors[2] = {-1, -1};
+    AFORC_Terminal *terminal = NULL;
+    AFORC_TerminalConfig config;
+    bool passed;
+
+    if (!pty_open(&pair) || pipe(descriptors) < 0)
+    {
+        pty_close(&pair);
+        return false;
+    }
+    config = terminal_config(pair.slave);
+    config.input_fd = descriptors[0];
+    passed =
+        aforc_terminal_open(&terminal, &config) == AFORC_ERROR_UNSUPPORTED &&
+        terminal == NULL;
+    config = terminal_config(pair.slave);
+    config.output_fd = descriptors[1];
+    passed =
+        passed &&
+        aforc_terminal_open(&terminal, &config) == AFORC_ERROR_UNSUPPORTED &&
+        terminal == NULL;
+    (void)close(descriptors[0]);
+    (void)close(descriptors[1]);
+    pty_close(&pair);
+    return passed;
+}
+
+static bool test_split_ttys_use_output_dimensions(void)
+{
+    PtyPair input_pair = {-1, -1};
+    PtyPair output_pair = {-1, -1};
+    AFORC_Terminal *terminal = NULL;
+    AFORC_TerminalConfig config;
+    AFORC_Size size;
+    bool passed;
+
+    if (!pty_open(&input_pair) || !pty_open(&output_pair) ||
+        !set_size(input_pair.slave, 80U, 24U) ||
+        !set_size(output_pair.slave, 132U, 43U))
+    {
+        pty_close(&input_pair);
+        pty_close(&output_pair);
+        return false;
+    }
+    config = terminal_config(input_pair.slave);
+    config.output_fd = output_pair.slave;
+    passed = aforc_terminal_open(&terminal, &config) == AFORC_OK &&
+             aforc_terminal_dimensions(terminal, &size) == AFORC_OK &&
+             size.width == 132 && size.height == 43;
+    aforc_terminal_close(terminal);
+    pty_close(&input_pair);
+    pty_close(&output_pair);
+    return passed;
+}
+
+static bool test_zero_dimensions_default_and_refresh(void)
+{
+    PtyPair pair;
+    AFORC_Terminal *terminal = NULL;
+    AFORC_TerminalConfig config;
+    AFORC_Size size;
+    bool changed = true;
+    bool passed;
+
+    if (!pty_open(&pair) || !set_size(pair.slave, 0U, 0U))
+    {
+        pty_close(&pair);
+        return false;
+    }
+    config = terminal_config(pair.slave);
+    passed =
+        aforc_terminal_open(&terminal, &config) == AFORC_OK &&
+        aforc_terminal_dimensions(terminal, &size) == AFORC_OK &&
+        size.width == 80 && size.height == 24 &&
+        set_size(pair.slave, 79U, 23U) &&
+        aforc_terminal_refresh_dimensions(terminal, &changed) == AFORC_OK &&
+        changed && aforc_terminal_dimensions(terminal, &size) == AFORC_OK &&
+        size.width == 79 && size.height == 23 &&
+        aforc_terminal_refresh_dimensions(terminal, &changed) == AFORC_OK &&
+        !changed;
+    aforc_terminal_close(terminal);
+    pty_close(&pair);
+    return passed;
+}
+
 int main(void)
 {
     if (!test_open_close_restores_and_borrows_fds())
@@ -356,25 +510,45 @@ int main(void)
         (void)fprintf(stderr, "terminal open/close contract failed\n");
         return 1;
     }
+    if (!test_enhanced_keyboard_negotiation_sequences())
+    {
+        (void)fprintf(stderr, "enhanced keyboard negotiation failed\n");
+        return 2;
+    }
     if (!test_resize_signal_is_coalesced())
     {
         (void)fprintf(stderr, "terminal resize signal failed\n");
-        return 2;
+        return 3;
     }
     if (!test_terminating_signal_restores_runtime())
     {
         (void)fprintf(stderr, "terminal terminating signal failed\n");
-        return 3;
+        return 4;
     }
     if (!test_master_hangup_reports_end_of_stream())
     {
         (void)fprintf(stderr, "terminal hangup handling failed\n");
-        return 4;
+        return 5;
     }
     if (!test_explicit_release_preserves_poll_timeout())
     {
         (void)fprintf(stderr, "explicit-release poll timeout failed\n");
-        return 5;
+        return 6;
+    }
+    if (!test_redirected_descriptors_are_rejected())
+    {
+        (void)fprintf(stderr, "redirected descriptor rejection failed\n");
+        return 7;
+    }
+    if (!test_split_ttys_use_output_dimensions())
+    {
+        (void)fprintf(stderr, "split terminal descriptor sizing failed\n");
+        return 8;
+    }
+    if (!test_zero_dimensions_default_and_refresh())
+    {
+        (void)fprintf(stderr, "terminal dimension fallback failed\n");
+        return 9;
     }
     (void)puts("terminal lifecycle: ok");
     return 0;

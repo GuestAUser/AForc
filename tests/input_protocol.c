@@ -89,6 +89,121 @@ static bool test_release_all_clears_explicit_release_key(void)
     return passed;
 }
 
+static bool test_kitty_capability_and_text_reporting(void)
+{
+    static const unsigned char partial_capabilities[] = "\x1b[?1u";
+    static const unsigned char full_capabilities[] = "\x1b[?27u";
+    static const unsigned char press[] = "\x1b[97;2;65u";
+    static const unsigned char repeat[] = "\x1b[97;2:2;65u";
+    static const unsigned char release[] = "\x1b[97;1:3u";
+    static const unsigned char pure_text[] = "\x1b[0;;229:97u";
+    static const unsigned char control_text[] = "\x1b[97;1:1;31u";
+    AFORC_Input *input = NULL;
+    AFORC_InputEvent event;
+    bool passed = false;
+
+    if (!create_input(&input, 32U, 10U))
+    {
+        return false;
+    }
+    if (aforc_input_key_release_mode(NULL) !=
+            AFORC_INPUT_KEY_RELEASE_SYNTHETIC ||
+        aforc_input_key_release_mode(input) !=
+            AFORC_INPUT_KEY_RELEASE_SYNTHETIC ||
+        aforc_input_feed(input,
+                         partial_capabilities,
+                         sizeof(partial_capabilities) - 1U,
+                         1U) != AFORC_OK ||
+        aforc_input_key_release_mode(input) !=
+            AFORC_INPUT_KEY_RELEASE_SYNTHETIC ||
+        !no_events(input) ||
+        aforc_input_feed(
+            input, full_capabilities, sizeof(full_capabilities) - 1U, 2U) !=
+            AFORC_OK ||
+        aforc_input_key_release_mode(input) !=
+            AFORC_INPUT_KEY_RELEASE_EXPLICIT ||
+        !no_events(input))
+    {
+        aforc_input_destroy(input);
+        return false;
+    }
+    if (aforc_input_feed(input, press, sizeof(press) - 1U, 3U) == AFORC_OK &&
+        aforc_input_next_event(input, &event) &&
+        event.type == AFORC_INPUT_EVENT_KEY_DOWN &&
+        event.data.key.key == AFORC_KEY_A &&
+        event.data.key.codepoint == (uint32_t)'A' &&
+        event.data.key.modifiers == AFORC_MOD_SHIFT && !event.data.key.repeat &&
+        aforc_input_next_event(input, &event) &&
+        event.type == AFORC_INPUT_EVENT_TEXT &&
+        event.data.text.codepoint == (uint32_t)'A' && no_events(input) &&
+        aforc_input_flush(input, 1000U) == AFORC_OK && no_events(input) &&
+        aforc_input_key_held(input, AFORC_KEY_A) &&
+        aforc_input_feed(input, repeat, sizeof(repeat) - 1U, 1001U) ==
+            AFORC_OK &&
+        aforc_input_next_event(input, &event) &&
+        event.type == AFORC_INPUT_EVENT_KEY_DOWN &&
+        event.data.key.key == AFORC_KEY_A &&
+        event.data.key.codepoint == (uint32_t)'A' && event.data.key.repeat &&
+        aforc_input_next_event(input, &event) &&
+        event.type == AFORC_INPUT_EVENT_TEXT &&
+        event.data.text.codepoint == (uint32_t)'A' && no_events(input) &&
+        aforc_input_feed(input, release, sizeof(release) - 1U, 1002U) ==
+            AFORC_OK &&
+        aforc_input_next_event(input, &event) &&
+        event.type == AFORC_INPUT_EVENT_KEY_UP &&
+        event.data.key.key == AFORC_KEY_A && no_events(input) &&
+        !aforc_input_key_held(input, AFORC_KEY_A) &&
+        aforc_input_feed(input, pure_text, sizeof(pure_text) - 1U, 1003U) ==
+            AFORC_OK &&
+        aforc_input_next_event(input, &event) &&
+        event.type == AFORC_INPUT_EVENT_TEXT &&
+        event.data.text.codepoint == UINT32_C(229) &&
+        aforc_input_next_event(input, &event) &&
+        event.type == AFORC_INPUT_EVENT_TEXT &&
+        event.data.text.codepoint == (uint32_t)'a' && no_events(input) &&
+        aforc_input_feed(
+            input, control_text, sizeof(control_text) - 1U, 1004U) ==
+            AFORC_OK &&
+        no_events(input))
+    {
+        passed = true;
+    }
+    aforc_input_destroy(input);
+    return passed;
+}
+
+static bool test_kitty_function_key_uses_negotiated_release(void)
+{
+    static const unsigned char capabilities[] = "\x1b[?27u";
+    static const unsigned char press[] = "\x1b[1A";
+    static const unsigned char release[] = "\x1b[1;1:3A";
+    AFORC_Input *input = NULL;
+    AFORC_InputEvent event;
+    bool passed;
+
+    if (!create_input(&input, 8U, 10U))
+    {
+        return false;
+    }
+    passed =
+        aforc_input_feed(input, capabilities, sizeof(capabilities) - 1U, 1U) ==
+            AFORC_OK &&
+        aforc_input_feed(input, press, sizeof(press) - 1U, 2U) == AFORC_OK &&
+        aforc_input_next_event(input, &event) &&
+        event.type == AFORC_INPUT_EVENT_KEY_DOWN &&
+        event.data.key.key == AFORC_KEY_UP && no_events(input) &&
+        aforc_input_flush(input, 1000U) == AFORC_OK &&
+        aforc_input_key_held(input, AFORC_KEY_UP) && no_events(input) &&
+        aforc_input_feed(input, release, sizeof(release) - 1U, 1001U) ==
+            AFORC_OK &&
+        aforc_input_next_event(input, &event) &&
+        event.type == AFORC_INPUT_EVENT_KEY_UP &&
+        event.data.key.key == AFORC_KEY_UP && no_events(input) &&
+        !aforc_input_key_held(input, AFORC_KEY_UP);
+    aforc_input_destroy(input);
+    return passed;
+}
+
 static bool test_unsupported_kitty_function_is_not_text(void)
 {
     static const unsigned char caps_lock[] = "\x1b[57358;1:1u";
@@ -228,30 +343,40 @@ int main(void)
         (void)fprintf(stderr, "explicit-release release-all failed\n");
         return 2;
     }
+    if (!test_kitty_capability_and_text_reporting())
+    {
+        (void)fprintf(stderr, "Kitty capability/text reporting failed\n");
+        return 3;
+    }
+    if (!test_kitty_function_key_uses_negotiated_release())
+    {
+        (void)fprintf(stderr, "Kitty function-key release failed\n");
+        return 4;
+    }
     if (!test_unsupported_kitty_function_is_not_text())
     {
         (void)fprintf(stderr, "Kitty functional-key filtering failed\n");
-        return 3;
+        return 5;
     }
     if (!test_incremental_utf8_and_paste_boundaries())
     {
         (void)fprintf(stderr, "incremental parser boundary failed\n");
-        return 4;
+        return 6;
     }
     if (!test_legacy_alt_key_is_not_text())
     {
         (void)fprintf(stderr, "legacy Alt text filtering failed\n");
-        return 5;
+        return 7;
     }
     if (!test_bounded_escape_forces_progress())
     {
         (void)fprintf(stderr, "bounded escape progress failed\n");
-        return 6;
+        return 8;
     }
     if (!test_queue_overflow_preserves_state_and_order())
     {
         (void)fprintf(stderr, "input queue overflow contract failed\n");
-        return 7;
+        return 9;
     }
     (void)puts("input protocol: ok");
     return 0;

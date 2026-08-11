@@ -48,7 +48,7 @@ static const AFORC_TerminalModeSequence aforc_terminal_mode_sequences[] = {
      "\x1b[?1006l\x1b[?1002l\x1b[?1000l"},
     {AFORC_TERMINAL_MODE_FOCUS, "\x1b[?1004h", "\x1b[?1004l"},
     {AFORC_TERMINAL_MODE_PASTE, "\x1b[?2004h", "\x1b[?2004l"},
-    {AFORC_TERMINAL_MODE_KEYBOARD, "\x1b[>3u", "\x1b[<u"}};
+    {AFORC_TERMINAL_MODE_KEYBOARD, "\x1b[>27u\x1b[?u\x1b[c", "\x1b[<u"}};
 
 static size_t aforc_terminal_write_request(size_t remaining)
 {

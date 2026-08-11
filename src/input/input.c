@@ -102,6 +102,7 @@ AFORC_Status aforc_input_create(AFORC_Input **out_input,
     input->byte_capacity = effective_config.byte_capacity;
     input->key_release_timeout_ms = effective_config.key_release_timeout_ms;
     input->escape_timeout_ms = effective_config.escape_timeout_ms;
+    input->key_release_mode = AFORC_INPUT_KEY_RELEASE_SYNTHETIC;
     input->mouse_x = -1;
     input->mouse_y = -1;
     *out_input = input;
@@ -286,6 +287,12 @@ size_t aforc_input_event_count(const AFORC_Input *input)
 uint64_t aforc_input_dropped_events(const AFORC_Input *input)
 {
     return input == NULL ? 0u : input->dropped_events;
+}
+
+AFORC_InputKeyReleaseMode aforc_input_key_release_mode(const AFORC_Input *input)
+{
+    return input == NULL ? AFORC_INPUT_KEY_RELEASE_SYNTHETIC
+                         : input->key_release_mode;
 }
 
 bool aforc_input_key_held(const AFORC_Input *input, AFORC_Key key)

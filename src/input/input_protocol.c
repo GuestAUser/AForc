@@ -102,6 +102,13 @@ static bool aforc_input_internal_codepoint_valid(uint32_t codepoint)
            !(codepoint >= UINT32_C(0xd800) && codepoint <= UINT32_C(0xdfff));
 }
 
+static bool aforc_input_internal_text_codepoint_valid(uint32_t codepoint)
+{
+    return aforc_input_internal_codepoint_valid(codepoint) &&
+           codepoint >= UINT32_C(0x20) &&
+           !(codepoint >= UINT32_C(0x7f) && codepoint <= UINT32_C(0x9f));
+}
+
 static void aforc_input_internal_emit_plain_byte(AFORC_Input *input,
                                                  unsigned char byte,
                                                  AFORC_Modifiers modifiers,
@@ -407,6 +414,212 @@ static void aforc_input_internal_emit_protocol_key(AFORC_Input *input,
                                        timestamp_ms);
 }
 
+enum
+{
+    AFORC_KITTY_EVENT_TYPES = 1u << 1,
+    AFORC_KITTY_ALL_KEYS = 1u << 3,
+    AFORC_KITTY_TEXT_CAPACITY = 32
+};
+
+typedef struct AFORC_KittyKeyReport
+{
+    uint32_t codepoint;
+    uint32_t modifiers;
+    uint32_t event_type;
+    uint32_t text[AFORC_KITTY_TEXT_CAPACITY];
+    size_t text_count;
+    bool event_type_present;
+} AFORC_KittyKeyReport;
+
+static bool aforc_input_internal_parse_decimal(const unsigned char *bytes,
+                                               size_t size,
+                                               size_t *index,
+                                               uint32_t *out_value,
+                                               bool *out_present)
+{
+    uint32_t value = 0u;
+    bool present = false;
+
+    while (*index < size && bytes[*index] >= (unsigned char)'0' &&
+           bytes[*index] <= (unsigned char)'9')
+    {
+        const uint32_t digit = (uint32_t)(bytes[*index] - (unsigned char)'0');
+
+        if (value > (UINT32_MAX - digit) / 10u)
+        {
+            return false;
+        }
+        value = value * 10u + digit;
+        present = true;
+        ++*index;
+    }
+    *out_value = value;
+    *out_present = present;
+    return true;
+}
+
+static bool
+aforc_input_internal_parse_kitty_report(const unsigned char *payload,
+                                        size_t payload_size,
+                                        AFORC_KittyKeyReport *report)
+{
+    size_t index = 0u;
+    size_t alternate_count = 0u;
+    uint32_t value = 0u;
+    bool present = false;
+
+    report->codepoint = 0u;
+    report->modifiers = 1u;
+    report->event_type = 1u;
+    report->text_count = 0u;
+    report->event_type_present = false;
+    if (!aforc_input_internal_parse_decimal(
+            payload, payload_size, &index, &report->codepoint, &present) ||
+        !present || !aforc_input_internal_codepoint_valid(report->codepoint))
+    {
+        return false;
+    }
+    while (index < payload_size && payload[index] == (unsigned char)':')
+    {
+        if (alternate_count == 2u)
+        {
+            return false;
+        }
+        ++alternate_count;
+        ++index;
+        if (!aforc_input_internal_parse_decimal(
+                payload, payload_size, &index, &value, &present) ||
+            (present && !aforc_input_internal_codepoint_valid(value)))
+        {
+            return false;
+        }
+    }
+    if (index == payload_size)
+    {
+        return true;
+    }
+    if (payload[index++] != (unsigned char)';' ||
+        !aforc_input_internal_parse_decimal(
+            payload, payload_size, &index, &value, &present))
+    {
+        return false;
+    }
+    if (present)
+    {
+        report->modifiers = value;
+    }
+    if (index < payload_size && payload[index] == (unsigned char)':')
+    {
+        ++index;
+        if (!aforc_input_internal_parse_decimal(
+                payload, payload_size, &index, &value, &present))
+        {
+            return false;
+        }
+        if (present)
+        {
+            report->event_type = value;
+            report->event_type_present = true;
+        }
+    }
+    if (report->event_type == 0u || report->event_type > 3u)
+    {
+        return false;
+    }
+    if (index == payload_size)
+    {
+        return true;
+    }
+    if (payload[index++] != (unsigned char)';')
+    {
+        return false;
+    }
+    while (index < payload_size)
+    {
+        if (report->text_count == AFORC_KITTY_TEXT_CAPACITY ||
+            !aforc_input_internal_parse_decimal(
+                payload, payload_size, &index, &value, &present) ||
+            !present || !aforc_input_internal_text_codepoint_valid(value))
+        {
+            return false;
+        }
+        report->text[report->text_count++] = value;
+        if (index == payload_size)
+        {
+            break;
+        }
+        if (payload[index++] != (unsigned char)':')
+        {
+            return false;
+        }
+        if (index == payload_size)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool aforc_input_internal_parse_keyboard_flags(
+    const unsigned char *payload, size_t payload_size, uint32_t *out_flags)
+{
+    size_t index = 1u;
+    bool present = false;
+
+    return payload_size > 1u && payload[0] == (unsigned char)'?' &&
+           aforc_input_internal_parse_decimal(
+               payload, payload_size, &index, out_flags, &present) &&
+           present && index == payload_size;
+}
+
+static void
+aforc_input_internal_handle_kitty_report(AFORC_Input *input,
+                                         const unsigned char *payload,
+                                         size_t payload_size,
+                                         uint64_t timestamp_ms)
+{
+    AFORC_KittyKeyReport report;
+    AFORC_Key key;
+    uint32_t event_codepoint;
+    size_t index;
+
+    if (!aforc_input_internal_parse_kitty_report(
+            payload, payload_size, &report))
+    {
+        return;
+    }
+    key = report.codepoint == 27u   ? AFORC_KEY_ESCAPE
+          : report.codepoint == 13u ? AFORC_KEY_ENTER
+          : report.codepoint == 9u  ? AFORC_KEY_TAB
+          : report.codepoint == 127u
+              ? AFORC_KEY_BACKSPACE
+              : aforc_input_internal_key_from_codepoint(report.codepoint);
+    event_codepoint = report.codepoint >= 0x20u && report.codepoint != 0x7fu
+                          ? report.codepoint
+                          : 0u;
+    if (report.event_type != 3u && report.text_count == 1u)
+    {
+        event_codepoint = report.text[0];
+    }
+    aforc_input_internal_emit_protocol_key(
+        input,
+        key,
+        event_codepoint,
+        aforc_input_internal_decode_modifiers(report.modifiers),
+        report.event_type,
+        report.event_type_present ||
+            input->key_release_mode == AFORC_INPUT_KEY_RELEASE_EXPLICIT,
+        timestamp_ms);
+    if (report.event_type == 3u)
+    {
+        return;
+    }
+    for (index = 0u; index < report.text_count; ++index)
+    {
+        aforc_input_internal_emit_text(input, report.text[index], timestamp_ms);
+    }
+}
+
 static AFORC_MouseButton aforc_input_internal_mouse_button(uint32_t code)
 {
     if ((code & 128u) != 0u)
@@ -519,6 +732,26 @@ void aforc_input_internal_handle_csi(AFORC_Input *input,
     AFORC_Modifiers modifiers = AFORC_MOD_NONE;
     uint32_t event_type = 1u;
 
+    if (final_byte == (unsigned char)'u' && payload_size > 0u)
+    {
+        uint32_t flags = 0u;
+
+        if (aforc_input_internal_parse_keyboard_flags(
+                payload, payload_size, &flags))
+        {
+            const uint32_t required =
+                AFORC_KITTY_EVENT_TYPES | AFORC_KITTY_ALL_KEYS;
+
+            input->key_release_mode = (flags & required) == required
+                                          ? AFORC_INPUT_KEY_RELEASE_EXPLICIT
+                                          : AFORC_INPUT_KEY_RELEASE_SYNTHETIC;
+            return;
+        }
+        aforc_input_internal_handle_kitty_report(
+            input, payload, payload_size, timestamp_ms);
+        return;
+    }
+
     if ((final_byte == (unsigned char)'M' ||
          final_byte == (unsigned char)'m') &&
         payload_size > 0u && payload[0] == (unsigned char)'<')
@@ -561,44 +794,6 @@ void aforc_input_internal_handle_csi(AFORC_Input *input,
     {
         aforc_input_internal_emit_protocol_key(
             input, AFORC_KEY_TAB, 0u, AFORC_MOD_SHIFT, 1u, false, timestamp_ms);
-        return;
-    }
-    if (final_byte == (unsigned char)'u' && count > 0u)
-    {
-        const uint32_t codepoint = parameters[0];
-
-        if (!aforc_input_internal_codepoint_valid(codepoint))
-        {
-            return;
-        }
-
-        if (count > 1u)
-        {
-            modifiers = aforc_input_internal_decode_modifiers(parameters[1]);
-        }
-        if (count > 2u && parameters[2] != 0u)
-        {
-            event_type = parameters[2];
-        }
-        if (event_type > 3u)
-        {
-            return;
-        }
-        key = codepoint == 27u   ? AFORC_KEY_ESCAPE
-              : codepoint == 13u ? AFORC_KEY_ENTER
-              : codepoint == 9u  ? AFORC_KEY_TAB
-              : codepoint == 127u
-                  ? AFORC_KEY_BACKSPACE
-                  : aforc_input_internal_key_from_codepoint(codepoint);
-        /* Kitty's event type is authoritative for repeat and release state. */
-        aforc_input_internal_emit_protocol_key(
-            input,
-            key,
-            codepoint >= 0x20u && codepoint != 0x7fu ? codepoint : 0u,
-            modifiers,
-            event_type,
-            count > 2u,
-            timestamp_ms);
         return;
     }
     if (final_byte == (unsigned char)'~' && count > 0u)
@@ -663,6 +858,13 @@ void aforc_input_internal_handle_csi(AFORC_Input *input,
     if (key != AFORC_KEY_NONE)
     {
         aforc_input_internal_emit_protocol_key(
-            input, key, 0u, modifiers, event_type, count > 2u, timestamp_ms);
+            input,
+            key,
+            0u,
+            modifiers,
+            event_type,
+            count > 2u ||
+                input->key_release_mode == AFORC_INPUT_KEY_RELEASE_EXPLICIT,
+            timestamp_ms);
     }
 }

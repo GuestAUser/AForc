@@ -48,6 +48,7 @@ struct AFORC_Input
     bool escape_pending;
     bool paste_mode;
     bool queue_overflowed;
+    AFORC_InputKeyReleaseMode key_release_mode;
     AFORC_KeyState keys[AFORC_KEY_COUNT];
     AFORC_MouseState mouse[AFORC_MOUSE_BUTTON_COUNT];
     int32_t mouse_x;

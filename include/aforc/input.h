@@ -162,6 +162,12 @@ typedef struct AFORC_InputEvent
     } data;
 } AFORC_InputEvent;
 
+typedef enum AFORC_InputKeyReleaseMode
+{
+    AFORC_INPUT_KEY_RELEASE_SYNTHETIC = 0,
+    AFORC_INPUT_KEY_RELEASE_EXPLICIT
+} AFORC_InputKeyReleaseMode;
+
 typedef struct AFORC_InputConfig
 {
     size_t event_capacity;
@@ -205,6 +211,10 @@ AFORC_API bool aforc_input_next_event(AFORC_Input *input,
                                       AFORC_InputEvent *out_event);
 AFORC_API size_t aforc_input_event_count(const AFORC_Input *input);
 AFORC_API uint64_t aforc_input_dropped_events(const AFORC_Input *input);
+/* Explicit mode means the terminal confirmed event-type reporting for every
+ * key. Synthetic mode releases legacy keys after key_release_timeout_ms. */
+AFORC_API AFORC_InputKeyReleaseMode
+aforc_input_key_release_mode(const AFORC_Input *input);
 AFORC_API bool aforc_input_key_held(const AFORC_Input *input, AFORC_Key key);
 AFORC_API bool aforc_input_key_pressed(const AFORC_Input *input, AFORC_Key key);
 AFORC_API bool aforc_input_key_released(const AFORC_Input *input,
