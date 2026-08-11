@@ -79,6 +79,13 @@ Input transforms terminal bytes into bounded `AFORC_InputEvent` queues. Frame
 state distinguishes held, pressed, and released inputs. Escape decoding is
 incremental so partial terminal sequences can span reads.
 
+Enhanced keyboard startup pushes the Kitty flags needed for event types,
+all-key reporting, and associated text, then queries the active flags.
+`aforc_input_key_release_mode` reports explicit release only after the terminal
+confirms event types for every key. Legacy terminals retain the bounded
+inactivity-release fallback; real-time applications can reject that mode rather
+than hiding it behind timing assumptions.
+
 The public input facade coordinates private queue, state, protocol, and
 incremental-parser units against one timestamp and bounded storage contract.
 
@@ -166,6 +173,22 @@ Each `--smoke` path uses its normal game scene, input decoder, renderer, engine
 frame function, and relevant subsystems with an off-screen renderer and
 deterministic timestamps. Only raw-terminal open/present is skipped, so CI does
 not require a TTY.
+
+## FIELD ZERO Composition
+
+FIELD ZERO is a nested example under `examples/fieldzero`. `content/` holds 12
+immutable room definitions and tagged platform bands. `game/` owns fixed-point
+movement, collision, registration, checkpoints, and run progression.
+`presentation/` reads that state into layered renderer, UI, and effect passes
+without mutating simulation. `app/` adapts decoded press, repeat, and release
+events to fixed updates and owns scene and terminal lifecycle. `qa/` drives
+deterministic physics, content, render, and production smoke checks without
+sleeping.
+
+Three reusable tile maps keep registration atomic: one static-only collision
+map, one active room state, and one staging state. Moving bands are visual-only
+during the transition; the active and staging maps swap on the final fixed tick.
+Authored geometry never depends on the render-only seed or terminal size.
 
 ## Roguelike Composition
 

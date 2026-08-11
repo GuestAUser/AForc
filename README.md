@@ -6,10 +6,10 @@ AForc is an ASCII C game engine for 2D planes. It provides the low-level
 pieces that responsive terminal games repeatedly need, while leaving game
 rules and data layouts under application control.
 
-The repository includes a complete example. The procedural roguelike
-demonstrates the engine loop, terminal lifecycle, buffered renderer, decoded
-input, tile world, ECS, effects, UI, deterministic random generation, and save
-containers working together.
+The repository includes two complete examples. The procedural roguelike
+demonstrates the full engine stack, while FIELD ZERO demonstrates deterministic
+real-time platforming, negotiated key-release input, authored geometry, and
+layered terminal presentation.
 
 ## Features
 
@@ -17,7 +17,8 @@ containers working together.
   handling.
 - Double-buffered colored cell renderer with incremental terminal updates.
 - Escape-sequence and UTF-8 input decoding with keyboard, mouse, focus, paste,
-  and resize events.
+  and resize events, including negotiated explicit key releases for real-time
+  games and a bounded synthetic fallback for legacy terminals.
 - Fixed-step engine loop with deferred scene-stack transitions.
 - Layered tile maps, cameras, collision queries, raycasts, A* pathfinding, and
   field of view.
@@ -46,6 +47,9 @@ cmake --build build/cmake --parallel
 
 # Roguelike
 ./build/cmake/aforc-roguelike
+
+# FIELD ZERO
+./build/cmake/aforc-fieldzero
 ```
 
 With GNU Make:
@@ -55,6 +59,9 @@ make release
 
 # Roguelike
 ./build/make/bin/aforc-roguelike
+
+# FIELD ZERO
+./build/make/bin/aforc-fieldzero
 ```
 
 Run the game deterministically with `--seed`:
@@ -65,6 +72,14 @@ Run the game deterministically with `--seed`:
 
 The game needs an interactive terminal. Its `--help` and `--smoke` modes do not,
 which makes them suitable for scripts and continuous integration.
+
+FIELD ZERO requires the Kitty keyboard protocol with explicit key-release
+reporting. Terminals or multiplexers that do not negotiate those capabilities
+exit cleanly instead of guessing key-up timing.
+
+Compatible implementations include VS Code, kitty, WezTerm, and Windows
+Terminal 1.25+. Windows Terminal 1.24 does not provide the required key-release
+events.
 
 Run the roguelike's deterministic non-interactive path directly, or run its
 smoke check through Make:
@@ -92,20 +107,56 @@ reach the exit. Clear five floors to win. Movement is turn-based; enemies use
 the engine's A* pathfinder whenever the player takes a turn. The same seed
 reproduces the same sequence of floors.
 
+## FIELD ZERO
+
+FIELD ZERO is a deterministic terminal platformer set in a damaged survey
+system. Carry its last stable coordinate through twelve authored rooms: touch
+each `+` in sequence to shift tagged platforms in exact four-cell steps, then
+reach `>` after every mark becomes `x`. Optional `o` memory cells hold short
+calibration records; the seed changes scenery only.
+
+| Sector | Room identity |
+| --- | --- |
+| ORIGIN | Establish movement, the live datum, and registration |
+| SPAN | Cross broad baselines with wall contact and wall kicks |
+| WELL | Climb and descend through rain, shafts, and depth readings |
+| SHEAR | Resolve multi-stage lateral and vertical grid shifts |
+| HORIZON | Synthesize the route and reconstruct the survey reference |
+
+| Input | Action |
+| --- | --- |
+| Left/Right arrows or `A`/`D` | Move |
+| Space or `Z` | Jump |
+| `X` | Air dash |
+| `?` | Help |
+| `P` | Pause |
+| `R` | Restart current room |
+| `Q` or Escape | Quit or close an overlay |
+
+The minimum terminal size is `80x24`; larger terminals center the arena.
+`--reduced-motion` disables incidental animation without changing the
+simulation. `--no-color` keeps the same glyph and style cues.
+
+```sh
+./build/cmake/aforc-fieldzero --seed 2026
+./build/cmake/aforc-fieldzero --smoke --seed 2026
+./build/cmake/aforc-fieldzero --reduced-motion --no-color
+```
+
 ## Build Options
 
 Important CMake options:
 
 | Option | Default | Purpose |
 | --- | --- | --- |
-| `AFORC_BUILD_EXAMPLES` | Top-level `ON` | Build `aforc-roguelike` |
+| `AFORC_BUILD_EXAMPLES` | Top-level `ON` | Build both playable examples |
 | `AFORC_BUILD_TESTS` | Top-level `ON` | Build AForc regression tests |
 | `AFORC_WARNINGS_AS_ERRORS` | `OFF` | Promote project warnings to errors |
 | `AFORC_ENABLE_SANITIZERS` | `OFF` | Enable AddressSanitizer and UBSan |
 | `AFORC_ENABLE_HARDENING` | Top-level `ON` | Harden supported project-owned targets |
 | `BUILD_SHARED_LIBS` | `OFF` | Build AForc as a shared library |
 
-The example and tests default to `OFF` when AForc is added as a subproject. AForc
+The examples and tests default to `OFF` when AForc is added as a subproject. AForc
 does not define or change the parent project's `BUILD_TESTING` option. Embedded
 builds that opt into `AFORC_BUILD_TESTS` must enable testing in the parent.
 
@@ -117,6 +168,7 @@ make sanitize    # strict ASan/UBSan build, then all tests
 make smoke       # deterministic non-TTY integration checks
 make package-test  # stage install and exercise its pkg-config consumer
 make run         # launch the roguelike
+make run-fieldzero  # launch FIELD ZERO
 make help        # list all supported targets
 ```
 
@@ -210,6 +262,7 @@ src/effects/       Sprites, animation, tweens, and particles
 src/ui/            Layout and widgets
 src/assets/        Asset I/O, RNG, config, and save containers
 examples/roguelike/ Structured roguelike integration example
+examples/fieldzero/ Deterministic real-time platformer example
 DESIGN.md          Brand and terminal-game surface contract
 SECURITY.md        Security policy and integration constraints
 docs/              Architecture and extension guidance
@@ -225,6 +278,11 @@ The Roguelike keeps its cross-translation-unit contracts private. It separates
 its `app/`, `game/`, `presentation/`, `persistence/`, and `qa/` modules under
 `examples/roguelike`, with private headers in `include/roguelike/`. Its build
 manifest enumerates module units explicitly.
+
+FIELD ZERO follows the same private-example rule. Its `app/`, `game/`,
+`content/`, `presentation/`, and `qa/` modules separate terminal lifecycle,
+deterministic simulation, authored rooms, rendering, and non-interactive
+verification. No FIELD ZERO header is installed as engine API.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for subsystem boundaries,
 frame flow, and extension guidance. See [SECURITY.md](SECURITY.md) for trust
