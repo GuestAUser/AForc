@@ -8,8 +8,6 @@
 
 #include "save_internal.h"
 
-#include "assets_internal.h"
-
 #include <stdlib.h>
 #include <string.h>
 
@@ -66,11 +64,11 @@ static AFORC_Status aforc_save_writer_reserve(AFORC_SaveWriter *writer,
     {
         return AFORC_ERROR_STATE;
     }
-    if (additional_size > writer->max_payload_bytes - writer->size ||
-        !aforc_size_add(writer->size, additional_size, &required))
+    if (additional_size > writer->max_payload_bytes - writer->size)
     {
         return AFORC_ERROR_LIMIT;
     }
+    required = writer->size + additional_size;
     if (required <= writer->capacity)
     {
         return AFORC_OK;
@@ -97,7 +95,6 @@ static AFORC_Status aforc_save_writer_reserve(AFORC_SaveWriter *writer,
 static AFORC_Status
 aforc_save_writer_take(AFORC_SaveWriter *writer, size_t size, uint8_t **output)
 {
-    AFORC_SaveBoundedWriter bytes;
     AFORC_Status status;
 
     status = aforc_save_writer_reserve(writer, size);
@@ -105,13 +102,8 @@ aforc_save_writer_take(AFORC_SaveWriter *writer, size_t size, uint8_t **output)
     {
         return status;
     }
-    aforc_save_bounded_writer_init(
-        &bytes, writer->payload, writer->capacity, writer->size);
-    if (!aforc_save_bounded_writer_take(&bytes, size, output))
-    {
-        return AFORC_ERROR_STATE;
-    }
-    writer->size = bytes.cursor;
+    *output = writer->payload + writer->size;
+    writer->size += size;
     return AFORC_OK;
 }
 

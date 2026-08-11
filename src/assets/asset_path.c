@@ -25,24 +25,19 @@ typedef struct AFORC_PathParts
 static AFORC_Status
 aforc_bounded_string_size(const char *text, size_t limit, size_t *output)
 {
-    size_t index;
+    const char *terminator;
 
-    if (text == NULL || output == NULL)
+    if (text == NULL || output == NULL || limit == SIZE_MAX)
     {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
-    for (index = 0u;; ++index)
+    terminator = memchr(text, '\0', limit + 1u);
+    if (terminator == NULL)
     {
-        if (text[index] == '\0')
-        {
-            *output = index;
-            return AFORC_OK;
-        }
-        if (index == limit)
-        {
-            return AFORC_ERROR_LIMIT;
-        }
+        return AFORC_ERROR_LIMIT;
     }
+    *output = (size_t)(terminator - text);
+    return AFORC_OK;
 }
 
 static bool aforc_path_character_rejected(unsigned char character)
@@ -53,13 +48,10 @@ static bool aforc_path_character_rejected(unsigned char character)
 
 AFORC_AssetPathPolicy aforc_asset_path_policy_default(void)
 {
-    AFORC_AssetPathPolicy policy;
-
-    policy.max_path_bytes = AFORC_ASSET_DEFAULT_MAX_PATH_BYTES;
-    policy.max_component_bytes = AFORC_ASSET_DEFAULT_MAX_COMPONENT_BYTES;
-    policy.max_depth = AFORC_ASSET_DEFAULT_MAX_DEPTH;
-    policy.allow_hidden_components = false;
-    return policy;
+    return (AFORC_AssetPathPolicy){AFORC_ASSET_DEFAULT_MAX_PATH_BYTES,
+                                   AFORC_ASSET_DEFAULT_MAX_COMPONENT_BYTES,
+                                   AFORC_ASSET_DEFAULT_MAX_DEPTH,
+                                   false};
 }
 
 AFORC_Status aforc_asset_path_validate(const char *relative_path,
@@ -148,7 +140,6 @@ static AFORC_Status aforc_path_measure(const char *root,
     AFORC_Status status;
     size_t index;
     size_t total_size;
-    bool add_separator;
 
     if (root == NULL || parts == NULL)
     {
@@ -182,11 +173,11 @@ static AFORC_Status aforc_path_measure(const char *root,
         }
     }
 
-    add_separator = parts->root_size > 0u &&
-                    root[parts->root_size - 1u] != '/' &&
-                    root[parts->root_size - 1u] != '\\';
+    parts->add_separator = parts->root_size > 0u &&
+                           root[parts->root_size - 1u] != '/' &&
+                           root[parts->root_size - 1u] != '\\';
     total_size = parts->root_size;
-    if (add_separator)
+    if (parts->add_separator)
     {
         if (total_size == policy->max_path_bytes)
         {
@@ -201,7 +192,6 @@ static AFORC_Status aforc_path_measure(const char *root,
     total_size += parts->relative_size;
 
     parts->total_size = total_size;
-    parts->add_separator = add_separator;
     return AFORC_OK;
 }
 
@@ -235,7 +225,6 @@ AFORC_Status aforc_asset_path_join(const char *root,
     AFORC_PathParts parts;
     AFORC_Status status;
     char *joined;
-    size_t allocation_size;
 
     if (destination == NULL || destination_capacity == 0u)
     {
@@ -252,20 +241,14 @@ AFORC_Status aforc_asset_path_join(const char *root,
         destination[0] = '\0';
         return AFORC_ERROR_LIMIT;
     }
-    if (!aforc_size_add(parts.total_size, 1u, &allocation_size))
-    {
-        destination[0] = '\0';
-        return AFORC_ERROR_LIMIT;
-    }
-
-    joined = malloc(allocation_size);
+    joined = malloc(parts.total_size + 1u);
     if (joined == NULL)
     {
         destination[0] = '\0';
         return AFORC_ERROR_OUT_OF_MEMORY;
     }
     aforc_path_copy(root, relative_path, &parts, joined);
-    memmove(destination, joined, allocation_size);
+    memcpy(destination, joined, parts.total_size + 1u);
     free(joined);
     return AFORC_OK;
 }
@@ -278,7 +261,6 @@ AFORC_Status aforc_asset_path_allocate(const char *root,
     AFORC_PathParts parts;
     AFORC_Status status;
     char *path;
-    size_t allocation_size;
 
     if (output == NULL)
     {
@@ -290,11 +272,7 @@ AFORC_Status aforc_asset_path_allocate(const char *root,
     {
         return status;
     }
-    if (!aforc_size_add(parts.total_size, 1u, &allocation_size))
-    {
-        return AFORC_ERROR_LIMIT;
-    }
-    path = malloc(allocation_size);
+    path = malloc(parts.total_size + 1u);
     if (path == NULL)
     {
         return AFORC_ERROR_OUT_OF_MEMORY;

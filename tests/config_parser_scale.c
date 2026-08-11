@@ -4,15 +4,12 @@
  * SPDX-License-Identifier: MIT
  */
 
-#define _POSIX_C_SOURCE 200809L
-
 #include "aforc/assets.h"
 #include "config_parser_scale_support.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 
 static bool test_valid_grammar_and_order(void)
 {
@@ -166,67 +163,8 @@ static bool test_allocation_failure_cleanup(void)
     return true;
 }
 
-static int test_benchmark(void)
+int main(void)
 {
-    static const size_t counts[] = {512u, 1024u, 2048u, 4096u};
-    const size_t repetitions = 5u;
-    size_t index;
-
-    for (index = 0u; index < sizeof(counts) / sizeof(counts[0u]); ++index)
-    {
-        AFORC_ConfigLimits limits = aforc_config_limits_default();
-        struct timespec start;
-        struct timespec end;
-        char *text;
-        double elapsed;
-        size_t text_size;
-        size_t repetition;
-
-        text = aforc_config_scale_make_config(counts[index], false, &text_size);
-        if (text == NULL || clock_gettime(CLOCK_MONOTONIC, &start) != 0)
-        {
-            free(text);
-            return 1;
-        }
-        for (repetition = 0u; repetition < repetitions; ++repetition)
-        {
-            AFORC_Config config = {0};
-
-            if (aforc_config_parse(text, text_size, &limits, &config) !=
-                AFORC_OK)
-            {
-                aforc_config_release(&config);
-                free(text);
-                return 1;
-            }
-            aforc_config_release(&config);
-        }
-        if (clock_gettime(CLOCK_MONOTONIC, &end) != 0)
-        {
-            free(text);
-            return 1;
-        }
-        elapsed = aforc_config_scale_elapsed_milliseconds(&start, &end);
-        (void)printf("entries=%zu total_ms=%.3f per_parse_ms=%.3f\n",
-                     counts[index],
-                     elapsed,
-                     elapsed / (double)repetitions);
-        free(text);
-    }
-    return 0;
-}
-
-int main(int argc, char **argv)
-{
-    if (argc == 2 && strcmp(argv[1], "--benchmark") == 0)
-    {
-        return test_benchmark();
-    }
-    if (argc != 1)
-    {
-        (void)fputs("usage: config_parser_scale [--benchmark]\n", stderr);
-        return 1;
-    }
     if (!test_valid_grammar_and_order() || !test_malformed_inputs() ||
         !test_early_duplicate() || !test_late_duplicate() ||
         !test_unique_entry_counts() || !test_allocation_failure_cleanup())

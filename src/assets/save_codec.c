@@ -4,59 +4,9 @@
  * SPDX-License-Identifier: MIT
  */
 
-/* Owns checked cursor movement, endian primitives, and signed bit mappings. */
-
 #include "save_internal.h"
 
 #include <limits.h>
-#include <string.h>
-
-void aforc_save_bounded_reader_init(AFORC_SaveBoundedReader *reader,
-                                    const void *data,
-                                    size_t size)
-{
-    reader->data = (const uint8_t *)data;
-    reader->size = size;
-    reader->cursor = 0u;
-}
-
-bool aforc_save_bounded_reader_take(AFORC_SaveBoundedReader *reader,
-                                    size_t size,
-                                    const uint8_t **output)
-{
-    if (reader == NULL || output == NULL || reader->cursor > reader->size ||
-        size > reader->size - reader->cursor)
-    {
-        return false;
-    }
-    *output = reader->data + reader->cursor;
-    reader->cursor += size;
-    return true;
-}
-
-void aforc_save_bounded_writer_init(AFORC_SaveBoundedWriter *writer,
-                                    void *data,
-                                    size_t size,
-                                    size_t cursor)
-{
-    writer->data = (uint8_t *)data;
-    writer->size = size;
-    writer->cursor = cursor;
-}
-
-bool aforc_save_bounded_writer_take(AFORC_SaveBoundedWriter *writer,
-                                    size_t size,
-                                    uint8_t **output)
-{
-    if (writer == NULL || output == NULL || writer->cursor > writer->size ||
-        size > writer->size - writer->cursor)
-    {
-        return false;
-    }
-    *output = writer->data + writer->cursor;
-    writer->cursor += size;
-    return true;
-}
 
 /* Save bytes are explicitly little-endian, independent of host byte order. */
 void aforc_save_store_u16(uint8_t *destination, uint16_t value)
@@ -106,62 +56,6 @@ uint64_t aforc_save_load_u64(const uint8_t *source)
         value |= (uint64_t)source[index] << (index * 8u);
     }
     return value;
-}
-
-bool aforc_save_bounded_writer_write_bytes(AFORC_SaveBoundedWriter *writer,
-                                           const void *source,
-                                           size_t size)
-{
-    uint8_t *destination;
-
-    if (!aforc_save_bounded_writer_take(writer, size, &destination))
-    {
-        return false;
-    }
-    if (size > 0u)
-    {
-        memcpy(destination, source, size);
-    }
-    return true;
-}
-
-bool aforc_save_bounded_writer_write_u16(AFORC_SaveBoundedWriter *writer,
-                                         uint16_t value)
-{
-    uint8_t *destination;
-
-    if (!aforc_save_bounded_writer_take(writer, 2u, &destination))
-    {
-        return false;
-    }
-    aforc_save_store_u16(destination, value);
-    return true;
-}
-
-bool aforc_save_bounded_writer_write_u32(AFORC_SaveBoundedWriter *writer,
-                                         uint32_t value)
-{
-    uint8_t *destination;
-
-    if (!aforc_save_bounded_writer_take(writer, 4u, &destination))
-    {
-        return false;
-    }
-    aforc_save_store_u32(destination, value);
-    return true;
-}
-
-bool aforc_save_bounded_writer_write_u64(AFORC_SaveBoundedWriter *writer,
-                                         uint64_t value)
-{
-    uint8_t *destination;
-
-    if (!aforc_save_bounded_writer_take(writer, 8u, &destination))
-    {
-        return false;
-    }
-    aforc_save_store_u64(destination, value);
-    return true;
 }
 
 uint32_t aforc_save_signed_i32_bits(int32_t value)

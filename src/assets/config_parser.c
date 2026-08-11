@@ -17,15 +17,12 @@
 
 AFORC_ConfigLimits aforc_config_limits_default(void)
 {
-    AFORC_ConfigLimits limits;
-
-    limits.max_input_bytes = AFORC_CONFIG_DEFAULT_MAX_INPUT_BYTES;
-    limits.max_line_bytes = AFORC_CONFIG_DEFAULT_MAX_LINE_BYTES;
-    limits.max_entries = AFORC_CONFIG_DEFAULT_MAX_ENTRIES;
-    limits.max_section_bytes = AFORC_CONFIG_DEFAULT_MAX_SECTION_BYTES;
-    limits.max_key_bytes = AFORC_CONFIG_DEFAULT_MAX_KEY_BYTES;
-    limits.max_value_bytes = AFORC_CONFIG_DEFAULT_MAX_VALUE_BYTES;
-    return limits;
+    return (AFORC_ConfigLimits){AFORC_CONFIG_DEFAULT_MAX_INPUT_BYTES,
+                                AFORC_CONFIG_DEFAULT_MAX_LINE_BYTES,
+                                AFORC_CONFIG_DEFAULT_MAX_ENTRIES,
+                                AFORC_CONFIG_DEFAULT_MAX_SECTION_BYTES,
+                                AFORC_CONFIG_DEFAULT_MAX_KEY_BYTES,
+                                AFORC_CONFIG_DEFAULT_MAX_VALUE_BYTES};
 }
 
 static bool aforc_config_space(unsigned char character)
@@ -105,7 +102,7 @@ AFORC_Status aforc_config_parse(const char *input,
                                 const AFORC_ConfigLimits *limits,
                                 AFORC_Config *output)
 {
-    AFORC_ConfigBuilder builder = {NULL, 0u, 0u, 0u, {NULL, 0u}};
+    AFORC_ConfigBuilder builder = {0};
     char *section = NULL;
     size_t section_size = 0u;
     size_t position = 0u;

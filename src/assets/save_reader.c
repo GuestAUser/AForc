@@ -34,8 +34,6 @@ static AFORC_Status aforc_save_reader_take(AFORC_SaveReader *reader,
                                            size_t size,
                                            const uint8_t **output)
 {
-    AFORC_SaveBoundedReader bytes;
-
     if (reader == NULL || output == NULL)
     {
         return AFORC_ERROR_INVALID_ARGUMENT;
@@ -44,13 +42,12 @@ static AFORC_Status aforc_save_reader_take(AFORC_SaveReader *reader,
     {
         return AFORC_ERROR_STATE;
     }
-    aforc_save_bounded_reader_init(&bytes, reader->payload, reader->size);
-    bytes.cursor = reader->cursor;
-    if (!aforc_save_bounded_reader_take(&bytes, size, output))
+    if (size > reader->size - reader->cursor)
     {
         return AFORC_ERROR_END_OF_STREAM;
     }
-    reader->cursor = bytes.cursor;
+    *output = reader->payload + reader->cursor;
+    reader->cursor += size;
     return AFORC_OK;
 }
 

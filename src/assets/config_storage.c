@@ -8,8 +8,6 @@
 
 #include "config_internal.h"
 
-#include "assets_internal.h"
-
 #include <stdlib.h>
 #include <string.h>
 
@@ -86,7 +84,7 @@ AFORC_Status aforc_config_builder_append(AFORC_ConfigBuilder *builder,
                                          AFORC_ConfigRange key,
                                          AFORC_ConfigRange value)
 {
-    AFORC_ConfigEntry entry;
+    AFORC_ConfigEntry entry = {0};
     AFORC_Status status;
 
     if (aforc_config_index_contains(
@@ -113,9 +111,6 @@ AFORC_Status aforc_config_builder_append(AFORC_ConfigBuilder *builder,
         }
     }
 
-    entry.section = NULL;
-    entry.key = NULL;
-    entry.value = NULL;
     status = aforc_config_duplicate_range(section, &entry.section);
     if (status == AFORC_OK)
     {

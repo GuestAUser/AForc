@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: MIT
  */
 
-#define _POSIX_C_SOURCE 200809L
-
 #include "config_parser_scale_support.h"
+
+#include "aforc/assets.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -143,13 +143,4 @@ bool aforc_config_scale_parse_status(const char *text,
 
     aforc_config_release(&config);
     return passed;
-}
-
-double aforc_config_scale_elapsed_milliseconds(const struct timespec *start,
-                                               const struct timespec *end)
-{
-    const double seconds = (double)(end->tv_sec - start->tv_sec);
-    const double nanoseconds = (double)(end->tv_nsec - start->tv_nsec);
-
-    return (seconds * 1000.0) + (nanoseconds / 1000000.0);
 }

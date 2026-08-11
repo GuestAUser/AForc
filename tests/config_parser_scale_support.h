@@ -7,9 +7,7 @@
 #ifndef AFORC_CONFIG_PARSER_SCALE_SUPPORT_H
 #define AFORC_CONFIG_PARSER_SCALE_SUPPORT_H
 
-#include "aforc/assets.h"
-
-#include <time.h>
+#include "aforc/common.h"
 
 void *aforc_config_test_malloc(size_t size);
 void *aforc_config_test_realloc(void *memory, size_t size);
@@ -24,7 +22,5 @@ char *aforc_config_scale_make_config(size_t entry_count,
 bool aforc_config_scale_parse_status(const char *text,
                                      size_t text_size,
                                      AFORC_Status expected);
-double aforc_config_scale_elapsed_milliseconds(const struct timespec *start,
-                                               const struct timespec *end);
 
 #endif

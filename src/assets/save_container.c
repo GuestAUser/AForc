@@ -20,7 +20,6 @@ AFORC_Status aforc_save_writer_finish(const AFORC_SaveWriter *writer,
     uint8_t *container;
     uint32_t payload_checksum;
     uint32_t header_checksum;
-    AFORC_SaveBoundedWriter bytes;
 
     if (output == NULL)
     {
@@ -52,30 +51,22 @@ AFORC_Status aforc_save_writer_finish(const AFORC_SaveWriter *writer,
     {
         return AFORC_ERROR_OUT_OF_MEMORY;
     }
-    aforc_save_bounded_writer_init(&bytes, container, container_size, 0u);
     payload_checksum = aforc_save_crc32(writer->payload, writer->size);
 
     /* Header and payload CRCs cover distinct trust boundaries in the format. */
-    if (!aforc_save_bounded_writer_write_bytes(&bytes, magic, sizeof(magic)) ||
-        !aforc_save_bounded_writer_write_u16(&bytes,
-                                             AFORC_SAVE_CONTAINER_VERSION) ||
-        !aforc_save_bounded_writer_write_u16(&bytes, UINT16_C(0)) ||
-        !aforc_save_bounded_writer_write_u32(&bytes, writer->schema_version) ||
-        !aforc_save_bounded_writer_write_u64(&bytes, (uint64_t)writer->size) ||
-        !aforc_save_bounded_writer_write_u32(&bytes, payload_checksum))
-    {
-        free(container);
-        return AFORC_ERROR_OVERFLOW;
-    }
+    memcpy(container, magic, sizeof(magic));
+    aforc_save_store_u16(container + 4u, AFORC_SAVE_CONTAINER_VERSION);
+    aforc_save_store_u16(container + 6u, UINT16_C(0));
+    aforc_save_store_u32(container + 8u, writer->schema_version);
+    aforc_save_store_u64(container + 12u, (uint64_t)writer->size);
+    aforc_save_store_u32(container + 20u, payload_checksum);
     header_checksum = aforc_save_crc32(container, 24u);
-    if (!aforc_save_bounded_writer_write_u32(&bytes, header_checksum) ||
-        !aforc_save_bounded_writer_write_bytes(
-            &bytes, writer->payload, writer->size))
+    aforc_save_store_u32(container + 24u, header_checksum);
+    if (writer->size > 0u)
     {
-        free(container);
-        return AFORC_ERROR_OVERFLOW;
+        memcpy(
+            container + AFORC_SAVE_HEADER_SIZE, writer->payload, writer->size);
     }
-
     output->data = container;
     output->size = container_size;
     return AFORC_OK;
