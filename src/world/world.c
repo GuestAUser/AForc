@@ -6,6 +6,8 @@
 
 #include "world_private.h"
 
+#include <stdlib.h>
+
 /*
  * Allocation-free geometry primitives shared by world consumers.
  *
@@ -29,13 +31,8 @@ aforc_world_point_add(AFORC_Point left, AFORC_Point right, AFORC_Point *out_sum)
 
 uint64_t aforc_world_point_manhattan(AFORC_Point left, AFORC_Point right)
 {
-    const uint64_t delta_x = left.x >= right.x
-                                 ? (uint64_t)((int64_t)left.x - right.x)
-                                 : (uint64_t)((int64_t)right.x - left.x);
-    const uint64_t delta_y = left.y >= right.y
-                                 ? (uint64_t)((int64_t)left.y - right.y)
-                                 : (uint64_t)((int64_t)right.y - left.y);
-    return delta_x + delta_y;
+    return (uint64_t)llabs((long long)left.x - right.x) +
+           (uint64_t)llabs((long long)left.y - right.y);
 }
 
 bool aforc_world_rect_is_empty(AFORC_Rect rect)

@@ -59,22 +59,11 @@ struct AFORC_PathWorkspace
 
 static bool path_u64_add(uint64_t left, uint64_t right, uint64_t *out_sum)
 {
-    if (out_sum == NULL || right > UINT64_MAX - left)
+    if (right > UINT64_MAX - left)
     {
         return false;
     }
     *out_sum = left + right;
-    return true;
-}
-
-static bool
-path_u64_multiply(uint64_t left, uint64_t right, uint64_t *out_product)
-{
-    if (out_product == NULL || (left != 0U && right > UINT64_MAX / left))
-    {
-        return false;
-    }
-    *out_product = left * right;
     return true;
 }
 
@@ -90,8 +79,7 @@ static AFORC_Point path_point_from_index(const AFORC_TileMap *map, size_t index)
 
 AFORC_PathOptions aforc_path_options_default(void)
 {
-    const AFORC_PathOptions options = {AFORC_PATH_NONE, 0U};
-    return options;
+    return (AFORC_PathOptions){AFORC_PATH_NONE, 0U};
 }
 
 AFORC_Status aforc_path_workspace_create(const AFORC_Allocator *allocator,
@@ -318,11 +306,10 @@ static size_t path_heap_pop(PathHeap *heap)
     return result;
 }
 
-static AFORC_Status path_heuristic(const AFORC_TileMap *map,
-                                   size_t from_index,
-                                   size_t goal_index,
-                                   bool diagonal,
-                                   uint64_t *out_heuristic)
+static uint64_t path_heuristic(const AFORC_TileMap *map,
+                               size_t from_index,
+                               size_t goal_index,
+                               bool diagonal)
 {
     const AFORC_Point from = path_point_from_index(map, from_index);
     const AFORC_Point goal = path_point_from_index(map, goal_index);
@@ -332,31 +319,13 @@ static AFORC_Status path_heuristic(const AFORC_TileMap *map,
     const uint64_t delta_y = from.y >= goal.y
                                  ? (uint64_t)((int64_t)from.y - goal.y)
                                  : (uint64_t)((int64_t)goal.y - from.y);
-    uint64_t first;
-    uint64_t second;
-
-    if (out_heuristic == NULL)
-    {
-        return AFORC_ERROR_INVALID_ARGUMENT;
-    }
     if (!diagonal)
     {
-        if (!path_u64_add(delta_x, delta_y, &first) ||
-            !path_u64_multiply(first, PATH_CARDINAL_COST, out_heuristic))
-        {
-            return AFORC_ERROR_OVERFLOW;
-        }
-        return AFORC_OK;
+        return (delta_x + delta_y) * PATH_CARDINAL_COST;
     }
-    first = delta_x < delta_y ? delta_x : delta_y;
-    second = delta_x > delta_y ? delta_x - delta_y : delta_y - delta_x;
-    if (!path_u64_multiply(first, PATH_DIAGONAL_COST, &first) ||
-        !path_u64_multiply(second, PATH_CARDINAL_COST, &second) ||
-        !path_u64_add(first, second, out_heuristic))
-    {
-        return AFORC_ERROR_OVERFLOW;
-    }
-    return AFORC_OK;
+    return (delta_x < delta_y ? delta_x : delta_y) * PATH_DIAGONAL_COST +
+           (delta_x > delta_y ? delta_x - delta_y : delta_y - delta_x) *
+               PATH_CARDINAL_COST;
 }
 
 static AFORC_Status path_write(const AFORC_TileMap *map,
@@ -471,15 +440,8 @@ static AFORC_Status path_search(AFORC_PathWorkspace *workspace,
     start_index = aforc_world_point_index_internal(map, start);
     goal_index = aforc_world_point_index_internal(map, goal);
     path_workspace_node(workspace, start_index)->cost = 0U;
-    status = path_heuristic(map,
-                            start_index,
-                            goal_index,
-                            request->diagonal,
-                            &workspace->nodes[start_index].heuristic);
-    if (status != AFORC_OK)
-    {
-        return status;
-    }
+    workspace->nodes[start_index].heuristic =
+        path_heuristic(map, start_index, goal_index, request->diagonal);
     workspace->nodes[start_index].score =
         workspace->nodes[start_index].heuristic;
     workspace->nodes[start_index].state = PATH_NODE_OPEN;
@@ -531,7 +493,6 @@ static AFORC_Status path_search(AFORC_PathWorkspace *workspace,
             uint64_t step_cost;
             uint64_t candidate_cost;
             uint64_t candidate_score;
-            AFORC_Status operation_status;
 
             if (!aforc_world_coordinates_contained_internal(
                     map, neighbor_x, neighbor_y))
@@ -580,15 +541,8 @@ static AFORC_Status path_search(AFORC_PathWorkspace *workspace,
             }
             if (neighbor_node->state == PATH_NODE_UNSEEN)
             {
-                operation_status = path_heuristic(map,
-                                                  neighbor_index,
-                                                  goal_index,
-                                                  request->diagonal,
-                                                  &neighbor_node->heuristic);
-                if (operation_status != AFORC_OK)
-                {
-                    return operation_status;
-                }
+                neighbor_node->heuristic = path_heuristic(
+                    map, neighbor_index, goal_index, request->diagonal);
             }
             if (!path_u64_add(
                     candidate_cost, neighbor_node->heuristic, &candidate_score))
@@ -601,10 +555,10 @@ static AFORC_Status path_search(AFORC_PathWorkspace *workspace,
             if (neighbor_node->state == PATH_NODE_UNSEEN)
             {
                 neighbor_node->state = PATH_NODE_OPEN;
-                operation_status = path_heap_push(&heap, neighbor_index);
-                if (operation_status != AFORC_OK)
+                status = path_heap_push(&heap, neighbor_index);
+                if (status != AFORC_OK)
                 {
-                    return operation_status;
+                    return status;
                 }
             }
             else

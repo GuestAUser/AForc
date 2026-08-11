@@ -35,8 +35,8 @@ bool astar_test_compare_query(AFORC_PathWorkspace *workspace,
 bool astar_test_create_workspace(const AFORC_Allocator *allocator,
                                  size_t cell_capacity,
                                  AFORC_PathWorkspace **out_workspace);
-bool astar_test_benchmark_size(int32_t width,
-                               int32_t height,
-                               size_t iterations);
+bool astar_test_workspace_reuse(int32_t width,
+                                int32_t height,
+                                size_t iterations);
 
 #endif

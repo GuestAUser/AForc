@@ -16,11 +16,6 @@
  * interface. Keeping that split avoids repeated bounds work inside algorithms.
  */
 
-static bool world_i64_fits_i32(int64_t value)
-{
-    return value >= (int64_t)INT32_MIN && value <= (int64_t)INT32_MAX;
-}
-
 AFORC_Status aforc_world_point_from_i64_internal(int64_t x,
                                                  int64_t y,
                                                  AFORC_Point *out_point)
@@ -29,7 +24,7 @@ AFORC_Status aforc_world_point_from_i64_internal(int64_t x,
     {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
-    if (!world_i64_fits_i32(x) || !world_i64_fits_i32(y))
+    if (x < INT32_MIN || x > INT32_MAX || y < INT32_MIN || y > INT32_MAX)
     {
         return AFORC_ERROR_OVERFLOW;
     }

@@ -314,9 +314,9 @@ int main(void)
         return 4;
     if (!test_option_boundaries())
         return 5;
-    if (!astar_test_benchmark_size(72, 36, 1000U))
+    if (!astar_test_workspace_reuse(72, 36, 1000U))
         return 6;
-    if (!astar_test_benchmark_size(120, 60, 1000U))
+    if (!astar_test_workspace_reuse(120, 60, 1000U))
         return 7;
     (void)puts("astar workspace: ok");
     return 0;

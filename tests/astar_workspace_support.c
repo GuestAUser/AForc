@@ -6,10 +6,7 @@
 
 #include "astar_workspace_support.h"
 
-#include <inttypes.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 
 typedef struct QueryResult
 {
@@ -182,19 +179,9 @@ bool astar_test_create_workspace(const AFORC_Allocator *allocator,
     return status == AFORC_OK;
 }
 
-static uint64_t timestamp_ns(void)
-{
-    struct timespec value;
-
-    if (timespec_get(&value, TIME_UTC) != TIME_UTC || value.tv_sec < 0)
-    {
-        return 0U;
-    }
-    return (uint64_t)value.tv_sec * UINT64_C(1000000000) +
-           (uint64_t)value.tv_nsec;
-}
-
-bool astar_test_benchmark_size(int32_t width, int32_t height, size_t iterations)
+bool astar_test_workspace_reuse(int32_t width,
+                                int32_t height,
+                                size_t iterations)
 {
     AstarTestTrackingAllocator tracking = {0};
     AFORC_Allocator allocator = astar_test_tracking_allocator(&tracking);
@@ -209,11 +196,7 @@ bool astar_test_benchmark_size(int32_t width, int32_t height, size_t iterations)
     size_t length = 0U;
     size_t index;
     size_t allocations_before;
-    size_t legacy_allocations;
     size_t workspace_allocations;
-    uint64_t start_ns;
-    uint64_t legacy_ns;
-    uint64_t workspace_ns;
     AFORC_Status legacy_status = AFORC_ERROR_STATE;
     AFORC_Status workspace_status = AFORC_ERROR_STATE;
     bool passed = false;
@@ -231,26 +214,18 @@ bool astar_test_benchmark_size(int32_t width, int32_t height, size_t iterations)
         goto cleanup;
     }
     options.max_visited = 128U;
+    legacy_status = aforc_pathfind_astar(map,
+                                         0U,
+                                         start,
+                                         goal,
+                                         astar_test_tile_blocked,
+                                         NULL,
+                                         &options,
+                                         legacy_points,
+                                         cells,
+                                         &length);
     allocations_before = tracking.allocations;
-    start_ns = timestamp_ns();
-    for (index = 0U; start_ns != 0U && index < iterations; ++index)
-    {
-        legacy_status = aforc_pathfind_astar(map,
-                                             0U,
-                                             start,
-                                             goal,
-                                             astar_test_tile_blocked,
-                                             NULL,
-                                             &options,
-                                             legacy_points,
-                                             cells,
-                                             &length);
-    }
-    legacy_ns = timestamp_ns() - start_ns;
-    legacy_allocations = tracking.allocations - allocations_before;
-    allocations_before = tracking.allocations;
-    start_ns = timestamp_ns();
-    for (index = 0U; start_ns != 0U && index < iterations; ++index)
+    for (index = 0U; index < iterations; ++index)
     {
         workspace_status =
             aforc_pathfind_astar_workspace(workspace,
@@ -264,20 +239,8 @@ bool astar_test_benchmark_size(int32_t width, int32_t height, size_t iterations)
                                            &reused_points,
                                            &length);
     }
-    workspace_ns = timestamp_ns() - start_ns;
     workspace_allocations = tracking.allocations - allocations_before;
-    passed = start_ns != 0U && legacy_status == workspace_status &&
-             workspace_allocations == 0U;
-    (void)printf("astar benchmark %dx%d max_visited=128 iterations=%zu "
-                 "legacy_ns=%" PRIu64 " workspace_ns=%" PRIu64
-                 " legacy_allocations=%zu workspace_query_allocations=%zu\n",
-                 width,
-                 height,
-                 iterations,
-                 legacy_ns,
-                 workspace_ns,
-                 legacy_allocations,
-                 workspace_allocations);
+    passed = legacy_status == workspace_status && workspace_allocations == 0U;
 
 cleanup:
     free(legacy_points);
