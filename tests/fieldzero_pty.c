@@ -478,8 +478,8 @@ static bool fieldzero_run_supported(const char *executable)
     static const char dash[] = "\x1b[120;1:1u";
     static const char release_actions[] =
         "\x1b[120;1:3u\x1b[32;1:3u\x1b[97;1:3u";
-    static const char quit_key[] = "\x1b[113;1:1u\x1b[113;1:3u";
-    static const char quit_confirm[] = "\x1b[113;1:1u";
+    static const char quit_press[] = "\x1b[113;1:1u";
+    static const char quit_release[] = "\x1b[113;1:3u";
     FieldzeroPtyProcess process;
     size_t start;
     bool passed = false;
@@ -557,8 +557,9 @@ static bool fieldzero_run_supported(const char *executable)
         goto done;
     }
     start = process.output_size;
-    if (!fieldzero_check(fieldzero_write_all(
-                             process.master, quit_key, sizeof(quit_key) - 1u) &&
+    if (!fieldzero_check(fieldzero_write_all(process.master,
+                                             quit_press,
+                                             sizeof(quit_press) - 1u) &&
                              fieldzero_collect(
                                  &process, 1000u, fieldzero_quit_marker, start),
                          &process,
@@ -566,8 +567,18 @@ static bool fieldzero_run_supported(const char *executable)
     {
         goto done;
     }
+    if (!fieldzero_check(fieldzero_write_all(process.master,
+                                             quit_release,
+                                             sizeof(quit_release) - 1u) &&
+                             fieldzero_collect(&process, 100u, NULL, 0u) &&
+                             !fieldzero_process_exited(&process),
+                         &process,
+                         "quit release closed the supported run"))
+    {
+        goto done;
+    }
     (void)fieldzero_write_all(
-        process.master, quit_confirm, sizeof(quit_confirm) - 1u);
+        process.master, quit_press, sizeof(quit_press) - 1u);
     if (!fieldzero_check(fieldzero_wait_for_exit(&process, 2000u),
                          &process,
                          "supported run did not exit before timeout") ||
