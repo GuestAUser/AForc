@@ -59,7 +59,7 @@ static void fieldzero_print_usage(FILE *stream, const char *program_name)
         "  --no-color        Use monochrome presentation\n"
         "  --help            Show this help and exit\n"
         "\n"
-        "Controls: arrows or A/D move, Space or Z jumps, X dashes,\n"
+        "Controls: arrows or A/D move, Space or Z jumps, K dashes,\n"
         "          ? help, P pause, R restart, Q or Escape quit/back.\n",
         program_name != NULL ? program_name : "aforc-fieldzero");
 }
