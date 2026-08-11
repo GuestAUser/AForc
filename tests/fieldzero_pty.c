@@ -46,6 +46,7 @@ static const char fieldzero_supported_capabilities[] = "\x1b[?27u";
 static const char fieldzero_unsupported_capabilities[] = "\x1b[?1u";
 static const char fieldzero_title_marker[] = "ENTER BEGIN   ? HELP   Q QUIT";
 static const char fieldzero_play_marker[] = "A/D MOVE   SPACE/Z JUMP   K DASH";
+static const char fieldzero_quit_marker[] = "Q CONFIRM   ESC CONTINUE";
 static const char fieldzero_resize_marker[] =
     "FIELD ZERO REQUIRES 80x24 - RESIZE TERMINAL";
 static const char fieldzero_runtime_failure[] = "aforc-fieldzero runtime:";
@@ -478,6 +479,7 @@ static bool fieldzero_run_supported(const char *executable)
     static const char release_actions[] =
         "\x1b[107;1:3u\x1b[32;1:3u\x1b[97;1:3u";
     static const char quit_key[] = "\x1b[113;1:1u\x1b[113;1:3u";
+    static const char quit_confirm[] = "\x1b[113;1:1u";
     FieldzeroPtyProcess process;
     size_t start;
     bool passed = false;
@@ -554,16 +556,23 @@ static bool fieldzero_run_supported(const char *executable)
                                              sizeof(release_actions) - 1u) &&
                              fieldzero_collect(&process, 100u, NULL, 0u),
                          &process,
-                         "action release input failed") ||
-        !fieldzero_check(fieldzero_write_all(
+                         "action release input failed"))
+    {
+        goto done;
+    }
+    start = process.output_size;
+    if (!fieldzero_check(fieldzero_write_all(
                              process.master, quit_key, sizeof(quit_key) - 1u) &&
-                             fieldzero_collect(&process, 100u, NULL, 0u) &&
-                             fieldzero_write_all(process.master,
-                                                 quit_key,
-                                                 sizeof(quit_key) - 1u),
+                             fieldzero_collect(
+                                 &process, 1000u, fieldzero_quit_marker, start),
                          &process,
-                         "quit input failed") ||
-        !fieldzero_check(fieldzero_wait_for_exit(&process, 2000u),
+                         "quit confirmation was not rendered"))
+    {
+        goto done;
+    }
+    (void)fieldzero_write_all(
+        process.master, quit_confirm, sizeof(quit_confirm) - 1u);
+    if (!fieldzero_check(fieldzero_wait_for_exit(&process, 2000u),
                          &process,
                          "supported run did not exit before timeout") ||
         !fieldzero_check(fieldzero_exit_code(&process) == 0,
