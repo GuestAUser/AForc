@@ -509,8 +509,31 @@ static bool fieldzero_run_supported(const char *executable)
         !fieldzero_check(
             fieldzero_collect(&process, 1000u, fieldzero_play_marker, 0u),
             &process,
-            "supported run did not enter play") ||
-        !fieldzero_check(fieldzero_send_ignored_burst(&process),
+            "supported run did not enter play"))
+    {
+        goto done;
+    }
+
+    start = process.output_size;
+    if (!fieldzero_check(
+            fieldzero_resize(&process, 79u, 23u) &&
+                fieldzero_collect(
+                    &process, 1000u, fieldzero_resize_marker, start),
+            &process,
+            "small-terminal resize screen was not rendered"))
+    {
+        goto done;
+    }
+    start = process.output_size;
+    if (!fieldzero_check(fieldzero_resize(&process, 120u, 40u) &&
+                             fieldzero_collect(
+                                 &process, 1000u, fieldzero_play_marker, start),
+                         &process,
+                         "play screen was not restored after resize"))
+    {
+        goto done;
+    }
+    if (!fieldzero_check(fieldzero_send_ignored_burst(&process),
                          &process,
                          "ignored input overflow terminated the run") ||
         !fieldzero_check(
@@ -531,27 +554,7 @@ static bool fieldzero_run_supported(const char *executable)
                                              sizeof(release_actions) - 1u) &&
                              fieldzero_collect(&process, 100u, NULL, 0u),
                          &process,
-                         "action release input failed"))
-    {
-        goto done;
-    }
-
-    start = process.output_size;
-    if (!fieldzero_check(
-            fieldzero_resize(&process, 79u, 23u) &&
-                fieldzero_collect(
-                    &process, 1000u, fieldzero_resize_marker, start),
-            &process,
-            "small-terminal resize screen was not rendered"))
-    {
-        goto done;
-    }
-    start = process.output_size;
-    if (!fieldzero_check(fieldzero_resize(&process, 120u, 40u) &&
-                             fieldzero_collect(
-                                 &process, 1000u, fieldzero_play_marker, start),
-                         &process,
-                         "play screen was not restored after resize") ||
+                         "action release input failed") ||
         !fieldzero_check(fieldzero_write_all(
                              process.master, quit_key, sizeof(quit_key) - 1u) &&
                              fieldzero_collect(&process, 100u, NULL, 0u) &&
