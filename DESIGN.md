@@ -74,3 +74,18 @@ Use a borders-only strategy. Depth comes from the warm fixed plate, full-strengt
 - The fixed canvas makes the asset readable in light and dark embeddings. The full wordmark remains vector geometry at every scale.
 - Accessibility metadata must stay user-facing and descriptive; author and license provenance stays in the separate XML comment.
 - **Accepted debt:** none.
+
+## 9. Terminal UI Primitives
+
+### FIELD ZERO Survey Suit
+
+- **Structure:** a `2 x 2` terminal-cell sprite rendered as a `2 x 4`
+  half-block pixel grid. Its lower row stays anchored to the one-cell gameplay
+  position, so presentation never changes collision.
+- **Color:** canvas supplies transparency, ink defines the suit, framework
+  defines the boots, and exactly one live-origin signal cell defines the visor.
+- **States:** facing mirrors the visor, grounded movement alternates one boot,
+  reduced motion holds a neutral stance, and dash feedback remains in the
+  existing directional trail rather than distorting the silhouette.
+- **Fallback:** `--no-color` keeps the same block silhouette using terminal
+  defaults. The sprite clips to the arena and never writes raw ANSI sequences.

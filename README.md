@@ -127,7 +127,7 @@ calibration records; the seed changes scenery only.
 | --- | --- |
 | Left/Right arrows or `A`/`D` | Move |
 | Space or `Z` | Jump |
-| `X` | Air dash |
+| `K` | Air dash |
 | `?` | Help |
 | `P` | Pause |
 | `R` | Restart current room |
