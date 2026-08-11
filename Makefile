@@ -42,10 +42,41 @@ ROGUELIKE_SOURCES := \
 	examples/roguelike/qa/smoke.c
 ROGUELIKE_OBJECTS := $(patsubst examples/%.c,$(BUILD_DIR)/obj/examples/%.o,$(ROGUELIKE_SOURCES))
 ROGUELIKE_DEPS := $(ROGUELIKE_OBJECTS:.o=.d)
+FIELDZERO_DOMAIN_SOURCES := \
+	examples/fieldzero/content/horizon.c \
+	examples/fieldzero/content/origin.c \
+	examples/fieldzero/content/registry.c \
+	examples/fieldzero/content/shear.c \
+	examples/fieldzero/content/span.c \
+	examples/fieldzero/content/well.c \
+	examples/fieldzero/game/collision.c \
+	examples/fieldzero/game/game.c \
+	examples/fieldzero/game/progression.c \
+	examples/fieldzero/game/simulation.c \
+	examples/fieldzero/presentation/effects.c \
+	examples/fieldzero/presentation/render.c \
+	examples/fieldzero/presentation/render_ui.c \
+	examples/fieldzero/presentation/render_world.c \
+	examples/fieldzero/qa/digests.c \
+	examples/fieldzero/qa/regression.c \
+	examples/fieldzero/qa/validators.c
+FIELDZERO_SOURCES := \
+	examples/fieldzero/main.c \
+	examples/fieldzero/app/engine_hooks.c \
+	examples/fieldzero/app/input_actions.c \
+	examples/fieldzero/app/runtime.c \
+	examples/fieldzero/app/scenes.c \
+	examples/fieldzero/qa/smoke.c \
+	$(FIELDZERO_DOMAIN_SOURCES)
+FIELDZERO_DOMAIN_OBJECTS := $(patsubst examples/%.c,$(BUILD_DIR)/obj/examples/%.o,$(FIELDZERO_DOMAIN_SOURCES))
+FIELDZERO_OBJECTS := $(patsubst examples/%.c,$(BUILD_DIR)/obj/examples/%.o,$(FIELDZERO_SOURCES))
+FIELDZERO_REGRESSION_OBJECTS := $(BUILD_DIR)/obj/examples/fieldzero/qa/regression_main.o $(FIELDZERO_DOMAIN_OBJECTS)
+FIELDZERO_DEPS := $(FIELDZERO_OBJECTS:.o=.d) $(FIELDZERO_REGRESSION_OBJECTS:.o=.d)
 SCENE_TEST_SOURCES := tests/scene_reentrancy.c
 CORE_TEST_SOURCES := tests/core_lifecycle.c
 INPUT_TEST_SOURCES := tests/input_protocol.c
 TERMINAL_TEST_SOURCES := tests/terminal_lifecycle.c
+FIELDZERO_PTY_TEST_SOURCES := tests/fieldzero_pty.c
 SAVE_TEST_SOURCES := tests/save_crc.c
 ASSETS_TEST_SOURCES := tests/assets_contracts.c
 CONFIG_BOUNDARIES_TEST_SOURCES := tests/config_parser_boundaries.c
@@ -65,6 +96,7 @@ SCENE_TEST_OBJECTS := $(patsubst tests/%.c,$(BUILD_DIR)/obj/tests/%.o,$(SCENE_TE
 CORE_TEST_OBJECTS := $(patsubst tests/%.c,$(BUILD_DIR)/obj/tests/%.o,$(CORE_TEST_SOURCES))
 INPUT_TEST_OBJECTS := $(patsubst tests/%.c,$(BUILD_DIR)/obj/tests/%.o,$(INPUT_TEST_SOURCES))
 TERMINAL_TEST_OBJECTS := $(patsubst tests/%.c,$(BUILD_DIR)/obj/tests/%.o,$(TERMINAL_TEST_SOURCES))
+FIELDZERO_PTY_TEST_OBJECTS := $(patsubst tests/%.c,$(BUILD_DIR)/obj/tests/%.o,$(FIELDZERO_PTY_TEST_SOURCES))
 SAVE_TEST_OBJECTS := $(patsubst tests/%.c,$(BUILD_DIR)/obj/tests/%.o,$(SAVE_TEST_SOURCES))
 ASSETS_TEST_OBJECTS := $(patsubst tests/%.c,$(BUILD_DIR)/obj/tests/%.o,$(ASSETS_TEST_SOURCES))
 CONFIG_BOUNDARIES_TEST_OBJECTS := $(patsubst tests/%.c,$(BUILD_DIR)/obj/tests/%.o,$(CONFIG_BOUNDARIES_TEST_SOURCES))
@@ -79,6 +111,7 @@ EFFECTS_TEST_OBJECTS := $(patsubst tests/%.c,$(BUILD_DIR)/obj/tests/%.o,$(EFFECT
 UI_TEST_OBJECTS := $(patsubst tests/%.c,$(BUILD_DIR)/obj/tests/%.o,$(UI_TEST_SOURCES))
 TEST_OBJECTS := $(SCENE_TEST_OBJECTS) $(SAVE_TEST_OBJECTS) $(CONFIG_TEST_OBJECTS)
 TEST_OBJECTS += $(CORE_TEST_OBJECTS) $(INPUT_TEST_OBJECTS) $(TERMINAL_TEST_OBJECTS)
+TEST_OBJECTS += $(FIELDZERO_PTY_TEST_OBJECTS)
 TEST_OBJECTS += $(ASSETS_TEST_OBJECTS) $(CONFIG_BOUNDARIES_TEST_OBJECTS) $(SAVE_BOUNDARIES_TEST_OBJECTS)
 TEST_OBJECTS += $(RENDERER_TEST_OBJECTS) $(ECS_TEST_OBJECTS) $(ASTAR_TEST_OBJECTS)
 TEST_OBJECTS += $(WORLD_TEST_OBJECTS)
@@ -97,10 +130,13 @@ PACKAGE_TEST_ROOT ?= $(BUILD_DIR)/package-test
 PACKAGE_TEST_STAGE := $(abspath $(PACKAGE_TEST_ROOT)/stage)
 PACKAGE_TEST_CONSUMER_BUILD := $(abspath $(PACKAGE_TEST_ROOT)/consumer)
 ROGUELIKE := $(BUILD_DIR)/bin/aforc-roguelike
+FIELDZERO := $(BUILD_DIR)/bin/aforc-fieldzero
+FIELDZERO_REGRESSION := $(BUILD_DIR)/bin/aforc-fieldzero-regression
 SCENE_TEST := $(BUILD_DIR)/bin/aforc-scene-reentrancy-test
 CORE_TEST := $(BUILD_DIR)/bin/aforc-core-lifecycle-test
 INPUT_TEST := $(BUILD_DIR)/bin/aforc-input-protocol-test
 TERMINAL_TEST := $(BUILD_DIR)/bin/aforc-terminal-lifecycle-test
+FIELDZERO_PTY_TEST := $(BUILD_DIR)/bin/aforc-fieldzero-pty-test
 SAVE_TEST := $(BUILD_DIR)/bin/aforc-save-crc-test
 ASSETS_TEST := $(BUILD_DIR)/bin/aforc-assets-contracts-test
 CONFIG_BOUNDARIES_TEST := $(BUILD_DIR)/bin/aforc-config-parser-boundaries-test
@@ -115,14 +151,17 @@ EFFECTS_TEST := $(BUILD_DIR)/bin/aforc-effects-regression-test
 UI_TEST := $(BUILD_DIR)/bin/aforc-ui-regression-test
 TEST_BINARIES := $(SCENE_TEST) $(SAVE_TEST) $(CONFIG_TEST)
 TEST_BINARIES += $(CORE_TEST) $(INPUT_TEST) $(TERMINAL_TEST)
+TEST_BINARIES += $(FIELDZERO_PTY_TEST)
 TEST_BINARIES += $(ASSETS_TEST) $(CONFIG_BOUNDARIES_TEST) $(SAVE_BOUNDARIES_TEST)
 TEST_BINARIES += $(RENDERER_TEST) $(ECS_TEST) $(ASTAR_TEST)
 TEST_BINARIES += $(WORLD_TEST)
 TEST_BINARIES += $(RENDERER_LIFECYCLE_TEST) $(EFFECTS_TEST) $(UI_TEST)
+TEST_BINARIES += $(FIELDZERO_REGRESSION)
 FLAGS_STAMP := $(BUILD_DIR)/.build-flags
 
 AFORC_CPPFLAGS := -Iinclude
 AFORC_ROGUELIKE_CPPFLAGS := -Iexamples/roguelike/include
+AFORC_FIELDZERO_CPPFLAGS := -Iexamples/fieldzero/include
 AFORC_CFLAGS := -std=c17 -Wall -Wextra -Wpedantic
 AFORC_CFLAGS += -Wconversion -Wshadow -Wstrict-prototypes -Wmissing-prototypes
 AFORC_LDLIBS :=
@@ -178,13 +217,13 @@ endif
 
 .DEFAULT_GOAL := all
 
-.PHONY: all library example debug release strict sanitize smoke test package-test run install clean help FORCE
+.PHONY: all library example debug release strict sanitize smoke test package-test run run-fieldzero install clean help FORCE
 
 FORCE:
 
 $(FLAGS_STAMP): FORCE
 	@mkdir -p "$(@D)"
-	@signature='$(CC)|$(CPPFLAGS)|$(AFORC_CPPFLAGS)|$(AFORC_ROGUELIKE_CPPFLAGS)|$(AFORC_LIBRARY_CPPFLAGS)|$(CFLAGS)|$(AFORC_CFLAGS)|$(AFORC_LIBRARY_CFLAGS)|$(AFORC_PROGRAM_CFLAGS)|$(LDFLAGS)|$(AFORC_LDFLAGS)|$(AFORC_PROGRAM_LDFLAGS)|$(LDLIBS)|$(AFORC_LDLIBS)'; \
+	@signature='$(CC)|$(CPPFLAGS)|$(AFORC_CPPFLAGS)|$(AFORC_ROGUELIKE_CPPFLAGS)|$(AFORC_FIELDZERO_CPPFLAGS)|$(AFORC_LIBRARY_CPPFLAGS)|$(CFLAGS)|$(AFORC_CFLAGS)|$(AFORC_LIBRARY_CFLAGS)|$(AFORC_PROGRAM_CFLAGS)|$(LDFLAGS)|$(AFORC_LDFLAGS)|$(AFORC_PROGRAM_LDFLAGS)|$(LDLIBS)|$(AFORC_LDLIBS)'; \
 	temporary="$@.tmp"; \
 	printf '%s\n' "$$signature" > "$$temporary"; \
 	if ! cmp -s "$$temporary" "$@"; then \
@@ -198,7 +237,7 @@ all: library example
 
 library: $(LIBRARY)
 
-example: $(ROGUELIKE)
+example: $(ROGUELIKE) $(FIELDZERO)
 
 $(LIBRARY): $(OBJECTS)
 	@mkdir -p "$(@D)"
@@ -225,6 +264,7 @@ $(BUILD_DIR)/obj/examples/%.o: examples/%.c $(FLAGS_STAMP)
 	$(CC) $(CPPFLAGS) $(AFORC_CPPFLAGS) $(AFORC_EXAMPLE_CPPFLAGS) $(CFLAGS) $(AFORC_CFLAGS) $(AFORC_PROGRAM_CFLAGS) -MMD -MP -c "$<" -o "$@"
 
 $(ROGUELIKE_OBJECTS): AFORC_EXAMPLE_CPPFLAGS := $(AFORC_ROGUELIKE_CPPFLAGS)
+$(FIELDZERO_OBJECTS) $(FIELDZERO_REGRESSION_OBJECTS): AFORC_EXAMPLE_CPPFLAGS := $(AFORC_FIELDZERO_CPPFLAGS)
 
 $(BUILD_DIR)/obj/tests/%.o: tests/%.c $(FLAGS_STAMP)
 	@mkdir -p "$(@D)"
@@ -242,6 +282,14 @@ $(ROGUELIKE): $(ROGUELIKE_OBJECTS) $(LIBRARY)
 	@mkdir -p "$(@D)"
 	$(CC) $(LDFLAGS) $(AFORC_LDFLAGS) $(AFORC_PROGRAM_LDFLAGS) $(ROGUELIKE_OBJECTS) $(LIBRARY) $(LDLIBS) $(AFORC_LDLIBS) -o "$@"
 
+$(FIELDZERO): $(FIELDZERO_OBJECTS) $(LIBRARY)
+	@mkdir -p "$(@D)"
+	$(CC) $(LDFLAGS) $(AFORC_LDFLAGS) $(AFORC_PROGRAM_LDFLAGS) $(FIELDZERO_OBJECTS) $(LIBRARY) $(LDLIBS) $(AFORC_LDLIBS) -o "$@"
+
+$(FIELDZERO_REGRESSION): $(FIELDZERO_REGRESSION_OBJECTS) $(LIBRARY)
+	@mkdir -p "$(@D)"
+	$(CC) $(LDFLAGS) $(AFORC_LDFLAGS) $(AFORC_PROGRAM_LDFLAGS) $(FIELDZERO_REGRESSION_OBJECTS) $(LIBRARY) $(LDLIBS) $(AFORC_LDLIBS) -o "$@"
+
 $(SCENE_TEST): $(SCENE_TEST_OBJECTS) $(LIBRARY)
 	@mkdir -p "$(@D)"
 	$(CC) $(LDFLAGS) $(AFORC_LDFLAGS) $(AFORC_PROGRAM_LDFLAGS) $(SCENE_TEST_OBJECTS) $(LIBRARY) $(LDLIBS) $(AFORC_LDLIBS) -o "$@"
@@ -257,6 +305,10 @@ $(INPUT_TEST): $(INPUT_TEST_OBJECTS) $(LIBRARY)
 $(TERMINAL_TEST): $(TERMINAL_TEST_OBJECTS) $(LIBRARY)
 	@mkdir -p "$(@D)"
 	$(CC) $(LDFLAGS) $(AFORC_LDFLAGS) $(AFORC_PROGRAM_LDFLAGS) $(TERMINAL_TEST_OBJECTS) $(LIBRARY) $(LDLIBS) $(AFORC_LDLIBS) -o "$@"
+
+$(FIELDZERO_PTY_TEST): $(FIELDZERO_PTY_TEST_OBJECTS) $(FIELDZERO)
+	@mkdir -p "$(@D)"
+	$(CC) $(LDFLAGS) $(AFORC_LDFLAGS) $(AFORC_PROGRAM_LDFLAGS) $(FIELDZERO_PTY_TEST_OBJECTS) $(LDLIBS) $(AFORC_LDLIBS) -o "$@"
 
 $(SAVE_TEST): $(SAVE_TEST_OBJECTS) $(LIBRARY)
 	@mkdir -p "$(@D)"
@@ -322,17 +374,23 @@ sanitize:
 	$(MAKE) clean
 	$(MAKE) MODE=debug STRICT=1 SANITIZE=1 all test
 
-smoke: $(ROGUELIKE)
+smoke: $(ROGUELIKE) $(FIELDZERO)
 	"$(ROGUELIKE)" --smoke
+	"$(FIELDZERO)" --smoke --seed 2026
 
 test: smoke $(TEST_BINARIES)
 	! "$(ROGUELIKE)" --seed nope
 	! "$(ROGUELIKE)" --seed -1 --smoke
 	! "$(ROGUELIKE)" --seed 1 --seed 2 --smoke
+	! "$(FIELDZERO)" --seed nope
+	! "$(FIELDZERO)" --seed -1 --smoke
+	! "$(FIELDZERO)" --seed 1 --seed 2 --smoke
+	"$(FIELDZERO_REGRESSION)"
 	"$(SCENE_TEST)"
 	"$(CORE_TEST)"
 	"$(INPUT_TEST)"
 	"$(TERMINAL_TEST)"
+	"$(FIELDZERO_PTY_TEST)" "$(FIELDZERO)"
 	"$(SAVE_TEST)"
 	"$(ASSETS_TEST)"
 	"$(CONFIG_BOUNDARIES_TEST)"
@@ -360,6 +418,9 @@ package-test: $(LIBRARY) $(PKG_CONFIG_FILE)
 run: $(ROGUELIKE)
 	"$(ROGUELIKE)"
 
+run-fieldzero: $(FIELDZERO)
+	"$(FIELDZERO)"
+
 install: $(LIBRARY) $(PKG_CONFIG_FILE)
 	install -d \
 		"$(DESTDIR)$(PREFIX)/$(INSTALL_LIBDIR)" \
@@ -376,18 +437,19 @@ clean:
 
 help:
 	@printf '%s\n' \
-		'all       Build the static library and roguelike example (default)' \
-		'example   Build the roguelike example' \
+		'all       Build the static library and both examples (default)' \
+		'example   Build the roguelike and FIELD ZERO examples' \
 		'debug     Build unoptimized binaries with debug symbols' \
 		'release   Build optimized binaries' \
 		'strict    Rebuild with warnings promoted to errors, then test' \
 		'sanitize  Rebuild with ASan/UBSan, then test' \
-		'smoke     Run the deterministic, non-interactive example smoke' \
+		'smoke     Run both deterministic, non-interactive example smokes' \
 		'test      Run example CLI checks, smoke, and regression tests' \
 		'package-test Stage the Make install and run its pkg-config consumer' \
 		'run       Launch the playable terminal roguelike' \
+		'run-fieldzero Launch FIELD ZERO' \
 		'install   Install the library, headers, metadata, and licenses' \
 		'HARDEN=0  Disable supported build hardening (default: 1)' \
 		'clean     Remove Make build artifacts'
 
--include $(DEPS) $(ROGUELIKE_DEPS) $(TEST_DEPS)
+-include $(DEPS) $(ROGUELIKE_DEPS) $(FIELDZERO_DEPS) $(TEST_DEPS)

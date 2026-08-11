@@ -26,7 +26,7 @@ endif()
 
 option(
     AFORC_BUILD_EXAMPLES
-    "Build the AForc roguelike example"
+    "Build the AForc examples"
     "${AFORC_IS_TOP_LEVEL}"
 )
 option(
@@ -323,6 +323,44 @@ if(AFORC_BUILD_EXAMPLES)
     aforc_configure_owned_target(aforc_roguelike)
     target_link_libraries(aforc_roguelike PRIVATE aforc::aforc)
 
+    set(AFORC_FIELDZERO_DOMAIN_SOURCES
+        examples/fieldzero/content/horizon.c
+        examples/fieldzero/content/origin.c
+        examples/fieldzero/content/registry.c
+        examples/fieldzero/content/shear.c
+        examples/fieldzero/content/span.c
+        examples/fieldzero/content/well.c
+        examples/fieldzero/game/collision.c
+        examples/fieldzero/game/game.c
+        examples/fieldzero/game/progression.c
+        examples/fieldzero/game/simulation.c
+        examples/fieldzero/presentation/effects.c
+        examples/fieldzero/presentation/render.c
+        examples/fieldzero/presentation/render_ui.c
+        examples/fieldzero/presentation/render_world.c
+        examples/fieldzero/qa/digests.c
+        examples/fieldzero/qa/regression.c
+        examples/fieldzero/qa/validators.c
+    )
+    set(AFORC_FIELDZERO_SOURCES
+        examples/fieldzero/main.c
+        examples/fieldzero/app/engine_hooks.c
+        examples/fieldzero/app/input_actions.c
+        examples/fieldzero/app/runtime.c
+        examples/fieldzero/app/scenes.c
+        examples/fieldzero/qa/smoke.c
+        ${AFORC_FIELDZERO_DOMAIN_SOURCES}
+    )
+    add_executable(aforc_fieldzero ${AFORC_FIELDZERO_SOURCES})
+    set_target_properties(aforc_fieldzero PROPERTIES
+        OUTPUT_NAME "aforc-fieldzero"
+    )
+    target_include_directories(aforc_fieldzero PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/examples/fieldzero/include"
+    )
+    aforc_configure_owned_target(aforc_fieldzero)
+    target_link_libraries(aforc_fieldzero PRIVATE aforc::aforc)
+
     if(AFORC_TESTS_ACTIVE)
         add_test(NAME roguelike_smoke COMMAND aforc_roguelike --smoke)
         set_tests_properties(roguelike_smoke PROPERTIES TIMEOUT 15)
@@ -347,6 +385,61 @@ if(AFORC_BUILD_EXAMPLES)
             COMMAND aforc_roguelike --seed 1 --seed 2 --smoke
         )
         set_tests_properties(roguelike_duplicate_seed PROPERTIES
+            TIMEOUT 15
+            WILL_FAIL TRUE
+        )
+
+        add_executable(aforc_fieldzero_regression
+            examples/fieldzero/qa/regression_main.c
+            ${AFORC_FIELDZERO_DOMAIN_SOURCES}
+        )
+        set_target_properties(aforc_fieldzero_regression PROPERTIES
+            OUTPUT_NAME "aforc-fieldzero-regression"
+        )
+        target_include_directories(aforc_fieldzero_regression PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/examples/fieldzero/include"
+        )
+        aforc_configure_owned_target(aforc_fieldzero_regression)
+        target_link_libraries(aforc_fieldzero_regression PRIVATE aforc::aforc)
+
+        add_test(NAME fieldzero_regression COMMAND aforc_fieldzero_regression)
+        set_tests_properties(fieldzero_regression PROPERTIES TIMEOUT 30)
+        add_test(NAME fieldzero_smoke COMMAND aforc_fieldzero --smoke)
+        set_tests_properties(fieldzero_smoke PROPERTIES TIMEOUT 15)
+        add_executable(aforc_fieldzero_pty_test tests/fieldzero_pty.c)
+        set_target_properties(aforc_fieldzero_pty_test PROPERTIES
+            OUTPUT_NAME "aforc-fieldzero-pty-test"
+        )
+        aforc_configure_owned_target(aforc_fieldzero_pty_test)
+        add_dependencies(aforc_fieldzero_pty_test aforc_fieldzero)
+        add_test(
+            NAME fieldzero_pty
+            COMMAND
+                aforc_fieldzero_pty_test
+                "$<TARGET_FILE:aforc_fieldzero>"
+        )
+        set_tests_properties(fieldzero_pty PROPERTIES TIMEOUT 30)
+        add_test(
+            NAME fieldzero_invalid_seed
+            COMMAND aforc_fieldzero --seed nope
+        )
+        set_tests_properties(fieldzero_invalid_seed PROPERTIES
+            TIMEOUT 15
+            WILL_FAIL TRUE
+        )
+        add_test(
+            NAME fieldzero_negative_seed
+            COMMAND aforc_fieldzero --seed -1 --smoke
+        )
+        set_tests_properties(fieldzero_negative_seed PROPERTIES
+            TIMEOUT 15
+            WILL_FAIL TRUE
+        )
+        add_test(
+            NAME fieldzero_duplicate_seed
+            COMMAND aforc_fieldzero --seed 1 --seed 2 --smoke
+        )
+        set_tests_properties(fieldzero_duplicate_seed PROPERTIES
             TIMEOUT 15
             WILL_FAIL TRUE
         )
