@@ -12,11 +12,9 @@
 #include "../src/platform/terminal_internal.h"
 #include "../src/render/renderer_internal.h"
 
-#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 
 enum
 {
@@ -279,6 +277,28 @@ static bool non_ascii_repositions_following_cell(void)
     return passed;
 }
 
+static bool ansi_measurement_matches_encoding(void)
+{
+    static const char cursor[] = "\x1b[4294967295;4294967295H";
+    AFORC_RendererConfig config = aforc_renderer_config_default();
+    AFORC_Renderer *renderer = NULL;
+    bool passed;
+
+    config.size = (AFORC_Size){1, 1};
+    if (aforc_renderer_create(&renderer, &config) != AFORC_OK)
+    {
+        return false;
+    }
+    passed = aforc_renderer_ansi_cursor(renderer, UINT32_MAX, UINT32_MAX) ==
+                 AFORC_OK &&
+             renderer->batch_size == sizeof(cursor) - 1U &&
+             memcmp(renderer->batch, cursor, sizeof(cursor) - 1U) == 0 &&
+             aforc_renderer_ansi_cursor_size(UINT32_MAX, UINT32_MAX) ==
+                 sizeof(cursor) - 1U;
+    aforc_renderer_destroy(renderer);
+    return passed;
+}
+
 static bool empty_present_skips_front_copy(void)
 {
     AFORC_RendererConfig config = aforc_renderer_config_default();
@@ -303,161 +323,6 @@ static bool empty_present_skips_front_copy(void)
              !renderer->invalidated;
     aforc_renderer_destroy(renderer);
     return passed;
-}
-
-static uint64_t elapsed_nanoseconds(struct timespec started,
-                                    struct timespec finished)
-{
-    uint64_t elapsed =
-        (uint64_t)(finished.tv_sec - started.tv_sec) * UINT64_C(1000000000);
-
-    if (finished.tv_nsec >= started.tv_nsec)
-    {
-        elapsed += (uint64_t)(finished.tv_nsec - started.tv_nsec);
-    }
-    else
-    {
-        elapsed -= (uint64_t)(started.tv_nsec - finished.tv_nsec);
-    }
-    return elapsed;
-}
-
-int renderer_diff_run_benchmark(void)
-{
-    enum
-    {
-        BENCHMARK_EMPTY_ITERATIONS = 2000,
-        BENCHMARK_SPARSE_ITERATIONS = 2000,
-        BENCHMARK_DENSE_ITERATIONS = 200
-    };
-    AFORC_RendererConfig config = aforc_renderer_config_default();
-    AFORC_Renderer *renderer = NULL;
-    AFORC_Terminal terminal = {0};
-    const AFORC_Cell cleared = aforc_cell_default();
-    AFORC_Cell sparse = cleared;
-    AFORC_Cell dense = cleared;
-    struct timespec started;
-    struct timespec finished;
-    size_t cell_count;
-    size_t previous_sparse = SIZE_MAX;
-    uint64_t encoded_bytes = 0U;
-    uint64_t elapsed_ns;
-    int result = 1;
-
-    config.size = (AFORC_Size){320, 120};
-    if (aforc_renderer_create(&renderer, &config) != AFORC_OK)
-    {
-        return result;
-    }
-    renderer->invalidated = false;
-    terminal.active = true;
-    terminal.size = config.size;
-    cell_count = (size_t)config.size.width * (size_t)config.size.height;
-    sparse.codepoint = (uint32_t)'#';
-    dense.codepoint = (uint32_t)'A';
-    if (clock_gettime(CLOCK_MONOTONIC, &started) != 0)
-    {
-        goto cleanup;
-    }
-    for (size_t iteration = 0U; iteration < (size_t)BENCHMARK_EMPTY_ITERATIONS;
-         ++iteration)
-    {
-        if (aforc_renderer_present(renderer, &terminal) != AFORC_OK ||
-            renderer->batch_size != 0U)
-        {
-            goto cleanup;
-        }
-    }
-    if (clock_gettime(CLOCK_MONOTONIC, &finished) != 0)
-    {
-        goto cleanup;
-    }
-    elapsed_ns = elapsed_nanoseconds(started, finished);
-    (void)printf("renderer empty-present benchmark: iterations=%d "
-                 "cells=%d elapsed_ns=%" PRIu64 " ns_per_present=%" PRIu64 "\n",
-                 BENCHMARK_EMPTY_ITERATIONS,
-                 config.size.width * config.size.height,
-                 elapsed_ns,
-                 elapsed_ns / (uint64_t)BENCHMARK_EMPTY_ITERATIONS);
-
-    if (clock_gettime(CLOCK_MONOTONIC, &started) != 0)
-    {
-        goto cleanup;
-    }
-    for (size_t iteration = 0U; iteration < (size_t)BENCHMARK_SPARSE_ITERATIONS;
-         ++iteration)
-    {
-        const size_t current = iteration % cell_count;
-
-        if (previous_sparse != SIZE_MAX)
-        {
-            renderer->back[previous_sparse] = cleared;
-        }
-        renderer->back[current] = sparse;
-        if (aforc_renderer_build_ansi(renderer) != AFORC_OK ||
-            renderer->batch_size == 0U)
-        {
-            goto cleanup;
-        }
-        encoded_bytes += renderer->batch_size;
-        (void)memcpy(renderer->front,
-                     renderer->back,
-                     cell_count * sizeof(*renderer->front));
-        previous_sparse = current;
-    }
-    if (clock_gettime(CLOCK_MONOTONIC, &finished) != 0)
-    {
-        goto cleanup;
-    }
-    elapsed_ns = elapsed_nanoseconds(started, finished);
-    (void)printf("renderer sparse-animation benchmark: iterations=%d "
-                 "cells=%zu encoded_bytes=%" PRIu64 " elapsed_ns=%" PRIu64
-                 " ns_per_frame=%" PRIu64 "\n",
-                 BENCHMARK_SPARSE_ITERATIONS,
-                 cell_count,
-                 encoded_bytes,
-                 elapsed_ns,
-                 elapsed_ns / (uint64_t)BENCHMARK_SPARSE_ITERATIONS);
-
-    encoded_bytes = 0U;
-    if (clock_gettime(CLOCK_MONOTONIC, &started) != 0)
-    {
-        goto cleanup;
-    }
-    for (size_t iteration = 0U; iteration < (size_t)BENCHMARK_DENSE_ITERATIONS;
-         ++iteration)
-    {
-        dense.codepoint =
-            (iteration & 1U) == 0U ? (uint32_t)'A' : (uint32_t)'B';
-        aforc_renderer_fill_cells(renderer->back, cell_count, dense);
-        if (aforc_renderer_build_ansi(renderer) != AFORC_OK ||
-            renderer->batch_size == 0U)
-        {
-            goto cleanup;
-        }
-        encoded_bytes += renderer->batch_size;
-        (void)memcpy(renderer->front,
-                     renderer->back,
-                     cell_count * sizeof(*renderer->front));
-    }
-    if (clock_gettime(CLOCK_MONOTONIC, &finished) != 0)
-    {
-        goto cleanup;
-    }
-    elapsed_ns = elapsed_nanoseconds(started, finished);
-    (void)printf("renderer dense-animation benchmark: iterations=%d "
-                 "cells=%zu encoded_bytes=%" PRIu64 " elapsed_ns=%" PRIu64
-                 " ns_per_frame=%" PRIu64 "\n",
-                 BENCHMARK_DENSE_ITERATIONS,
-                 cell_count,
-                 encoded_bytes,
-                 elapsed_ns,
-                 elapsed_ns / (uint64_t)BENCHMARK_DENSE_ITERATIONS);
-    result = 0;
-
-cleanup:
-    aforc_renderer_destroy(renderer);
-    return result;
 }
 
 int renderer_diff_run_cases(void)
@@ -498,6 +363,11 @@ int renderer_diff_run_cases(void)
     {
         (void)fprintf(stderr, "empty renderer diff copied the front buffer\n");
         result = 7;
+    }
+    if (!ansi_measurement_matches_encoding())
+    {
+        (void)fprintf(stderr, "renderer ANSI measurement diverged\n");
+        result = 8;
     }
     return result;
 }

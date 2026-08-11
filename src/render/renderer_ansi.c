@@ -20,16 +20,6 @@ static bool ansi_styles_equal(AFORC_Cell left, AFORC_Cell right)
            aforc_renderer_colors_equal(left.background, right.background);
 }
 
-static bool ansi_cost_add(size_t *cost, size_t additional)
-{
-    if (additional > SIZE_MAX - *cost)
-    {
-        return false;
-    }
-    *cost += additional;
-    return true;
-}
-
 static bool ansi_cell_cost(AFORC_Cell cell,
                            AnsiEncodingState *state,
                            bool include_codepoint,
@@ -37,7 +27,7 @@ static bool ansi_cell_cost(AFORC_Cell cell,
 {
     if (!state->style_known || !ansi_styles_equal(cell, state->active_style))
     {
-        if (!ansi_cost_add(cost, aforc_renderer_ansi_style_size(cell)))
+        if (!aforc_size_add(*cost, aforc_renderer_ansi_style_size(cell), cost))
         {
             return false;
         }
@@ -45,8 +35,8 @@ static bool ansi_cell_cost(AFORC_Cell cell,
         state->style_known = true;
     }
     return !include_codepoint ||
-           ansi_cost_add(cost,
-                         aforc_renderer_ansi_codepoint_size(cell.codepoint));
+           aforc_size_add(
+               *cost, aforc_renderer_ansi_codepoint_size(cell.codepoint), cost);
 }
 
 static bool ansi_cell_needs_output(const AFORC_Renderer *renderer,
@@ -118,8 +108,9 @@ static bool ansi_gap_is_cheaper(const AFORC_Renderer *renderer,
         (uint32_t)row + 1u, (uint32_t)next_changed + 1u);
 
     if (!state.ascii_width || !aforc_renderer_cell_is_valid(next_cell) ||
-        !ansi_cost_add(&restart_cost,
-                       aforc_renderer_ansi_style_size(next_cell)))
+        !aforc_size_add(restart_cost,
+                        aforc_renderer_ansi_style_size(next_cell),
+                        &restart_cost))
     {
         return false;
     }

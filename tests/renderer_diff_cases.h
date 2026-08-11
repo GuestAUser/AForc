@@ -8,6 +8,5 @@
 #define AFORC_TESTS_RENDERER_DIFF_CASES_H
 
 int renderer_diff_run_cases(void);
-int renderer_diff_run_benchmark(void);
 
 #endif

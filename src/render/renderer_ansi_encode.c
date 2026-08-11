@@ -6,6 +6,7 @@
 
 #include "renderer_ansi_internal.h"
 
+#include <stdio.h>
 #include <string.h>
 
 static AFORC_Status ansi_reserve(AFORC_Renderer *renderer, size_t additional)
@@ -107,22 +108,11 @@ static AFORC_Status ansi_byte(AFORC_Renderer *renderer, unsigned char byte)
 
 static AFORC_Status ansi_u32(AFORC_Renderer *renderer, uint32_t value)
 {
-    char digits[10];
-    size_t count = 0u;
+    char digits[sizeof "4294967295"];
+    const int count =
+        snprintf(digits, sizeof(digits), "%lu", (unsigned long)value);
 
-    do
-    {
-        digits[count++] = (char)('0' + value % 10u);
-        value /= 10u;
-    } while (value != 0u);
-    for (size_t index = 0u; index < count / 2u; ++index)
-    {
-        const char temporary = digits[index];
-
-        digits[index] = digits[count - index - 1u];
-        digits[count - index - 1u] = temporary;
-    }
-    return ansi_append(renderer, digits, count);
+    return ansi_append(renderer, digits, (size_t)count);
 }
 
 static AFORC_Status ansi_parameter(AFORC_Renderer *renderer, uint32_t value)

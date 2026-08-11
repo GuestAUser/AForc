@@ -7,14 +7,9 @@
 #include "renderer_diff_cases.h"
 
 #include <stdio.h>
-#include <string.h>
 
-int main(int argument_count, char **arguments)
+int main(void)
 {
-    if (argument_count == 2 && strcmp(arguments[1], "--benchmark") == 0)
-    {
-        return renderer_diff_run_benchmark();
-    }
     const int result = renderer_diff_run_cases();
 
     if (result == 0)
