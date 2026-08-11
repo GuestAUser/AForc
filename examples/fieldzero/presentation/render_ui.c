@@ -503,7 +503,7 @@ static AFORC_Status fieldzero_draw_hud(const AFORC_UICanvas *canvas,
         result = fieldzero_label(
             canvas,
             (AFORC_Rect){arena.x, hud_y + 2, arena.width, 1},
-            "A/D MOVE   SPACE/Z JUMP   X DASH   ? HELP   P PAUSE",
+            "A/D MOVE   SPACE/Z JUMP   K DASH   ? HELP   P PAUSE",
             AFORC_UI_ALIGN_START,
             FIELDZERO_VISUAL_FRAME,
             AFORC_STYLE_DIM,
@@ -584,13 +584,13 @@ static AFORC_Status fieldzero_draw_help(const AFORC_UICanvas *canvas,
         "MOVE       LEFT/RIGHT OR A/D",
         "JUMP       SPACE OR Z   RELEASE FOR SHORT JUMP",
         "WALL KICK  JUMP WHILE TOUCHING A WALL",
-        "AIR DASH   X   ONE DASH UNTIL LANDING",
+        "AIR DASH   K   ONE DASH UNTIL LANDING",
         "REGISTER   TOUCH + IN ORDER   BANDS SHIFT 4 CELLS",
         "EXIT       REACH > AFTER EVERY + BECOMES x",
         "RESTART    R   RETURN TO ROOM ENTRY",
         "PAUSE      P",
         "QUIT       Q OR ESCAPE",
-        "GLYPHS     @ PLAYER   o MEMORY   > EXIT"};
+        "GLYPHS     BLOCK SUIT PLAYER   o MEMORY   > EXIT"};
     AFORC_Rect panel;
     AFORC_UIPanelStyle panel_style = fieldzero_panel_style(true, no_color);
     AFORC_Status status = aforc_ui_layout_anchor(
