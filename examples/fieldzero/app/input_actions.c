@@ -133,7 +133,7 @@ void fieldzero_app_reconcile_input(FieldzeroApp *app)
     {
         app->game.actions.jump_held = jump_held;
     }
-    if (aforc_input_key_pressed(app->input, AFORC_KEY_X))
+    if (aforc_input_key_pressed(app->input, AFORC_KEY_K))
     {
         fieldzero_game_press_dash(&app->game);
     }
@@ -215,7 +215,7 @@ void fieldzero_app_handle_input(FieldzeroApp *app,
             fieldzero_game_press_jump(&app->game);
         }
     }
-    else if (fieldzero_codepoint_is(codepoint, 'x') && !event->data.key.repeat)
+    else if (fieldzero_codepoint_is(codepoint, 'k') && !event->data.key.repeat)
     {
         fieldzero_game_press_dash(&app->game);
     }

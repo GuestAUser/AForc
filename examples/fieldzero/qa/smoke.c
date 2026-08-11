@@ -149,7 +149,7 @@ static bool fieldzero_smoke_input_contracts(FieldzeroApp *app,
     static const unsigned char jump_z_up[] = "\x1b[122;1:3u";
     static const unsigned char overflow_left[] = "\x1b[97;1:1u";
     static const unsigned char overflow_jump[] = "\x1b[32;1:1u";
-    static const unsigned char overflow_dash[] = "\x1b[120;1:1u";
+    static const unsigned char overflow_dash[] = "\x1b[107;1:1u";
     unsigned char overflow[FIELDZERO_SMOKE_OVERFLOW_KEYS];
     uint64_t dropped_before;
 
@@ -234,7 +234,7 @@ bool fieldzero_smoke_drive(FieldzeroApp *app, AFORC_Error *error)
     static const unsigned char start_input[] = " ";
     static const unsigned char move_input[] = "d";
     static const unsigned char jump_input[] = "z";
-    static const unsigned char dash_input[] = "x";
+    static const unsigned char dash_input[] = "k";
     static const unsigned char help_input[] = "?";
     FieldzeroSmokeClock clock = {0};
     AFORC_TileMap *registration_active = NULL;
