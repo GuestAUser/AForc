@@ -28,6 +28,11 @@ AFORC_Cell fieldzero_visual_cell(uint32_t codepoint,
                                  uint8_t role,
                                  AFORC_CellStyle style,
                                  bool no_color);
+AFORC_Cell fieldzero_visual_pair_cell(uint32_t codepoint,
+                                      uint8_t foreground_role,
+                                      uint8_t background_role,
+                                      AFORC_CellStyle style,
+                                      bool no_color);
 AFORC_Status
 fieldzero_visual_plot(void *context, AFORC_Point position, AFORC_Cell cell);
 AFORC_Status fieldzero_render_world(AFORC_Renderer *renderer,

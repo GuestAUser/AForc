@@ -20,7 +20,10 @@ enum
     FIELDZERO_RAIN_MIDDLE_LANE_PERIOD = 13,
     FIELDZERO_RAIN_FAR_TICK_INTERVAL = 8,
     FIELDZERO_RAIN_MIDDLE_TICK_INTERVAL = 3,
-    FIELDZERO_RAIN_REST_STEPS = 3
+    FIELDZERO_RAIN_REST_STEPS = 3,
+    FIELDZERO_UPPER_HALF_BLOCK = 0x2580,
+    FIELDZERO_LOWER_HALF_BLOCK = 0x2584,
+    FIELDZERO_FULL_BLOCK = 0x2588
 };
 
 static const uint64_t fieldzero_background_stream =
@@ -675,35 +678,6 @@ fieldzero_render_exit(AFORC_Renderer *renderer,
                                                      presentation->no_color));
 }
 
-static uint32_t fieldzero_player_motion_glyph(const FieldzeroPlayer *player)
-{
-    if (player->dash_ticks != 0U)
-    {
-        return player->facing < 0 ? (uint32_t)'<' : (uint32_t)'>';
-    }
-    if (player->velocity_y <= -FIELDZERO_FIXED_ONE)
-    {
-        return (uint32_t)'^';
-    }
-    if (player->velocity_y >= FIELDZERO_FIXED_ONE)
-    {
-        return (uint32_t)'v';
-    }
-    if (!player->grounded && (player->wall_left || player->wall_right))
-    {
-        return player->wall_left ? (uint32_t)'<' : (uint32_t)'>';
-    }
-    if (player->velocity_x <= -FIELDZERO_FIXED_ONE)
-    {
-        return (uint32_t)'<';
-    }
-    if (player->velocity_x >= FIELDZERO_FIXED_ONE)
-    {
-        return (uint32_t)'>';
-    }
-    return (uint32_t)'@';
-}
-
 static AFORC_Point fieldzero_player_cell(const FieldzeroGame *game,
                                          AFORC_Point impulse)
 {
@@ -848,16 +822,82 @@ fieldzero_render_player(AFORC_Renderer *renderer,
                         AFORC_Point impulse)
 {
     const AFORC_Point player = fieldzero_player_cell(game, impulse);
+    const bool moving = !presentation->reduced_motion &&
+                        game->player.grounded && game->player.velocity_x != 0;
+    const uint32_t filled = presentation->no_color ? FIELDZERO_FULL_BLOCK
+                                                   : FIELDZERO_UPPER_HALF_BLOCK;
+    AFORC_Point points[4];
+    AFORC_Cell cells[4];
+    uint8_t left_boot = FIELDZERO_VISUAL_FRAME;
+    uint8_t right_boot = FIELDZERO_VISUAL_FRAME;
+    int32_t left = player.x + (game->player.facing < 0 ? -1 : 0);
+    int32_t top = player.y - 1;
+    AFORC_Status status = AFORC_OK;
 
-    return fieldzero_put_local(
-        renderer,
-        arena,
-        player,
-        (AFORC_Point){0, 0},
-        fieldzero_visual_cell(fieldzero_player_motion_glyph(&game->player),
-                              FIELDZERO_VISUAL_SIGNAL,
-                              AFORC_STYLE_BOLD | AFORC_STYLE_REVERSE,
-                              presentation->no_color));
+    if (left < 0)
+    {
+        left = 0;
+    }
+    else if (left + 1 >= FIELDZERO_ARENA_WIDTH)
+    {
+        left = FIELDZERO_ARENA_WIDTH - 2;
+    }
+    if (top < 0)
+    {
+        top = 0;
+    }
+    else if (top + 1 >= FIELDZERO_ARENA_HEIGHT)
+    {
+        top = FIELDZERO_ARENA_HEIGHT - 2;
+    }
+    if (moving)
+    {
+        if ((presentation->frame_index / 4U) % 2U == 0U)
+        {
+            left_boot = FIELDZERO_VISUAL_CANVAS;
+        }
+        else
+        {
+            right_boot = FIELDZERO_VISUAL_CANVAS;
+        }
+    }
+    points[0] = (AFORC_Point){left, top};
+    points[1] = (AFORC_Point){left + 1, top};
+    points[2] = (AFORC_Point){left, top + 1};
+    points[3] = (AFORC_Point){left + 1, top + 1};
+    cells[0] = fieldzero_visual_pair_cell(FIELDZERO_LOWER_HALF_BLOCK,
+                                          FIELDZERO_VISUAL_INK,
+                                          FIELDZERO_VISUAL_CANVAS,
+                                          AFORC_STYLE_NONE,
+                                          presentation->no_color);
+    cells[1] = fieldzero_visual_pair_cell(filled,
+                                          FIELDZERO_VISUAL_INK,
+                                          FIELDZERO_VISUAL_SIGNAL,
+                                          AFORC_STYLE_NONE,
+                                          presentation->no_color);
+    if (game->player.facing < 0)
+    {
+        const AFORC_Cell swap = cells[0];
+
+        cells[0] = cells[1];
+        cells[1] = swap;
+    }
+    cells[2] = fieldzero_visual_pair_cell(filled,
+                                          FIELDZERO_VISUAL_INK,
+                                          left_boot,
+                                          AFORC_STYLE_NONE,
+                                          presentation->no_color);
+    cells[3] = fieldzero_visual_pair_cell(filled,
+                                          FIELDZERO_VISUAL_INK,
+                                          right_boot,
+                                          AFORC_STYLE_NONE,
+                                          presentation->no_color);
+    for (size_t index = 0U; index < 4U && status == AFORC_OK; ++index)
+    {
+        status = fieldzero_put_local(
+            renderer, arena, points[index], (AFORC_Point){0, 0}, cells[index]);
+    }
+    return status;
 }
 
 AFORC_Status fieldzero_render_world(AFORC_Renderer *renderer,

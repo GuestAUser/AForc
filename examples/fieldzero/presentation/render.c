@@ -65,6 +65,22 @@ AFORC_Cell fieldzero_visual_cell(uint32_t codepoint,
     return cell;
 }
 
+AFORC_Cell fieldzero_visual_pair_cell(uint32_t codepoint,
+                                      uint8_t foreground_role,
+                                      uint8_t background_role,
+                                      AFORC_CellStyle style,
+                                      bool no_color)
+{
+    AFORC_Cell cell =
+        fieldzero_visual_cell(codepoint, foreground_role, style, no_color);
+
+    if (!no_color)
+    {
+        cell.background = fieldzero_visual_color(background_role);
+    }
+    return cell;
+}
+
 AFORC_Status
 fieldzero_visual_plot(void *context, AFORC_Point position, AFORC_Cell cell)
 {
@@ -181,9 +197,8 @@ static bool fieldzero_palette_color(AFORC_Color color)
 
 static bool fieldzero_player_glyph(uint32_t codepoint)
 {
-    return codepoint == (uint32_t)'@' || codepoint == (uint32_t)'^' ||
-           codepoint == (uint32_t)'v' || codepoint == (uint32_t)'<' ||
-           codepoint == (uint32_t)'>';
+    return codepoint == UINT32_C(0x2580) || codepoint == UINT32_C(0x2584) ||
+           codepoint == UINT32_C(0x2588);
 }
 
 AFORC_Status fieldzero_render_validate(const AFORC_Renderer *renderer,
@@ -193,7 +208,7 @@ AFORC_Status fieldzero_render_validate(const AFORC_Renderer *renderer,
     const AFORC_Color signal = fieldzero_visual_color(FIELDZERO_VISUAL_SIGNAL);
     AFORC_Size screen;
     size_t signal_cells = 0U;
-    size_t inverse_players = 0U;
+    size_t player_cells = 0U;
 
     if (renderer == NULL || view == NULL)
     {
@@ -216,8 +231,9 @@ AFORC_Status fieldzero_render_validate(const AFORC_Renderer *renderer,
             {
                 return status;
             }
-            if (cell.codepoint < UINT32_C(0x20) ||
-                cell.codepoint > UINT32_C(0x7e))
+            if ((cell.codepoint < UINT32_C(0x20) ||
+                 cell.codepoint > UINT32_C(0x7e)) &&
+                !fieldzero_player_glyph(cell.codepoint))
             {
                 return AFORC_ERROR_FORMAT;
             }
@@ -243,10 +259,9 @@ AFORC_Status fieldzero_render_validate(const AFORC_Renderer *renderer,
             {
                 ++signal_cells;
             }
-            if ((cell.style & AFORC_STYLE_REVERSE) != 0U &&
-                fieldzero_player_glyph(cell.codepoint))
+            if (fieldzero_player_glyph(cell.codepoint))
             {
-                ++inverse_players;
+                ++player_cells;
             }
         }
     }
@@ -257,7 +272,7 @@ AFORC_Status fieldzero_render_validate(const AFORC_Renderer *renderer,
     const bool gameplay =
         view->screen == FIELDZERO_SCREEN_PLAY && !too_small && !overlay;
 
-    if (gameplay && inverse_players != 1U)
+    if (gameplay && player_cells != 4U)
     {
         return AFORC_ERROR_STATE;
     }
