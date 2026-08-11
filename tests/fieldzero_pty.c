@@ -478,6 +478,7 @@ static bool fieldzero_run_supported(const char *executable)
     static const char release_actions[] =
         "\x1b[120;1:3u\x1b[32;1:3u\x1b[97;1:3u";
     static const char quit_key[] = "\x1b[113;1:1u\x1b[113;1:3u";
+    static const char quit_confirm[] = "\x1b[113;1:1u";
     FieldzeroPtyProcess process;
     size_t start;
     bool passed = false;
@@ -555,8 +556,8 @@ static bool fieldzero_run_supported(const char *executable)
                              process.master, quit_key, sizeof(quit_key) - 1u) &&
                              fieldzero_collect(&process, 100u, NULL, 0u) &&
                              fieldzero_write_all(process.master,
-                                                 quit_key,
-                                                 sizeof(quit_key) - 1u),
+                                                 quit_confirm,
+                                                 sizeof(quit_confirm) - 1u),
                          &process,
                          "quit input failed") ||
         !fieldzero_check(fieldzero_wait_for_exit(&process, 2000u),
