@@ -6,7 +6,7 @@
 
 #include "aforc/effects.h"
 
-#include <float.h>
+#include <math.h>
 
 /*
  * Bounded scalar tween state machine.
@@ -27,17 +27,12 @@ static bool easing_valid(AFORC_Easing easing)
            easing == AFORC_EASING_CUBIC_IN_OUT;
 }
 
-static bool double_finite(double value)
-{
-    return value == value && value >= -DBL_MAX && value <= DBL_MAX;
-}
-
 static bool tween_ready(const AFORC_Tween *tween)
 {
     return tween != NULL && tween->initialized && tween->duration_ms > 0U &&
            tween->elapsed_ms <= tween->duration_ms &&
-           easing_valid(tween->easing) && double_finite(tween->start) &&
-           double_finite(tween->end);
+           easing_valid(tween->easing) && isfinite(tween->start) &&
+           isfinite(tween->end);
 }
 
 AFORC_Status
@@ -45,7 +40,7 @@ aforc_easing_sample(AFORC_Easing easing, double progress, double *out_value)
 {
     double value = progress;
 
-    if (out_value == NULL || !easing_valid(easing) || !double_finite(progress))
+    if (out_value == NULL || !easing_valid(easing) || !isfinite(progress))
     {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
@@ -117,7 +112,7 @@ AFORC_Status aforc_tween_init(AFORC_Tween *tween,
                               uint64_t duration_ms,
                               AFORC_Easing easing)
 {
-    if (tween == NULL || !double_finite(start) || !double_finite(end) ||
+    if (tween == NULL || !isfinite(start) || !isfinite(end) ||
         duration_ms == 0U || !easing_valid(easing))
     {
         return AFORC_ERROR_INVALID_ARGUMENT;

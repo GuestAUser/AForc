@@ -4,15 +4,10 @@
  * SPDX-License-Identifier: MIT
  */
 
-#define _POSIX_C_SOURCE 200809L
-
 #include "../include/aforc/effects.h"
 
-#include <inttypes.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <time.h>
 
 typedef struct PlotCapture
 {
@@ -35,34 +30,6 @@ capture_plot(void *context, AFORC_Point position, AFORC_Cell cell)
     capture->cells[capture->count] = cell;
     ++capture->count;
     return AFORC_OK;
-}
-
-static AFORC_Status
-benchmark_plot(void *context, AFORC_Point position, AFORC_Cell cell)
-{
-    size_t *count = context;
-
-    (void)position;
-    (void)cell;
-    ++*count;
-    return AFORC_OK;
-}
-
-static uint64_t elapsed_nanoseconds(struct timespec started,
-                                    struct timespec finished)
-{
-    uint64_t elapsed =
-        (uint64_t)(finished.tv_sec - started.tv_sec) * UINT64_C(1000000000);
-
-    if (finished.tv_nsec >= started.tv_nsec)
-    {
-        elapsed += (uint64_t)(finished.tv_nsec - started.tv_nsec);
-    }
-    else
-    {
-        elapsed -= (uint64_t)(started.tv_nsec - finished.tv_nsec);
-    }
-    return elapsed;
 }
 
 static AFORC_Cell test_cell(uint32_t codepoint)
@@ -517,113 +484,8 @@ static bool particle_free_list_matches_slot_zero_model(void)
     return true;
 }
 
-static int particle_hot_path_benchmark(void)
+int main(void)
 {
-    enum
-    {
-        BENCHMARK_CAPACITY = 32768,
-        BENCHMARK_ITERATIONS = 5000
-    };
-    AFORC_Particle *storage =
-        malloc((size_t)BENCHMARK_CAPACITY * sizeof(*storage));
-    AFORC_ParticlePool pool = {0};
-    AFORC_ParticleDesc description = {
-        {0, 0}, {0, 0}, {0, 0}, 1000U, test_cell((uint32_t)'x')};
-    const AFORC_Cell emitted_cells[] = {test_cell((uint32_t)'*')};
-    const AFORC_ParticleEmitter emitter = {{0, 0},
-                                           {0, 0},
-                                           {0, 0},
-                                           {0, 0},
-                                           {0, 0},
-                                           {0, 0},
-                                           {1000U, 1000U},
-                                           emitted_cells,
-                                           1U};
-    const AFORC_ParticleDrawOptions options =
-        aforc_particle_draw_options_default();
-    struct timespec started;
-    struct timespec finished;
-    uint64_t spawn_elapsed;
-    uint64_t sparse_elapsed;
-    size_t spawned = 0U;
-    size_t particle_index = SIZE_MAX;
-    int result = 1;
-
-    if (storage == NULL ||
-        aforc_particle_pool_init(
-            &pool, storage, (size_t)BENCHMARK_CAPACITY, UINT32_C(1)) !=
-            AFORC_OK ||
-        aforc_particle_pool_emit(
-            &pool, &emitter, (size_t)BENCHMARK_CAPACITY, &spawned) !=
-            AFORC_OK ||
-        spawned != (size_t)BENCHMARK_CAPACITY ||
-        clock_gettime(CLOCK_MONOTONIC, &started) != 0)
-    {
-        goto cleanup;
-    }
-    for (size_t iteration = 0U; iteration < (size_t)BENCHMARK_ITERATIONS;
-         ++iteration)
-    {
-        if (aforc_particle_pool_kill(&pool, (size_t)BENCHMARK_CAPACITY - 1U) !=
-                AFORC_OK ||
-            aforc_particle_pool_spawn(&pool, &description, &particle_index) !=
-                AFORC_OK ||
-            particle_index != (size_t)BENCHMARK_CAPACITY - 1U)
-        {
-            goto cleanup;
-        }
-    }
-    if (clock_gettime(CLOCK_MONOTONIC, &finished) != 0)
-    {
-        goto cleanup;
-    }
-    spawn_elapsed = elapsed_nanoseconds(started, finished);
-
-    if (aforc_particle_pool_clear(&pool) != AFORC_OK ||
-        aforc_particle_pool_spawn(&pool, &description, &particle_index) !=
-            AFORC_OK ||
-        particle_index != 0U || clock_gettime(CLOCK_MONOTONIC, &started) != 0)
-    {
-        goto cleanup;
-    }
-    for (size_t iteration = 0U; iteration < (size_t)BENCHMARK_ITERATIONS;
-         ++iteration)
-    {
-        size_t plotted = 0U;
-
-        if (aforc_particle_pool_update(&pool, 0U) != AFORC_OK ||
-            aforc_particle_pool_draw(
-                &pool, &options, benchmark_plot, &plotted) != AFORC_OK ||
-            plotted != 1U)
-        {
-            goto cleanup;
-        }
-    }
-    if (clock_gettime(CLOCK_MONOTONIC, &finished) != 0)
-    {
-        goto cleanup;
-    }
-    sparse_elapsed = elapsed_nanoseconds(started, finished);
-    (void)printf("particle hot-path benchmark: capacity=%d iterations=%d "
-                 "spawn_ns=%" PRIu64 " sparse_update_draw_ns=%" PRIu64 "\n",
-                 BENCHMARK_CAPACITY,
-                 BENCHMARK_ITERATIONS,
-                 spawn_elapsed,
-                 sparse_elapsed);
-    result = 0;
-
-cleanup:
-    aforc_particle_pool_dispose(&pool);
-    free(storage);
-    return result;
-}
-
-int main(int argument_count, char **arguments)
-{
-    if (argument_count == 2 && strcmp(arguments[1], "--benchmark") == 0)
-    {
-        return particle_hot_path_benchmark();
-    }
     if (!sprite_animation_and_tween_are_deterministic())
     {
         (void)fputs("sprite/animation/tween regression failed\n", stderr);
