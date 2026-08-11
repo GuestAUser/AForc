@@ -119,9 +119,8 @@ static bool config_valid(const AFORC_EngineConfig *config)
            config->maximum_frame_seconds <= 3600.0 &&
            isfinite(config->maximum_frame_seconds) &&
            config->scene_capacity > 0U && config->scene_command_capacity > 0U &&
-           config->allocator.allocate != NULL &&
-           config->allocator.reallocate != NULL &&
-           config->allocator.deallocate != NULL && config->hooks.now != NULL;
+           aforc_allocator_is_valid(&config->allocator) &&
+           config->hooks.now != NULL;
 }
 
 AFORC_Status aforc_engine_create(const AFORC_EngineConfig *config,
