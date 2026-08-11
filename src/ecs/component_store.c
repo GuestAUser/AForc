@@ -37,15 +37,13 @@ AFORC_Status aforc_ecs_reserve_stores(AFORC_Ecs *ecs, size_t required)
     {
         return status;
     }
-    status = aforc_ecs_allocate_array(&ecs->allocator,
-                                      capacity,
-                                      sizeof(*replacement),
-                                      true,
-                                      (void **)&replacement);
+    status = aforc_alloc_array(
+        &ecs->allocator, capacity, sizeof(*replacement), (void **)&replacement);
     if (status != AFORC_OK)
     {
         return status;
     }
+    (void)memset(replacement, 0, capacity * sizeof(*replacement));
     if (!aforc_size_multiply(
             ecs->store_count, sizeof(*replacement), &copy_bytes))
     {
@@ -81,15 +79,13 @@ AFORC_Status aforc_ecs_reserve_sparse(AFORC_Ecs *ecs,
     {
         return status;
     }
-    status = aforc_ecs_allocate_array(&ecs->allocator,
-                                      capacity,
-                                      sizeof(*replacement),
-                                      true,
-                                      (void **)&replacement);
+    status = aforc_alloc_array(
+        &ecs->allocator, capacity, sizeof(*replacement), (void **)&replacement);
     if (status != AFORC_OK)
     {
         return status;
     }
+    (void)memset(replacement, 0, capacity * sizeof(*replacement));
     if (!aforc_size_multiply(
             store->sparse_capacity, sizeof(*replacement), &copy_bytes))
     {
@@ -127,20 +123,16 @@ AFORC_Status aforc_ecs_reserve_dense(AFORC_Ecs *ecs,
     {
         return status;
     }
-    status = aforc_ecs_allocate_array(&ecs->allocator,
-                                      capacity,
-                                      sizeof(*replacement_entities),
-                                      false,
-                                      (void **)&replacement_entities);
+    status = aforc_alloc_array(&ecs->allocator,
+                               capacity,
+                               sizeof(*replacement_entities),
+                               (void **)&replacement_entities);
     if (status != AFORC_OK)
     {
         return status;
     }
-    status = aforc_ecs_allocate_array(&ecs->allocator,
-                                      capacity,
-                                      store->stride,
-                                      false,
-                                      (void **)&replacement_data);
+    status = aforc_alloc_array(
+        &ecs->allocator, capacity, store->stride, (void **)&replacement_data);
     if (status != AFORC_OK)
     {
         aforc_free(&ecs->allocator, replacement_entities);

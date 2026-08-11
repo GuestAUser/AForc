@@ -10,38 +10,6 @@
 #include <stdint.h>
 #include <string.h>
 
-AFORC_Status aforc_ecs_allocate_array(const AFORC_Allocator *allocator,
-                                      size_t count,
-                                      size_t element_size,
-                                      bool zero_initialize,
-                                      void **out_memory)
-{
-    size_t byte_count = 0U;
-    void *memory = NULL;
-    AFORC_Status status;
-
-    if (!aforc_allocator_is_valid(allocator) || out_memory == NULL)
-    {
-        return AFORC_ERROR_INVALID_ARGUMENT;
-    }
-    *out_memory = NULL;
-    if (!aforc_size_multiply(count, element_size, &byte_count))
-    {
-        return AFORC_ERROR_OVERFLOW;
-    }
-    status = aforc_alloc_array(allocator, count, element_size, &memory);
-    if (status != AFORC_OK)
-    {
-        return status;
-    }
-    if (zero_initialize && byte_count != 0U)
-    {
-        (void)memset(memory, 0, byte_count);
-    }
-    *out_memory = memory;
-    return AFORC_OK;
-}
-
 size_t aforc_ecs_handle_capacity_limit(void)
 {
 #if SIZE_MAX < UINT32_MAX
@@ -173,12 +141,13 @@ AFORC_Status aforc_ecs_create(const AFORC_EcsConfig *config,
     {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
-    status = aforc_ecs_allocate_array(
-        &selected.allocator, 1U, sizeof(*ecs), true, (void **)&ecs);
+    status =
+        aforc_alloc_array(&selected.allocator, 1U, sizeof(*ecs), (void **)&ecs);
     if (status != AFORC_OK)
     {
         return status;
     }
+    (void)memset(ecs, 0, sizeof(*ecs));
     ecs->allocator = selected.allocator;
     ecs->max_entities = selected.max_entities;
     ecs->max_component_types = selected.max_component_types;

@@ -25,11 +25,8 @@ AFORC_Status aforc_ecs_reserve_slots(AFORC_Ecs *ecs, size_t required)
     {
         return status;
     }
-    status = aforc_ecs_allocate_array(&ecs->allocator,
-                                      capacity,
-                                      sizeof(*replacement),
-                                      false,
-                                      (void **)&replacement);
+    status = aforc_alloc_array(
+        &ecs->allocator, capacity, sizeof(*replacement), (void **)&replacement);
     if (status != AFORC_OK)
     {
         return status;

@@ -78,21 +78,21 @@ AFORC_Status aforc_ecs_view_create(AFORC_Ecs *ecs,
     {
         return status;
     }
-    status = aforc_ecs_allocate_array(
-        &ecs->allocator, 1U, sizeof(*view), true, (void **)&view);
+    status =
+        aforc_alloc_array(&ecs->allocator, 1U, sizeof(*view), (void **)&view);
     if (status != AFORC_OK)
     {
         return status;
     }
+    (void)memset(view, 0, sizeof(*view));
     view->allocator = ecs->allocator;
     view->ecs = ecs;
     if (required_type_count != 0U)
     {
-        status = aforc_ecs_allocate_array(&ecs->allocator,
-                                          required_type_count,
-                                          sizeof(*view->required_types),
-                                          false,
-                                          (void **)&view->required_types);
+        status = aforc_alloc_array(&ecs->allocator,
+                                   required_type_count,
+                                   sizeof(*view->required_types),
+                                   (void **)&view->required_types);
         if (status != AFORC_OK)
         {
             aforc_free(&view->allocator, view);

@@ -12,9 +12,7 @@
 enum
 {
     ECS_TEST_TYPE_LIMIT = 8,
-    ECS_TEST_HIGH_ENTITY_INDEX = 65535,
-    ECS_BENCHMARK_ENTITY_COUNT = 32768,
-    ECS_BENCHMARK_ROUNDS = 64
+    ECS_TEST_HIGH_ENTITY_INDEX = 65535
 };
 
 typedef struct EcsTestComponent
@@ -42,14 +40,13 @@ ecs_test_add(AFORC_Ecs *ecs, AFORC_Entity entity, AFORC_ComponentType type)
 
     return aforc_ecs_add(ecs, entity, type, &value, NULL) == AFORC_OK;
 }
-bool ecs_test_sparse(size_t *out_sparse_bytes);
+bool ecs_test_sparse(void);
 bool ecs_test_next_match(AFORC_EcsView *view,
                          AFORC_Ecs *ecs,
                          AFORC_Entity expected,
                          const AFORC_ComponentType *required,
                          size_t type_count);
 bool ecs_test_exhausted(AFORC_EcsView *view, size_t type_count);
-bool ecs_test_benchmark(void);
 bool ecs_test_lifecycle_cases(void);
 bool ecs_test_storage_cases(void);
 

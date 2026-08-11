@@ -66,11 +66,8 @@ AFORC_Status aforc_ecs_add(AFORC_Ecs *ecs,
     }
     if (initial_value != NULL && required_count > store->capacity)
     {
-        status = aforc_ecs_allocate_array(&ecs->allocator,
-                                          1U,
-                                          store->component_size,
-                                          false,
-                                          (void **)&staged_value);
+        status = aforc_alloc_array(
+            &ecs->allocator, 1U, store->component_size, (void **)&staged_value);
         if (status != AFORC_OK)
         {
             return status;

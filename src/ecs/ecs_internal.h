@@ -63,12 +63,6 @@ struct AFORC_EcsView
     uint64_t revision;
 };
 
-AFORC_INTERNAL AFORC_Status
-aforc_ecs_allocate_array(const AFORC_Allocator *allocator,
-                         size_t count,
-                         size_t element_size,
-                         bool zero_initialize,
-                         void **out_memory);
 AFORC_INTERNAL size_t aforc_ecs_handle_capacity_limit(void);
 AFORC_INTERNAL bool aforc_ecs_encode_sparse_index(size_t dense_index,
                                                   uint32_t *out_encoded_index);

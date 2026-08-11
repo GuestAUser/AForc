@@ -4,10 +4,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-#define _POSIX_C_SOURCE 200809L
 #include "ecs_optimization_support.h"
-#include <stdio.h>
-#include <time.h>
+
 bool ecs_test_create(size_t max_entities,
                      size_t max_component_types,
                      size_t initial_component_capacity,
@@ -45,7 +43,7 @@ bool ecs_test_register_types(AFORC_Ecs *ecs,
     return true;
 }
 
-bool ecs_test_sparse(size_t *out_sparse_bytes)
+bool ecs_test_sparse(void)
 {
     const size_t limit = aforc_ecs_handle_capacity_limit();
     AFORC_ComponentType type = AFORC_COMPONENT_TYPE_INVALID;
@@ -89,11 +87,6 @@ bool ecs_test_sparse(size_t *out_sparse_bytes)
         return false;
     }
     store = &ecs->stores[type.id];
-    *out_sparse_bytes = store->sparse_capacity * sizeof(*store->sparse);
-    (void)printf("sparse memory: capacity=%zu element=%zu bytes=%zu\n",
-                 store->sparse_capacity,
-                 sizeof(*store->sparse),
-                 *out_sparse_bytes);
     passed =
         sizeof(*store->sparse) == sizeof(uint32_t) &&
         store->sparse_capacity == (size_t)ECS_TEST_HIGH_ENTITY_INDEX + 1U &&
@@ -179,108 +172,5 @@ bool ecs_test_exhausted(AFORC_EcsView *view, size_t type_count)
             return false;
         }
     }
-    return true;
-}
-
-static uint64_t monotonic_nanoseconds(void)
-{
-    struct timespec now;
-    if (clock_gettime(CLOCK_MONOTONIC, &now) != 0)
-    {
-        return UINT64_C(0);
-    }
-    return (uint64_t)now.tv_sec * UINT64_C(1000000000) + (uint64_t)now.tv_nsec;
-}
-
-bool ecs_test_benchmark(void)
-{
-    AFORC_ComponentType types[ECS_TEST_TYPE_LIMIT];
-    AFORC_Entity entity = AFORC_ENTITY_INVALID;
-    AFORC_Ecs *ecs = NULL;
-    uint64_t checksum = UINT64_C(0);
-    uint64_t started;
-    uint64_t elapsed;
-    size_t entity_index;
-    size_t round;
-    if (!ecs_test_create(ECS_BENCHMARK_ENTITY_COUNT,
-                         ECS_TEST_TYPE_LIMIT,
-                         ECS_BENCHMARK_ENTITY_COUNT,
-                         &ecs) ||
-        !ecs_test_register_types(
-            ecs, ECS_TEST_TYPE_LIMIT, ECS_BENCHMARK_ENTITY_COUNT, types))
-    {
-        aforc_ecs_destroy(ecs);
-        return false;
-    }
-    for (entity_index = 0U; entity_index < ECS_BENCHMARK_ENTITY_COUNT;
-         ++entity_index)
-    {
-        size_t type_index;
-        if (!ecs_test_create_entity(ecs, &entity))
-        {
-            aforc_ecs_destroy(ecs);
-            return false;
-        }
-        for (type_index = 0U; type_index < ECS_TEST_TYPE_LIMIT; ++type_index)
-        {
-            if (!ecs_test_add(ecs, entity, types[type_index]))
-            {
-                aforc_ecs_destroy(ecs);
-                return false;
-            }
-        }
-    }
-    (void)printf("benchmark memory: capacity=%zu element=%zu bytes/store=%zu\n",
-                 ecs->stores[0].sparse_capacity,
-                 sizeof(*ecs->stores[0].sparse),
-                 ecs->stores[0].sparse_capacity *
-                     sizeof(*ecs->stores[0].sparse));
-    started = monotonic_nanoseconds();
-    for (round = 0U; round < ECS_BENCHMARK_ROUNDS; ++round)
-    {
-        AFORC_EcsView *view = NULL;
-        void *components[ECS_TEST_TYPE_LIMIT];
-        bool has_value = false;
-        if (aforc_ecs_view_create(ecs, types, ECS_TEST_TYPE_LIMIT, &view) !=
-            AFORC_OK)
-        {
-            aforc_ecs_destroy(ecs);
-            return false;
-        }
-        for (;;)
-        {
-            size_t type_index;
-            if (aforc_ecs_view_next(view, &entity, components, &has_value) !=
-                AFORC_OK)
-            {
-                aforc_ecs_view_destroy(view);
-                aforc_ecs_destroy(ecs);
-                return false;
-            }
-            if (!has_value)
-            {
-                break;
-            }
-            for (type_index = 0U; type_index < ECS_TEST_TYPE_LIMIT;
-                 ++type_index)
-            {
-                const EcsTestComponent *component =
-                    (const EcsTestComponent *)components[type_index];
-                checksum += (uint64_t)component->entity_index +
-                            (uint64_t)component->type_id;
-            }
-        }
-        aforc_ecs_view_destroy(view);
-    }
-    elapsed = monotonic_nanoseconds() - started;
-    (void)printf(
-        "benchmark iteration: visits=%zu elapsed_ns=%llu ns/visit=%.3f "
-        "checksum=%llu\n",
-        (size_t)ECS_BENCHMARK_ENTITY_COUNT * (size_t)ECS_BENCHMARK_ROUNDS,
-        (unsigned long long)elapsed,
-        (double)elapsed /
-            ((double)ECS_BENCHMARK_ENTITY_COUNT * (double)ECS_BENCHMARK_ROUNDS),
-        (unsigned long long)checksum);
-    aforc_ecs_destroy(ecs);
     return true;
 }

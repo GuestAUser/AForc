@@ -7,7 +7,6 @@
 #include "ecs_optimization_support.h"
 
 #include <stdio.h>
-#include <string.h>
 
 static bool test_view_case(size_t type_count)
 {
@@ -143,24 +142,11 @@ static bool test_zero_and_revision(void)
     return passed;
 }
 
-int main(int argc, char **argv)
+int main(void)
 {
-    size_t sparse_bytes = 0U;
-
-    if (argc == 2 && strcmp(argv[1], "--benchmark") == 0)
+    if (!ecs_test_sparse())
     {
-        return ecs_test_benchmark() ? 0 : 1;
-    }
-    if (argc != 1)
-    {
-        (void)fprintf(stderr, "usage: %s [--benchmark]\n", argv[0]);
-        return 2;
-    }
-    if (!ecs_test_sparse(&sparse_bytes))
-    {
-        (void)fprintf(stderr,
-                      "sparse width/swap regression failed (bytes=%zu)\n",
-                      sparse_bytes);
+        (void)fprintf(stderr, "sparse width/swap regression failed\n");
         return 3;
     }
     if (!test_view_case(2U) || !test_view_case(4U) || !test_view_case(8U))
