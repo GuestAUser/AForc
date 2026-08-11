@@ -532,86 +532,6 @@ static AFORC_Status game_replace_exact(Game *game, const GameSaveState *state)
     return AFORC_OK;
 }
 
-static AFORC_Status game_replace_legacy(Game *game,
-                                        uint64_t seed,
-                                        uint32_t floor,
-                                        int32_t health,
-                                        uint32_t score,
-                                        uint32_t turn)
-{
-    Game replacement = {0};
-    const char *save_path = game->save_path;
-    AFORC_Status status = game_initialize(
-        &replacement, game->renderer, game->input, game->terminal, seed);
-
-    if (status != AFORC_OK)
-    {
-        return status;
-    }
-    replacement.save_path = save_path;
-    status = game_generate_floor(&replacement, floor, health);
-    if (status != AFORC_OK)
-    {
-        game_dispose(&replacement);
-        return status;
-    }
-    replacement.score = score;
-    replacement.turn = turn;
-    game_set_message(&replacement, "Run loaded from %s.", save_path);
-
-    game_dispose(game);
-    *game = replacement;
-    game->particle_pool.particles = game->particles;
-    game->scene.user_data = game;
-    return AFORC_OK;
-}
-
-static AFORC_Status game_decode_legacy(Game *game, AFORC_SaveReader *reader)
-{
-    uint64_t seed = 0U;
-    uint32_t floor = 0U;
-    int32_t health = 0;
-    uint32_t score = 0U;
-    uint32_t turn = 0U;
-    AFORC_Status status = aforc_save_reader_read_u64(reader, &seed);
-
-    if (status == AFORC_OK)
-    {
-        status = aforc_save_reader_read_u32(reader, &floor);
-    }
-    if (status == AFORC_OK)
-    {
-        status = aforc_save_reader_read_i32(reader, &health);
-    }
-    if (status == AFORC_OK)
-    {
-        status = aforc_save_reader_read_u32(reader, &score);
-    }
-    if (status == AFORC_OK)
-    {
-        status = aforc_save_reader_read_u32(reader, &turn);
-    }
-    if (status == AFORC_OK && !aforc_save_reader_finished(reader))
-    {
-        status = AFORC_ERROR_FORMAT;
-    }
-    if (status == AFORC_ERROR_END_OF_STREAM)
-    {
-        status = AFORC_ERROR_FORMAT;
-    }
-    if (status == AFORC_OK &&
-        (floor == 0U || floor > game->rules.final_floor || health <= 0 ||
-         health > GAME_SAVE_MAX_ACTOR_STAT))
-    {
-        status = AFORC_ERROR_FORMAT;
-    }
-    if (status != AFORC_OK)
-    {
-        return status;
-    }
-    return game_replace_legacy(game, seed, floor, health, score, turn);
-}
-
 AFORC_Status game_decode_save(Game *game, const void *data, size_t size)
 {
     AFORC_SaveReader reader = {0};
@@ -621,16 +541,12 @@ AFORC_Status game_decode_save(Game *game, const void *data, size_t size)
                                                  data,
                                                  size,
                                                  GAME_SAVE_MAX_BYTES,
-                                                 GAME_SAVE_LEGACY_SCHEMA,
+                                                 GAME_SAVE_SCHEMA,
                                                  GAME_SAVE_SCHEMA);
 
     if (status != AFORC_OK)
     {
         return status;
-    }
-    if (reader.schema_version == GAME_SAVE_LEGACY_SCHEMA)
-    {
-        return game_decode_legacy(game, &reader);
     }
     status = game_save_read_exact(game, &reader, &state);
     if (status == AFORC_OK)

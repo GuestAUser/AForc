@@ -201,7 +201,7 @@ static AFORC_Status game_smoke_exact_save_round_trip(Game *game,
                                         blob.data,
                                         blob.size,
                                         GAME_SAVE_MAX_BYTES,
-                                        GAME_SAVE_LEGACY_SCHEMA,
+                                        GAME_SAVE_SCHEMA,
                                         GAME_SAVE_SCHEMA);
         if (status == AFORC_OK && (GAME_SAVE_SCHEMA != 2 ||
                                    reader.schema_version != GAME_SAVE_SCHEMA))
@@ -305,81 +305,6 @@ static AFORC_Status game_smoke_exact_save_round_trip(Game *game,
     {
         game_dispose(&source);
     }
-    return status;
-}
-
-static AFORC_Status game_smoke_legacy_save(Game *game, AFORC_Error *error)
-{
-    Game loaded = {0};
-    AFORC_SaveWriter writer = {0};
-    AFORC_AssetBlob blob = {NULL, 0U};
-    GamePosition *position = NULL;
-    GameActor *actor = NULL;
-    const uint64_t seed = UINT64_C(0x123456789abcdef0);
-    const uint32_t floor = 2U;
-    const int32_t health = 520;
-    const int32_t expected_health =
-        game->rules.player_health < health ? game->rules.player_health : health;
-    const uint32_t score = UINT32_C(0x13579bdf);
-    const uint32_t turn = UINT32_C(0x2468ace0);
-    bool initialized = false;
-    AFORC_Status status = aforc_save_writer_init(
-        &writer, GAME_SAVE_LEGACY_SCHEMA, GAME_SAVE_MAX_BYTES);
-
-    if (status == AFORC_OK)
-    {
-        status = aforc_save_writer_write_u64(&writer, seed);
-    }
-    if (status == AFORC_OK)
-    {
-        status = aforc_save_writer_write_u32(&writer, floor);
-    }
-    if (status == AFORC_OK)
-    {
-        status = aforc_save_writer_write_i32(&writer, health);
-    }
-    if (status == AFORC_OK)
-    {
-        status = aforc_save_writer_write_u32(&writer, score);
-    }
-    if (status == AFORC_OK)
-    {
-        status = aforc_save_writer_write_u32(&writer, turn);
-    }
-    if (status == AFORC_OK)
-    {
-        status = aforc_save_writer_finish(&writer, &blob);
-    }
-    if (status == AFORC_OK)
-    {
-        status = game_initialize(
-            &loaded, game->renderer, game->input, game->terminal, UINT64_C(1));
-        initialized = status == AFORC_OK;
-    }
-    if (status == AFORC_OK)
-    {
-        status = game_decode_save(&loaded, blob.data, blob.size);
-    }
-    if (status == AFORC_OK)
-    {
-        status =
-            game_actor_components(&loaded, loaded.player, &position, &actor);
-    }
-    if (status == AFORC_OK && (loaded.seed != seed || loaded.floor != floor ||
-                               loaded.score != score || loaded.turn != turn ||
-                               actor->health != expected_health))
-    {
-        status = game_error(error,
-                            AFORC_ERROR_STATE,
-                            "smoke",
-                            "schema 1 checkpoint compatibility regressed");
-    }
-    if (initialized)
-    {
-        game_dispose(&loaded);
-    }
-    aforc_asset_blob_release(&blob);
-    aforc_save_writer_release(&writer);
     return status;
 }
 
@@ -646,10 +571,6 @@ game_runtime_smoke_checks(Game *game, AFORC_Engine *engine, AFORC_Error *error)
     if (status == AFORC_OK)
     {
         status = game_smoke_exact_save_round_trip(game, error);
-    }
-    if (status == AFORC_OK)
-    {
-        status = game_smoke_legacy_save(game, error);
     }
     if (status == AFORC_OK)
     {

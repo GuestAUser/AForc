@@ -6,6 +6,7 @@
 
 #include "roguelike/internal.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,32 +22,24 @@ typedef struct ProgramOptions
 
 AFORC_Status game_parse_seed(const char *text, uint64_t *out_seed)
 {
-    uint64_t value = 0U;
+    char *end = NULL;
+    unsigned long long value;
 
     if (text == NULL || out_seed == NULL)
     {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
-    if (text[0] == '\0')
+    if (text[0] < '0' || text[0] > '9')
     {
         return AFORC_ERROR_FORMAT;
     }
-    for (size_t index = 0U; text[index] != '\0'; ++index)
+    errno = 0;
+    value = strtoull(text, &end, 10);
+    if (errno != 0 || *end != '\0' || value > UINT64_MAX)
     {
-        uint64_t digit;
-
-        if (text[index] < '0' || text[index] > '9')
-        {
-            return AFORC_ERROR_FORMAT;
-        }
-        digit = (uint64_t)(text[index] - '0');
-        if (value > (UINT64_MAX - digit) / UINT64_C(10))
-        {
-            return AFORC_ERROR_FORMAT;
-        }
-        value = value * UINT64_C(10) + digit;
+        return AFORC_ERROR_FORMAT;
     }
-    *out_seed = value;
+    *out_seed = (uint64_t)value;
     return AFORC_OK;
 }
 

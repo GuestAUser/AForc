@@ -551,17 +551,6 @@ static AFORC_Status game_smoke_help_and_overlay(Game *game,
     return status;
 }
 
-static AFORC_Status game_smoke_maturity_stage(AFORC_Status status,
-                                              AFORC_Error *error,
-                                              const char *message)
-{
-    if (status != AFORC_OK && error->message[0] == '\0')
-    {
-        return game_error(error, status, "smoke", message);
-    }
-    return status;
-}
-
 static AFORC_Status game_smoke_burst_preserves_particles(Game *game,
                                                          AFORC_Point point,
                                                          bool strong,
@@ -821,50 +810,34 @@ game_smoke_checks(Game *game, AFORC_Engine *engine, AFORC_Error *error)
     if (status == AFORC_OK)
     {
         status = game_smoke_balanced_archetypes(game, error);
-        status = game_smoke_maturity_stage(
-            status, error, "archetype balance check failed");
     }
     if (status == AFORC_OK)
     {
         status = game_smoke_viewport_freezes_turn(game, engine, error);
-        status = game_smoke_maturity_stage(
-            status, error, "viewport freeze check failed");
     }
     if (status == AFORC_OK)
     {
         status = game_smoke_queued_turns_are_bounded(game, engine, error);
-        status = game_smoke_maturity_stage(
-            status, error, "queued turn check failed");
     }
     if (status == AFORC_OK)
     {
         status = game_smoke_terminal_states_can_load(game, engine, error);
-        status = game_smoke_maturity_stage(
-            status, error, "ended-run load check failed");
     }
     if (status == AFORC_OK)
     {
         status = game_smoke_enemy_perception(game, error);
-        status = game_smoke_maturity_stage(
-            status, error, "enemy perception check failed");
     }
     if (status == AFORC_OK)
     {
         status = game_smoke_turn_feedback(game, error);
-        status = game_smoke_maturity_stage(
-            status, error, "turn feedback check failed");
     }
     if (status == AFORC_OK)
     {
         status = game_smoke_adaptive_render(game, engine, error);
-        status = game_smoke_maturity_stage(
-            status, error, "adaptive render check failed");
     }
     if (status == AFORC_OK)
     {
         status = game_smoke_help_and_overlay(game, engine, error);
-        status = game_smoke_maturity_stage(
-            status, error, "help and overlay check failed");
     }
     aforc_free(&game->allocator, path);
     return status;
