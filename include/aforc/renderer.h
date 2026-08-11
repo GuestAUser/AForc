@@ -14,6 +14,8 @@ extern "C"
 {
 #endif
 
+#define AFORC_RENDERER_MAX_CELLS ((size_t)1048576u)
+
 typedef struct AFORC_Renderer AFORC_Renderer;
 
 typedef enum AFORC_ColorMode
@@ -73,7 +75,10 @@ typedef struct AFORC_RendererConfig
  * above ASCII, treats newline and carriage return as cursor controls, and
  * renders other control bytes as spaces. Present resizes to the terminal,
  * writes one complete diff batch, and advances the front buffer only after a
- * successful write; a failure therefore leaves the frame retryable.
+ * successful write; a failure therefore leaves the frame retryable. Create and
+ * resize reject surfaces above AFORC_RENDERER_MAX_CELLS with AFORC_ERROR_LIMIT
+ * before allocating either cell buffer. A rejected resize leaves the existing
+ * size and buffers unchanged.
  */
 
 AFORC_API AFORC_Color aforc_color_default(void);

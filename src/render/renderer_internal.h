@@ -49,18 +49,15 @@ static inline bool aforc_renderer_cell_is_valid(AFORC_Cell cell)
 static inline AFORC_Status aforc_renderer_cell_count(AFORC_Size size,
                                                      size_t *out_count)
 {
-    size_t count = 0u;
-
     if (out_count == NULL || size.width <= 0 || size.height <= 0)
     {
         return AFORC_ERROR_INVALID_ARGUMENT;
     }
-    if (!aforc_size_multiply((size_t)size.width, (size_t)size.height, &count) ||
-        count > SIZE_MAX / sizeof(AFORC_Cell))
+    if ((size_t)size.width > AFORC_RENDERER_MAX_CELLS / (size_t)size.height)
     {
-        return AFORC_ERROR_OVERFLOW;
+        return AFORC_ERROR_LIMIT;
     }
-    *out_count = count;
+    *out_count = (size_t)size.width * (size_t)size.height;
     return AFORC_OK;
 }
 
