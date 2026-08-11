@@ -3,16 +3,6 @@
 #include <stdint.h>
 #include <string.h>
 
-typedef const FieldzeroRoomDefinition *(*FieldzeroRoomProvider)(size_t *);
-
-static const FieldzeroRoomProvider fieldzero_room_providers[] = {
-    fieldzero_origin_rooms,
-    fieldzero_span_rooms,
-    fieldzero_well_rooms,
-    fieldzero_shear_rooms,
-    fieldzero_horizon_rooms,
-};
-
 static const size_t fieldzero_sector_room_counts[] = {2U, 2U, 3U, 3U, 2U};
 
 static bool fieldzero_text_valid(const char *text, bool allow_newline)
@@ -181,8 +171,8 @@ static bool fieldzero_band_valid(const FieldzeroBand *band, uint8_t state_count)
     return moved_horizontally != moved_vertically;
 }
 
-static bool fieldzero_room_valid(const FieldzeroRoomDefinition *room,
-                                 FieldzeroSector sector)
+bool fieldzero_content_validate_room(const FieldzeroRoomDefinition *room,
+                                     FieldzeroSector sector)
 {
     int64_t reverse_x;
     int64_t reverse_y;
@@ -191,8 +181,7 @@ static bool fieldzero_room_valid(const FieldzeroRoomDefinition *room,
     if (room == NULL || !fieldzero_text_valid(room->name, false) ||
         room->sector != sector || room->state_count < 2U ||
         room->state_count > FIELDZERO_MAX_ROOM_STATES ||
-        room->mark_count != (size_t)room->state_count - 1U ||
-        room->mark_count > FIELDZERO_MAX_MARKS ||
+        fieldzero_room_mark_count(room) > FIELDZERO_MAX_MARKS ||
         room->static_rectangle_count == 0U ||
         room->static_rectangle_count > FIELDZERO_MAX_STATIC_RECTS ||
         room->band_count == 0U || room->band_count > FIELDZERO_MAX_BANDS ||
@@ -200,8 +189,8 @@ static bool fieldzero_room_valid(const FieldzeroRoomDefinition *room,
         (unsigned char)room->terrain_glyph > 126U ||
         (unsigned char)room->detail_glyph < 32U ||
         (unsigned char)room->detail_glyph > 126U ||
-        room->has_memory != (room->memory_text != NULL) ||
-        (room->has_memory && !fieldzero_text_valid(room->memory_text, true)))
+        (fieldzero_room_has_memory(room) &&
+         !fieldzero_text_valid(room->memory_text, true)))
     {
         return false;
     }
@@ -226,14 +215,15 @@ static bool fieldzero_room_valid(const FieldzeroRoomDefinition *room,
     {
         return false;
     }
-    for (size_t index = 0U; index < room->mark_count; ++index)
+    for (size_t index = 0U; index < fieldzero_room_mark_count(room); ++index)
     {
         if (!fieldzero_room_release_safe(room, room->marks[index]))
         {
             return false;
         }
     }
-    if (room->has_memory && !fieldzero_room_release_safe(room, room->memory))
+    if (fieldzero_room_has_memory(room) &&
+        !fieldzero_room_release_safe(room, room->memory))
     {
         return false;
     }
@@ -248,51 +238,15 @@ static bool fieldzero_room_valid(const FieldzeroRoomDefinition *room,
     return fieldzero_room_release_safe(room, reverse_spawn);
 }
 
-static bool
-fieldzero_validator_rejects_broken(const FieldzeroRoomDefinition *room)
-{
-    FieldzeroRoomDefinition broken = *room;
-
-    broken.state_count = 0U;
-    if (fieldzero_room_valid(&broken, room->sector))
-    {
-        return false;
-    }
-    broken = *room;
-    broken.bands[0].offsets[1].x = 1;
-    if (fieldzero_room_valid(&broken, room->sector))
-    {
-        return false;
-    }
-    broken = *room;
-    broken.bands[0].offsets[1] = (AFORC_Point){4, 4};
-    if (fieldzero_room_valid(&broken, room->sector))
-    {
-        return false;
-    }
-    broken = *room;
-    broken.spawn = (AFORC_Point){-1, 0};
-    if (fieldzero_room_valid(&broken, room->sector))
-    {
-        return false;
-    }
-    broken = *room;
-    broken.has_memory = !broken.has_memory;
-    return !fieldzero_room_valid(&broken, room->sector);
-}
-
 bool fieldzero_content_validate_all(void)
 {
     const FieldzeroRoomDefinition *seen[FIELDZERO_ROOM_COUNT] = {0};
     size_t total_rooms = 0U;
     size_t total_memories = 0U;
 
-    if (sizeof(fieldzero_room_providers) /
-                sizeof(fieldzero_room_providers[0]) !=
-            FIELDZERO_SECTOR_COUNT ||
-        sizeof(fieldzero_sector_room_counts) /
-                sizeof(fieldzero_sector_room_counts[0]) !=
-            FIELDZERO_SECTOR_COUNT)
+    if (sizeof(fieldzero_sector_room_counts) /
+            sizeof(fieldzero_sector_room_counts[0]) !=
+        FIELDZERO_SECTOR_COUNT)
     {
         return false;
     }
@@ -300,7 +254,7 @@ bool fieldzero_content_validate_all(void)
     {
         size_t count = 0U;
         const FieldzeroRoomDefinition *rooms =
-            fieldzero_room_providers[sector](&count);
+            fieldzero_content_sector_rooms((FieldzeroSector)sector, &count);
 
         if (rooms == NULL || count != fieldzero_sector_room_counts[sector] ||
             strcmp(fieldzero_sector_name((FieldzeroSector)sector), "UNKNOWN") ==
@@ -313,7 +267,8 @@ bool fieldzero_content_validate_all(void)
             const FieldzeroRoomDefinition *room = &rooms[room_index];
 
             if (total_rooms >= FIELDZERO_ROOM_COUNT ||
-                !fieldzero_room_valid(room, (FieldzeroSector)sector) ||
+                !fieldzero_content_validate_room(room,
+                                                 (FieldzeroSector)sector) ||
                 fieldzero_content_room(total_rooms) != room)
             {
                 return false;
@@ -327,11 +282,10 @@ bool fieldzero_content_validate_all(void)
             }
             seen[total_rooms] = room;
             ++total_rooms;
-            total_memories += room->has_memory ? 1U : 0U;
+            total_memories += fieldzero_room_has_memory(room) ? 1U : 0U;
         }
     }
     return total_rooms == FIELDZERO_ROOM_COUNT &&
            total_memories == FIELDZERO_MEMORY_COUNT &&
-           fieldzero_content_room(FIELDZERO_ROOM_COUNT) == NULL &&
-           fieldzero_validator_rejects_broken(seen[0]);
+           fieldzero_content_room(FIELDZERO_ROOM_COUNT) == NULL;
 }

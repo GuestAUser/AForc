@@ -10,9 +10,7 @@ static const FieldzeroRoomDefinition span_rooms[] = {
         .spawn = {4, 16},
         .exit = {67, 10},
         .marks = {{18, 10}},
-        .mark_count = 1U,
         .memory = {14, 13},
-        .has_memory = true,
         .static_rectangles =
             {
                 {0, 0, 1, 18},
@@ -47,9 +45,7 @@ static const FieldzeroRoomDefinition span_rooms[] = {
         .spawn = {4, 16},
         .exit = {68, 5},
         .marks = {{19, 12}, {51, 9}},
-        .mark_count = 2U,
         .memory = {10, 14},
-        .has_memory = true,
         .static_rectangles =
             {
                 {0, 0, 1, 18},

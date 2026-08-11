@@ -10,9 +10,7 @@ static const FieldzeroRoomDefinition shear_rooms[] = {
         .spawn = {4, 16},
         .exit = {67, 4},
         .marks = {{32, 11}},
-        .mark_count = 1U,
         .memory = {0, 0},
-        .has_memory = false,
         .static_rectangles =
             {
                 {0, 0, 1, 18},
@@ -51,9 +49,7 @@ static const FieldzeroRoomDefinition shear_rooms[] = {
         .spawn = {4, 16},
         .exit = {68, 1},
         .marks = {{28, 12}, {60, 6}},
-        .mark_count = 2U,
         .memory = {46, 9},
-        .has_memory = true,
         .static_rectangles =
             {
                 {0, 0, 1, 18},
@@ -100,9 +96,7 @@ static const FieldzeroRoomDefinition shear_rooms[] = {
         .spawn = {4, 3},
         .exit = {68, 2},
         .marks = {{34, 14}, {53, 8}},
-        .mark_count = 2U,
         .memory = {22, 10},
-        .has_memory = true,
         .static_rectangles =
             {
                 {0, 0, 1, 18},

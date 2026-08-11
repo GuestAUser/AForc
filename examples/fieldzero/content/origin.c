@@ -10,9 +10,7 @@ static const FieldzeroRoomDefinition origin_rooms[] = {
         .spawn = {4, 16},
         .exit = {68, 9},
         .marks = {{27, 11}},
-        .mark_count = 1U,
         .memory = {15, 14},
-        .has_memory = true,
         .static_rectangles =
             {
                 {0, 0, 1, 18},
@@ -46,9 +44,7 @@ static const FieldzeroRoomDefinition origin_rooms[] = {
         .spawn = {4, 16},
         .exit = {68, 6},
         .marks = {{32, 10}},
-        .mark_count = 1U,
         .memory = {13, 14},
-        .has_memory = true,
         .static_rectangles =
             {
                 {0, 0, 1, 18},

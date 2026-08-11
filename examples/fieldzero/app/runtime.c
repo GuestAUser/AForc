@@ -207,18 +207,6 @@ static void fieldzero_print_failure(const char *mode,
                   error != NULL ? error->message : "");
 }
 
-static unsigned int fieldzero_count_room_bits(uint16_t bits)
-{
-    unsigned int count = 0U;
-
-    while (bits != 0U)
-    {
-        count += (unsigned int)(bits & UINT16_C(1));
-        bits = (uint16_t)(bits >> 1U);
-    }
-    return count;
-}
-
 int fieldzero_run_interactive(const FieldzeroOptions *options)
 {
     FieldzeroApp app = {0};
@@ -296,8 +284,8 @@ int fieldzero_run_smoke(const FieldzeroOptions *options)
                      " rooms=%u memories=%u state=%" PRIu64
                      " collision=%" PRIu64 "\n",
                      app.game.seed,
-                     fieldzero_count_room_bits(app.game.completed_rooms),
-                     fieldzero_count_room_bits(app.game.collected_memories),
+                     fieldzero_popcount_u16(app.game.completed_rooms),
+                     fieldzero_popcount_u16(app.game.collected_memories),
                      fieldzero_game_state_digest(&app.game),
                      fieldzero_game_collision_digest(&app.game));
     }

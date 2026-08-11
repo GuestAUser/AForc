@@ -46,6 +46,7 @@ void fieldzero_game_press_dash(FieldzeroGame *game);
 bool fieldzero_game_cell_blocked(const FieldzeroGame *game,
                                  int32_t x,
                                  int32_t y);
+AFORC_Status fieldzero_collision_move(FieldzeroGame *game);
 AFORC_Status fieldzero_game_rebuild_maps(FieldzeroGame *game);
 AFORC_Status fieldzero_game_begin_registration(FieldzeroGame *game);
 AFORC_Status fieldzero_game_tick_registration(FieldzeroGame *game);

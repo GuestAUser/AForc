@@ -25,11 +25,28 @@ typedef struct FieldzeroApp
     bool initialized;
 } FieldzeroApp;
 
-bool fieldzero_parse_options(int argc,
-                             char **argv,
-                             FieldzeroOptions *out_options,
-                             bool *out_help);
-void fieldzero_print_help(const char *program_name);
+static inline uint32_t fieldzero_event_codepoint(const AFORC_InputEvent *event)
+{
+    uint32_t codepoint = event->data.key.codepoint;
+
+    if (codepoint == 0U && event->data.key.key >= AFORC_KEY_A &&
+        event->data.key.key <= AFORC_KEY_Z)
+    {
+        codepoint = (uint32_t)event->data.key.key;
+        if ((event->data.key.modifiers & AFORC_MOD_SHIFT) == 0U)
+        {
+            codepoint += (uint32_t)('a' - 'A');
+        }
+    }
+    return codepoint;
+}
+
+static inline bool fieldzero_codepoint_is(uint32_t codepoint, char letter)
+{
+    return codepoint == (uint32_t)letter ||
+           codepoint == (uint32_t)(letter - ('a' - 'A'));
+}
+
 int fieldzero_run_interactive(const FieldzeroOptions *options);
 int fieldzero_run_smoke(const FieldzeroOptions *options);
 

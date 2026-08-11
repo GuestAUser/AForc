@@ -24,18 +24,6 @@ enum
     FIELDZERO_HUD_LINE_CAPACITY = 160
 };
 
-AFORC_Cell fieldzero_visual_cell(uint32_t codepoint,
-                                 uint8_t role,
-                                 AFORC_CellStyle style,
-                                 bool no_color);
-AFORC_Status
-fieldzero_visual_plot(void *context, AFORC_Point position, AFORC_Cell cell);
-AFORC_Status fieldzero_render_ui(AFORC_Renderer *renderer,
-                                 const FieldzeroGame *game,
-                                 const FieldzeroPresentation *presentation,
-                                 const FieldzeroViewState *view,
-                                 AFORC_Rect arena);
-
 static AFORC_Cell
 fieldzero_ui_cell(uint8_t role, AFORC_CellStyle style, bool no_color)
 {
@@ -67,18 +55,6 @@ static AFORC_Status fieldzero_label(const AFORC_UICanvas *canvas,
                                strlen(text),
                                align,
                                fieldzero_ui_cell(role, style, no_color));
-}
-
-static unsigned int fieldzero_popcount_u16(uint16_t bits)
-{
-    unsigned int count = 0U;
-
-    while (bits != 0U)
-    {
-        count += (unsigned int)(bits & UINT16_C(1));
-        bits = (uint16_t)(bits >> 1U);
-    }
-    return count;
 }
 
 static AFORC_Status fieldzero_draw_title(const AFORC_UICanvas *canvas,
@@ -382,7 +358,7 @@ static void fieldzero_format_phase_status(const FieldzeroGame *game,
                            capacity,
                            "REGISTERING + %u/%zu // FOUR-CELL SHIFT",
                            (unsigned int)game->registration_target_state,
-                           game->room->mark_count);
+                           fieldzero_room_mark_count(game->room));
             break;
         case FIELDZERO_PHASE_DISSOLVING:
             (void)snprintf(
@@ -403,13 +379,13 @@ static void fieldzero_format_phase_status(const FieldzeroGame *game,
             break;
         case FIELDZERO_PHASE_ACTIVE:
         default:
-            if (game->room_state < game->room->mark_count)
+            if (game->room_state < fieldzero_room_mark_count(game->room))
             {
                 (void)snprintf(text,
                                capacity,
                                "OBJECTIVE // TOUCH + %u/%zu TO ALIGN",
                                (unsigned int)game->room_state + 1U,
-                               game->room->mark_count);
+                               fieldzero_room_mark_count(game->room));
             }
             else
             {
@@ -447,7 +423,7 @@ static AFORC_Status fieldzero_draw_hud(const AFORC_UICanvas *canvas,
         fieldzero_popcount_u16(game->completed_rooms),
         FIELDZERO_ROOM_COUNT,
         (unsigned int)game->room_state,
-        game->room->mark_count,
+        fieldzero_room_mark_count(game->room),
         fieldzero_popcount_u16(game->collected_memories),
         FIELDZERO_MEMORY_COUNT,
         game->falls);

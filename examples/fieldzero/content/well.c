@@ -10,9 +10,7 @@ static const FieldzeroRoomDefinition well_rooms[] = {
         .spawn = {4, 16},
         .exit = {67, 4},
         .marks = {{32, 10}},
-        .mark_count = 1U,
         .memory = {20, 13},
-        .has_memory = true,
         .static_rectangles =
             {
                 {0, 0, 1, 18},
@@ -52,9 +50,7 @@ static const FieldzeroRoomDefinition well_rooms[] = {
         .spawn = {4, 16},
         .exit = {67, 13},
         .marks = {{29, 3}},
-        .mark_count = 1U,
         .memory = {32, 6},
-        .has_memory = true,
         .static_rectangles =
             {
                 {0, 0, 1, 18},
@@ -100,9 +96,7 @@ static const FieldzeroRoomDefinition well_rooms[] = {
         .spawn = {4, 2},
         .exit = {68, 2},
         .marks = {{31, 14}, {50, 8}},
-        .mark_count = 2U,
         .memory = {20, 11},
-        .has_memory = true,
         .static_rectangles =
             {
                 {0, 0, 1, 18},

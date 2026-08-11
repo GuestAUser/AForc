@@ -4,7 +4,11 @@
 #include "fieldzero/types.h"
 
 const FieldzeroRoomDefinition *fieldzero_content_room(size_t room_index);
+const FieldzeroRoomDefinition *
+fieldzero_content_sector_rooms(FieldzeroSector sector, size_t *out_count);
 const char *fieldzero_sector_name(FieldzeroSector sector);
+bool fieldzero_content_validate_room(const FieldzeroRoomDefinition *room,
+                                     FieldzeroSector sector);
 bool fieldzero_content_validate_all(void);
 
 const FieldzeroRoomDefinition *fieldzero_origin_rooms(size_t *out_count);

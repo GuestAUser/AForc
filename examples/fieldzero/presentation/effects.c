@@ -26,39 +26,23 @@ enum
 static const uint64_t fieldzero_decorative_stream =
     UINT64_C(0x465a50524553454e);
 
-AFORC_Cell fieldzero_visual_cell(uint32_t codepoint,
-                                 uint8_t role,
-                                 AFORC_CellStyle style,
-                                 bool no_color);
-
-static int32_t fieldzero_effect_fixed_to_cell(int32_t value)
-{
-    const int64_t wide = value;
-    const int64_t half = FIELDZERO_FIXED_ONE / 2;
-
-    if (wide >= 0)
-    {
-        return (int32_t)((wide + half) / FIELDZERO_FIXED_ONE);
-    }
-    return (int32_t)-((-wide + half) / FIELDZERO_FIXED_ONE);
-}
-
 static AFORC_Point fieldzero_effect_player_cell(const FieldzeroGame *game)
 {
-    return (AFORC_Point){fieldzero_effect_fixed_to_cell(game->player.x),
-                         fieldzero_effect_fixed_to_cell(game->player.y)};
+    return (AFORC_Point){fieldzero_fixed_to_cell(game->player.x),
+                         fieldzero_fixed_to_cell(game->player.y)};
 }
 
 static bool fieldzero_effect_is_feature(const FieldzeroGame *game,
                                         AFORC_Point point)
 {
     if (aforc_world_point_equal(point, game->room->exit) ||
-        (game->room->has_memory &&
+        (fieldzero_room_has_memory(game->room) &&
          aforc_world_point_equal(point, game->room->memory)))
     {
         return true;
     }
-    for (size_t index = 0U; index < game->room->mark_count; ++index)
+    for (size_t index = 0U; index < fieldzero_room_mark_count(game->room);
+         ++index)
     {
         if (aforc_world_point_equal(point, game->room->marks[index]))
         {
@@ -220,7 +204,7 @@ fieldzero_effect_emit_phase(FieldzeroPresentation *presentation,
                        : FIELDZERO_PHASE_PARTICLE_COUNT;
 
     if (game->phase == FIELDZERO_PHASE_REGISTERING &&
-        game->room_state < game->room->mark_count)
+        game->room_state < fieldzero_room_mark_count(game->room))
     {
         point = game->room->marks[game->room_state];
     }

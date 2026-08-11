@@ -5,13 +5,10 @@
 
 enum
 {
-    FIELDZERO_FIXED_HALF = FIELDZERO_FIXED_ONE / 2,
     FIELDZERO_CORNER_THRESHOLD = FIELDZERO_FIXED_ONE / 4,
     FIELDZERO_COLLISION_TICKS_PER_SECOND = FIELDZERO_FIXED_UPDATES_PER_SECOND,
     FIELDZERO_SWEEP_LIMIT = FIELDZERO_ARENA_WIDTH + FIELDZERO_ARENA_HEIGHT + 2
 };
-
-AFORC_Status fieldzero_collision_move(FieldzeroGame *game);
 
 static bool fieldzero_tile_blocks(AFORC_Tile tile,
                                   uint32_t layer,
@@ -77,17 +74,6 @@ bool fieldzero_game_cell_blocked(const FieldzeroGame *game,
 
     return fieldzero_collision_cell_blocked(game, x, y, &blocked) != AFORC_OK ||
            blocked;
-}
-
-static int32_t fieldzero_fixed_to_cell(int32_t value)
-{
-    const int64_t wide = value;
-
-    if (wide >= 0)
-    {
-        return (int32_t)((wide + FIELDZERO_FIXED_HALF) / FIELDZERO_FIXED_ONE);
-    }
-    return (int32_t)-((-wide + FIELDZERO_FIXED_HALF) / FIELDZERO_FIXED_ONE);
 }
 
 static AFORC_Status

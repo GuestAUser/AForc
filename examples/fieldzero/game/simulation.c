@@ -32,8 +32,6 @@ enum
         (120 * FIELDZERO_TICKS_PER_SECOND + 500) / 1000
 };
 
-AFORC_Status fieldzero_collision_move(FieldzeroGame *game);
-
 static int fieldzero_movement_intent(const FieldzeroActions *actions)
 {
     return (actions->right ? 1 : 0) - (actions->left ? 1 : 0);

@@ -1,33 +1,5 @@
 #include "fieldzero/app.h"
 
-static uint32_t fieldzero_event_codepoint(const AFORC_InputEvent *event)
-{
-    uint32_t codepoint = event->data.key.codepoint;
-
-    if (codepoint == 0U && event->data.key.key >= AFORC_KEY_A &&
-        event->data.key.key <= AFORC_KEY_Z)
-    {
-        codepoint = (uint32_t)event->data.key.key;
-        if ((event->data.key.modifiers & AFORC_MOD_SHIFT) == 0U)
-        {
-            codepoint += (uint32_t)('a' - 'A');
-        }
-    }
-    return codepoint;
-}
-
-static bool fieldzero_codepoint_is(uint32_t codepoint, char letter)
-{
-    return codepoint == (uint32_t)letter ||
-           codepoint == (uint32_t)(letter - ('a' - 'A'));
-}
-
-static bool fieldzero_overlay_active(const FieldzeroViewState *view)
-{
-    return view->help_visible || view->paused || view->focus_paused ||
-           view->quit_confirmation;
-}
-
 static bool fieldzero_is_left(const AFORC_InputEvent *event, uint32_t codepoint)
 {
     return event->data.key.key == AFORC_KEY_LEFT ||
@@ -129,7 +101,8 @@ void fieldzero_app_reconcile_input(FieldzeroApp *app)
         return;
     }
     if (app->view.screen != FIELDZERO_SCREEN_PLAY ||
-        fieldzero_overlay_active(&app->view) || app->view.terminal_too_small ||
+        fieldzero_view_has_overlay(&app->view) ||
+        app->view.terminal_too_small ||
         app->game.phase != FIELDZERO_PHASE_ACTIVE)
     {
         fieldzero_game_clear_actions(&app->game);
@@ -221,7 +194,8 @@ void fieldzero_app_handle_input(FieldzeroApp *app,
         return;
     }
     if (app->view.screen != FIELDZERO_SCREEN_PLAY ||
-        fieldzero_overlay_active(&app->view) || app->view.terminal_too_small ||
+        fieldzero_view_has_overlay(&app->view) ||
+        app->view.terminal_too_small ||
         app->game.phase != FIELDZERO_PHASE_ACTIVE)
     {
         return;

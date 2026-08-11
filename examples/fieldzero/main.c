@@ -64,10 +64,10 @@ static void fieldzero_print_usage(FILE *stream, const char *program_name)
         program_name != NULL ? program_name : "aforc-fieldzero");
 }
 
-bool fieldzero_parse_options(int argc,
-                             char **argv,
-                             FieldzeroOptions *out_options,
-                             bool *out_help)
+static bool fieldzero_parse_options(int argc,
+                                    char **argv,
+                                    FieldzeroOptions *out_options,
+                                    bool *out_help)
 {
     FieldzeroOptions options = {0};
     bool help = false;
@@ -152,11 +152,6 @@ bool fieldzero_parse_options(int argc,
     return true;
 }
 
-void fieldzero_print_help(const char *program_name)
-{
-    fieldzero_print_usage(stdout, program_name);
-}
-
 int main(int argc, char **argv)
 {
     const char *program_name = argc > 0 && argv != NULL && argv[0] != NULL
@@ -173,7 +168,7 @@ int main(int argc, char **argv)
     }
     if (help)
     {
-        fieldzero_print_help(program_name);
+        fieldzero_print_usage(stdout, program_name);
         return EXIT_SUCCESS;
     }
     return options.smoke ? fieldzero_run_smoke(&options)

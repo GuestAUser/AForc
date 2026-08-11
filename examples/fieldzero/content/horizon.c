@@ -10,9 +10,7 @@ static const FieldzeroRoomDefinition horizon_rooms[] = {
         .spawn = {4, 16},
         .exit = {68, 3},
         .marks = {{28, 6}, {47, 10}},
-        .mark_count = 2U,
         .memory = {0, 0},
-        .has_memory = false,
         .static_rectangles =
             {
                 {0, 0, 1, 18},
@@ -63,9 +61,7 @@ static const FieldzeroRoomDefinition horizon_rooms[] = {
         .spawn = {4, 11},
         .exit = {68, 2},
         .marks = {{30, 15}, {44, 9}},
-        .mark_count = 2U,
         .memory = {50, 9},
-        .has_memory = true,
         .static_rectangles =
             {
                 {0, 0, 1, 18},

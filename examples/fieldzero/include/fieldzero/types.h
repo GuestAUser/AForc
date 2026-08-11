@@ -73,9 +73,7 @@ typedef struct FieldzeroRoomDefinition
     AFORC_Point spawn;
     AFORC_Point exit;
     AFORC_Point marks[FIELDZERO_MAX_MARKS];
-    size_t mark_count;
     AFORC_Point memory;
-    bool has_memory;
     AFORC_Rect static_rectangles[FIELDZERO_MAX_STATIC_RECTS];
     size_t static_rectangle_count;
     FieldzeroBand bands[FIELDZERO_MAX_BANDS];
@@ -83,6 +81,39 @@ typedef struct FieldzeroRoomDefinition
     char terrain_glyph;
     char detail_glyph;
 } FieldzeroRoomDefinition;
+
+static inline size_t
+fieldzero_room_mark_count(const FieldzeroRoomDefinition *room)
+{
+    return (size_t)room->state_count - 1U;
+}
+
+static inline bool
+fieldzero_room_has_memory(const FieldzeroRoomDefinition *room)
+{
+    return room->memory_text != NULL;
+}
+
+static inline int32_t fieldzero_fixed_to_cell(int32_t value)
+{
+    const int64_t wide = value;
+    const int64_t half = FIELDZERO_FIXED_ONE / 2;
+
+    return wide >= 0 ? (int32_t)((wide + half) / FIELDZERO_FIXED_ONE)
+                     : (int32_t)-((-wide + half) / FIELDZERO_FIXED_ONE);
+}
+
+static inline unsigned int fieldzero_popcount_u16(uint16_t bits)
+{
+    unsigned int count = 0U;
+
+    while (bits != 0U)
+    {
+        count += (unsigned int)(bits & UINT16_C(1));
+        bits = (uint16_t)(bits >> 1U);
+    }
+    return count;
+}
 
 typedef struct FieldzeroActions
 {
@@ -135,5 +166,11 @@ typedef struct FieldzeroViewState
     bool quit_confirmation;
     bool terminal_too_small;
 } FieldzeroViewState;
+
+static inline bool fieldzero_view_has_overlay(const FieldzeroViewState *view)
+{
+    return view->help_visible || view->paused || view->focus_paused ||
+           view->quit_confirmation;
+}
 
 #endif

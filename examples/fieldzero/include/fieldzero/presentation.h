@@ -24,6 +24,21 @@ typedef struct FieldzeroPresentation
     bool no_color;
 } FieldzeroPresentation;
 
+AFORC_Cell fieldzero_visual_cell(uint32_t codepoint,
+                                 uint8_t role,
+                                 AFORC_CellStyle style,
+                                 bool no_color);
+AFORC_Status
+fieldzero_visual_plot(void *context, AFORC_Point position, AFORC_Cell cell);
+AFORC_Status fieldzero_render_world(AFORC_Renderer *renderer,
+                                    const FieldzeroGame *game,
+                                    const FieldzeroPresentation *presentation,
+                                    AFORC_Rect arena);
+AFORC_Status fieldzero_render_ui(AFORC_Renderer *renderer,
+                                 const FieldzeroGame *game,
+                                 const FieldzeroPresentation *presentation,
+                                 const FieldzeroViewState *view,
+                                 AFORC_Rect arena);
 AFORC_Status fieldzero_presentation_init(FieldzeroPresentation *presentation,
                                          const FieldzeroOptions *options);
 void fieldzero_presentation_dispose(FieldzeroPresentation *presentation);

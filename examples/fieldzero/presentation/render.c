@@ -25,22 +25,6 @@ enum
     FIELDZERO_SIGNAL_BLUE = 0x76
 };
 
-AFORC_Cell fieldzero_visual_cell(uint32_t codepoint,
-                                 uint8_t role,
-                                 AFORC_CellStyle style,
-                                 bool no_color);
-AFORC_Status
-fieldzero_visual_plot(void *context, AFORC_Point position, AFORC_Cell cell);
-AFORC_Status fieldzero_render_world(AFORC_Renderer *renderer,
-                                    const FieldzeroGame *game,
-                                    const FieldzeroPresentation *presentation,
-                                    AFORC_Rect arena);
-AFORC_Status fieldzero_render_ui(AFORC_Renderer *renderer,
-                                 const FieldzeroGame *game,
-                                 const FieldzeroPresentation *presentation,
-                                 const FieldzeroViewState *view,
-                                 AFORC_Rect arena);
-
 static AFORC_Color fieldzero_visual_color(uint8_t role)
 {
     switch (role)
@@ -269,8 +253,7 @@ AFORC_Status fieldzero_render_validate(const AFORC_Renderer *renderer,
     const bool too_small = screen.width < FIELDZERO_MIN_WIDTH ||
                            screen.height < FIELDZERO_MIN_HEIGHT ||
                            view->terminal_too_small;
-    const bool overlay = view->help_visible || view->paused ||
-                         view->focus_paused || view->quit_confirmation;
+    const bool overlay = fieldzero_view_has_overlay(view);
     const bool gameplay =
         view->screen == FIELDZERO_SCREEN_PLAY && !too_small && !overlay;
 

@@ -248,7 +248,7 @@ AFORC_Status fieldzero_game_begin_registration(FieldzeroGame *game)
         game->phase != FIELDZERO_PHASE_ACTIVE ||
         game->room->state_count == 0U ||
         game->room_state + 1U >= game->room->state_count ||
-        game->room_state >= game->room->mark_count)
+        game->room_state >= fieldzero_room_mark_count(game->room))
     {
         return AFORC_ERROR_STATE;
     }

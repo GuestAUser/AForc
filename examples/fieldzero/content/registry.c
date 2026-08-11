@@ -10,6 +10,20 @@ static const FieldzeroRoomProvider room_providers[FIELDZERO_SECTOR_COUNT] = {
     fieldzero_horizon_rooms,
 };
 
+const FieldzeroRoomDefinition *
+fieldzero_content_sector_rooms(FieldzeroSector sector, size_t *out_count)
+{
+    if (sector < FIELDZERO_SECTOR_ORIGIN || sector > FIELDZERO_SECTOR_HORIZON)
+    {
+        if (out_count != NULL)
+        {
+            *out_count = 0U;
+        }
+        return NULL;
+    }
+    return room_providers[(size_t)sector](out_count);
+}
+
 const FieldzeroRoomDefinition *fieldzero_content_room(size_t room_index)
 {
     if (room_index >= FIELDZERO_ROOM_COUNT)
@@ -19,7 +33,8 @@ const FieldzeroRoomDefinition *fieldzero_content_room(size_t room_index)
     for (size_t sector = 0U; sector < FIELDZERO_SECTOR_COUNT; ++sector)
     {
         size_t count = 0U;
-        const FieldzeroRoomDefinition *rooms = room_providers[sector](&count);
+        const FieldzeroRoomDefinition *rooms =
+            fieldzero_content_sector_rooms((FieldzeroSector)sector, &count);
 
         if (rooms == NULL)
         {

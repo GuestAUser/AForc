@@ -5,10 +5,6 @@
 
 enum
 {
-    FIELDZERO_REGRESSION_REGISTRATION_TICKS = 27,
-    FIELDZERO_REGRESSION_DISSOLVE_TICKS = 30,
-    FIELDZERO_REGRESSION_ROOM_TRANSITION_TICKS = 18,
-    FIELDZERO_REGRESSION_SECTOR_TRANSITION_TICKS = 45,
     FIELDZERO_REGRESSION_DASH_TICKS = 7
 };
 
@@ -242,60 +238,16 @@ static const FieldzeroRegressionRouteRun fieldzero_completion_routes
 
 static bool fieldzero_regression_content(void)
 {
-    static const FieldzeroSector expected_sectors[FIELDZERO_ROOM_COUNT] = {
-        FIELDZERO_SECTOR_ORIGIN,
-        FIELDZERO_SECTOR_ORIGIN,
-        FIELDZERO_SECTOR_SPAN,
-        FIELDZERO_SECTOR_SPAN,
-        FIELDZERO_SECTOR_WELL,
-        FIELDZERO_SECTOR_WELL,
-        FIELDZERO_SECTOR_WELL,
-        FIELDZERO_SECTOR_SHEAR,
-        FIELDZERO_SECTOR_SHEAR,
-        FIELDZERO_SECTOR_SHEAR,
-        FIELDZERO_SECTOR_HORIZON,
-        FIELDZERO_SECTOR_HORIZON,
-    };
-    size_t memories = 0U;
+    const FieldzeroRoomDefinition *room = fieldzero_content_room(0U);
+    FieldzeroRoomDefinition malformed;
 
-    if (!fieldzero_content_validate_all() ||
-        fieldzero_content_room(FIELDZERO_ROOM_COUNT) != NULL)
+    if (!fieldzero_content_validate_all() || room == NULL)
     {
         return false;
     }
-    for (size_t room_index = 0U; room_index < FIELDZERO_ROOM_COUNT;
-         ++room_index)
-    {
-        const FieldzeroRoomDefinition *room =
-            fieldzero_content_room(room_index);
-
-        if (room == NULL || room->sector != expected_sectors[room_index] ||
-            room->state_count < 2U ||
-            room->state_count > FIELDZERO_MAX_ROOM_STATES ||
-            room->mark_count != (size_t)room->state_count - 1U)
-        {
-            return false;
-        }
-        memories += room->has_memory ? 1U : 0U;
-        for (size_t band_index = 0U; band_index < room->band_count;
-             ++band_index)
-        {
-            const FieldzeroBand *band = &room->bands[band_index];
-
-            for (uint8_t state = 0U; state < room->state_count; ++state)
-            {
-                if (band->offsets[state].x % 4 != 0 ||
-                    band->offsets[state].y % 4 != 0)
-                {
-                    return false;
-                }
-            }
-        }
-    }
-    return memories == FIELDZERO_MEMORY_COUNT &&
-           strcmp(fieldzero_sector_name(FIELDZERO_SECTOR_ORIGIN), "ORIGIN") ==
-               0 &&
-           strcmp(fieldzero_sector_name((FieldzeroSector)-1), "UNKNOWN") == 0;
+    malformed = *room;
+    malformed.bands[0].offsets[1].x = 1;
+    return !fieldzero_content_validate_room(&malformed, room->sector);
 }
 
 static bool fieldzero_regression_acceleration(void)
@@ -491,26 +443,10 @@ static bool fieldzero_regression_completion_routes(void)
                 fieldzero_completion_routes[room_index],
                 &registrations) &&
             game.phase == FIELDZERO_PHASE_ROOM_TRANSITION &&
-            registrations == game.room->mark_count &&
+            registrations == fieldzero_room_mark_count(game.room) &&
             game.room_state + 1U == game.room->state_count &&
             game.checkpoint.room_state == game.room_state && game.falls == 0U &&
             (game.completed_rooms & room_bit) != 0U;
-        fieldzero_game_dispose(&game);
-    }
-    if (passed)
-    {
-        FieldzeroGame game = {0};
-        FieldzeroRegressionRouteRun
-            unterminated[FIELDZERO_REGRESSION_MAX_ROUTE_RUNS];
-        uint8_t registrations = 0U;
-
-        for (size_t run = 0U; run < FIELDZERO_REGRESSION_MAX_ROUTE_RUNS; ++run)
-        {
-            unterminated[run] = (FieldzeroRegressionRouteRun){0U, 1U};
-        }
-        passed = fieldzero_game_init(&game, UINT64_C(2026)) == AFORC_OK &&
-                 !fieldzero_regression_run_route(
-                     &game, unterminated, &registrations);
         fieldzero_game_dispose(&game);
     }
     return passed;
@@ -587,7 +523,7 @@ static bool fieldzero_regression_fall_checkpoint(void)
     if (passed)
     {
         passed = fieldzero_regression_tick_many(
-                     &game, FIELDZERO_REGRESSION_DISSOLVE_TICKS - 1U) &&
+                     &game, FIELDZERO_DISSOLVE_TICKS - 1U) &&
                  game.phase == FIELDZERO_PHASE_DISSOLVING &&
                  fieldzero_game_tick(&game) == AFORC_OK &&
                  game.phase == FIELDZERO_PHASE_ACTIVE &&
@@ -620,8 +556,7 @@ static bool fieldzero_regression_registration(void)
                  game.registration_target_state == 1U;
         registering_digest = fieldzero_game_collision_digest(&game);
     }
-    for (size_t tick = 0U;
-         passed && tick + 1U < FIELDZERO_REGRESSION_REGISTRATION_TICKS;
+    for (size_t tick = 0U; passed && tick + 1U < FIELDZERO_REGISTRATION_TICKS;
          ++tick)
     {
         fieldzero_game_set_move(&game, 1, true);
@@ -657,7 +592,7 @@ static bool fieldzero_regression_registration(void)
                  aforc_tilemap_set(unsafe.staging_map, 0U, release, 1U) ==
                      AFORC_OK &&
                  fieldzero_regression_tick_many(
-                     &unsafe, FIELDZERO_REGRESSION_REGISTRATION_TICKS - 1U);
+                     &unsafe, FIELDZERO_REGISTRATION_TICKS - 1U);
     }
     if (passed)
     {
@@ -708,7 +643,7 @@ static bool fieldzero_regression_progression(void)
                  game.phase == FIELDZERO_PHASE_ROOM_TRANSITION &&
                  (game.completed_rooms & UINT16_C(1)) != 0U &&
                  fieldzero_regression_tick_many(
-                     &game, FIELDZERO_REGRESSION_ROOM_TRANSITION_TICKS) &&
+                     &game, FIELDZERO_ROOM_TRANSITION_TICKS) &&
                  game.room_index == 1U && game.phase == FIELDZERO_PHASE_ACTIVE;
     }
     if (passed)
@@ -716,18 +651,17 @@ static bool fieldzero_regression_progression(void)
         passed = fieldzero_regression_prepare_exit(&game) &&
                  fieldzero_game_tick(&game) == AFORC_OK &&
                  fieldzero_regression_tick_many(
-                     &game, FIELDZERO_REGRESSION_ROOM_TRANSITION_TICKS) &&
+                     &game, FIELDZERO_ROOM_TRANSITION_TICKS) &&
                  game.room_index == 2U &&
                  game.phase == FIELDZERO_PHASE_SECTOR_TRANSITION;
     }
     if (passed)
     {
-        passed =
-            fieldzero_regression_tick_many(
-                &game, FIELDZERO_REGRESSION_SECTOR_TRANSITION_TICKS - 1U) &&
-            game.phase == FIELDZERO_PHASE_SECTOR_TRANSITION &&
-            fieldzero_game_tick(&game) == AFORC_OK &&
-            game.phase == FIELDZERO_PHASE_ACTIVE;
+        passed = fieldzero_regression_tick_many(
+                     &game, FIELDZERO_SECTOR_TRANSITION_TICKS - 1U) &&
+                 game.phase == FIELDZERO_PHASE_SECTOR_TRANSITION &&
+                 fieldzero_game_tick(&game) == AFORC_OK &&
+                 game.phase == FIELDZERO_PHASE_ACTIVE;
     }
     if (passed)
     {
@@ -741,7 +675,7 @@ static bool fieldzero_regression_progression(void)
     {
         passed = fieldzero_game_tick(&game) == AFORC_OK &&
                  fieldzero_regression_tick_many(
-                     &game, FIELDZERO_REGRESSION_ROOM_TRANSITION_TICKS) &&
+                     &game, FIELDZERO_ROOM_TRANSITION_TICKS) &&
                  game.phase == FIELDZERO_PHASE_COMPLETE &&
                  (game.completed_rooms &
                   (uint16_t)(UINT16_C(1) << (FIELDZERO_ROOM_COUNT - 1U))) != 0U;

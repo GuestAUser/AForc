@@ -2,22 +2,10 @@
 
 #include <string.h>
 
-static int32_t game_fixed_to_cell(int32_t value)
-{
-    const int64_t wide = value;
-    const int64_t half = FIELDZERO_FIXED_ONE / 2;
-
-    if (wide >= 0)
-    {
-        return (int32_t)((wide + half) / FIELDZERO_FIXED_ONE);
-    }
-    return (int32_t)-((-wide + half) / FIELDZERO_FIXED_ONE);
-}
-
 static AFORC_Point game_player_cell(const FieldzeroGame *game)
 {
-    return (AFORC_Point){game_fixed_to_cell(game->player.x),
-                         game_fixed_to_cell(game->player.y)};
+    return (AFORC_Point){fieldzero_fixed_to_cell(game->player.x),
+                         fieldzero_fixed_to_cell(game->player.y)};
 }
 
 static uint16_t game_room_bit(uint8_t room_index)
@@ -66,14 +54,14 @@ static AFORC_Status game_tick_active_progression(FieldzeroGame *game)
         return AFORC_OK;
     }
     room_bit = game_room_bit(game->room_index);
-    if (game->room->has_memory && !game->memory_collected_here &&
+    if (fieldzero_room_has_memory(game->room) && !game->memory_collected_here &&
         aforc_world_point_equal(player_cell, game->room->memory))
     {
         game->collected_memories |= room_bit;
         game->memory_collected_here = true;
     }
     if (game->room_state < game->room->state_count - 1U &&
-        game->room_state < game->room->mark_count &&
+        game->room_state < fieldzero_room_mark_count(game->room) &&
         aforc_world_point_equal(player_cell,
                                 game->room->marks[game->room_state]))
     {

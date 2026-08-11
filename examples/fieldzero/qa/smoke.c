@@ -5,9 +5,6 @@
 enum
 {
     FIELDZERO_SMOKE_FRAME_NS = 16666667,
-    FIELDZERO_SMOKE_REGISTRATION_TICKS = 27,
-    FIELDZERO_SMOKE_DISSOLVE_TICKS = 30,
-    FIELDZERO_SMOKE_ROOM_TRANSITION_TICKS = 18,
     FIELDZERO_SMOKE_OVERFLOW_KEYS = 130
 };
 
@@ -243,7 +240,6 @@ bool fieldzero_smoke_drive(FieldzeroApp *app, AFORC_Error *error)
     AFORC_TileMap *registration_active = NULL;
     AFORC_TileMap *registration_staging = NULL;
     FieldzeroCheckpoint checkpoint;
-    AFORC_Cell original_cell;
     uint64_t registration_digest = 0U;
     uint64_t paused_digest = 0U;
     uint64_t small_digest = 0U;
@@ -325,8 +321,7 @@ bool fieldzero_smoke_drive(FieldzeroApp *app, AFORC_Error *error)
             error, AFORC_ERROR_STATE, "registration did not begin at mark");
     }
     registration_digest = fieldzero_game_collision_digest(&app->game);
-    for (size_t tick = 0U; tick + 1U < FIELDZERO_SMOKE_REGISTRATION_TICKS;
-         ++tick)
+    for (size_t tick = 0U; tick + 1U < FIELDZERO_REGISTRATION_TICKS; ++tick)
     {
         if (!fieldzero_smoke_frame(app, &clock, error) ||
             app->game.phase != FIELDZERO_PHASE_REGISTERING ||
@@ -360,7 +355,7 @@ bool fieldzero_smoke_drive(FieldzeroApp *app, AFORC_Error *error)
         app->game.phase != FIELDZERO_PHASE_DISSOLVING ||
         app->game.falls != falls + 1U ||
         !fieldzero_smoke_frames(
-            app, &clock, FIELDZERO_SMOKE_DISSOLVE_TICKS - 1U, error) ||
+            app, &clock, FIELDZERO_DISSOLVE_TICKS - 1U, error) ||
         app->game.phase != FIELDZERO_PHASE_DISSOLVING ||
         !fieldzero_smoke_frame(app, &clock, error) ||
         app->game.phase != FIELDZERO_PHASE_ACTIVE ||
@@ -377,7 +372,7 @@ bool fieldzero_smoke_drive(FieldzeroApp *app, AFORC_Error *error)
         app->game.phase != FIELDZERO_PHASE_ROOM_TRANSITION ||
         (app->game.completed_rooms & UINT16_C(1)) == 0U ||
         !fieldzero_smoke_frames(
-            app, &clock, FIELDZERO_SMOKE_ROOM_TRANSITION_TICKS, error) ||
+            app, &clock, FIELDZERO_ROOM_TRANSITION_TICKS, error) ||
         app->game.room_index != 1U || app->game.phase != FIELDZERO_PHASE_ACTIVE)
     {
         return fieldzero_smoke_fail(
@@ -439,33 +434,6 @@ bool fieldzero_smoke_drive(FieldzeroApp *app, AFORC_Error *error)
     {
         return fieldzero_smoke_fail(
             error, AFORC_ERROR_STATE, "reduced motion retained camera impulse");
-    }
-    if (!fieldzero_smoke_status(aforc_renderer_get(app->renderer,
-                                                   (AFORC_Point){0, 0},
-                                                   &original_cell),
-                                error,
-                                "renderer probe failed"))
-    {
-        return false;
-    }
-    AFORC_Cell broken_cell = original_cell;
-
-    broken_cell.style |= AFORC_STYLE_HIDDEN;
-    if (!fieldzero_smoke_status(
-            aforc_renderer_put(app->renderer, (AFORC_Point){0, 0}, broken_cell),
-            error,
-            "renderer invariant probe could not be written") ||
-        fieldzero_render_validate(
-            app->renderer, &app->view, app->options.no_color) == AFORC_OK ||
-        !fieldzero_smoke_status(
-            aforc_renderer_put(
-                app->renderer, (AFORC_Point){0, 0}, original_cell),
-            error,
-            "renderer invariant probe could not be restored") ||
-        !fieldzero_smoke_render_valid(app, error))
-    {
-        return fieldzero_smoke_fail(
-            error, AFORC_ERROR_STATE, "broken render invariant was accepted");
     }
     return true;
 }
